@@ -17,6 +17,6 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      # Add your deployment step here (e.g., Azure, Vercel, etc.)
+      # Add your deployment step here
       - name: Deploy to Production
-        run: echo "Deploying to production... (replace with real deployment command)"
+        run: echo "Deploying to production... (configure your deployment command)"

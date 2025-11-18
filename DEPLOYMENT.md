@@ -117,7 +117,7 @@ npm run dev
    ```bash
    npm run build
    ```
-2. Deploy to your hosting platform (Azure, AWS, etc.)
+2. Deploy to your hosting platform
 3. Ensure environment variables are set:
    - `DATABASE_URL`
    - `SESSION_SECRET`

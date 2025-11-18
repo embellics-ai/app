@@ -122,11 +122,11 @@ npm run db:push
 
 This application is **platform agnostic** and can be deployed to:
 
-- ✅ Azure App Service
-- ✅ AWS (EC2, ECS, Lambda)
+- ✅ Any cloud platform
 - ✅ DigitalOcean
 - ✅ Heroku
-- ✅ Vercel (with serverless adapter)
+- ✅ Railway
+- ✅ Render
 - ✅ Any VPS with Node.js
 
 ### Deployment Checklist
@@ -141,41 +141,14 @@ This application is **platform agnostic** and can be deployed to:
    - Run migrations: `npm run db:push`
 
 3. **Email Configuration**
-   - Verify your sending domain in Resend
-   - Update `RESEND_FROM_EMAIL`
+   - Configure your SMTP settings
+   - Update email from address
 
 4. **Build & Deploy**
    ```bash
    npm run build
    npm start
    ```
-
-### Azure Deployment Example
-
-```bash
-# Install Azure CLI
-az login
-
-# Create resource group
-az group create --name myResourceGroup --location eastus
-
-# Create App Service plan
-az appservice plan create --name myAppServicePlan --resource-group myResourceGroup --sku B1 --is-linux
-
-# Create web app
-az webapp create --resource-group myResourceGroup --plan myAppServicePlan --name myRetellApp --runtime "NODE:20-lts"
-
-# Configure environment variables
-az webapp config appsettings set --resource-group myResourceGroup --name myRetellApp --settings \
-  NODE_ENV=production \
-  PORT=8080 \
-  APP_URL=https://myretellapp.azurewebsites.net \
-  DATABASE_URL="your-connection-string" \
-  # ... add all other variables
-
-# Deploy
-az webapp deployment source config-zip --resource-group myResourceGroup --name myRetellApp --src ./build.zip
-```
 
 ## 🗃️ Database
 
@@ -185,9 +158,7 @@ az webapp deployment source config-zip --resource-group myResourceGroup --name m
 - Hosted options:
   - Neon (https://neon.tech)
   - Supabase (https://supabase.com)
-  - Azure Database for PostgreSQL
-  - AWS RDS
-  - DigitalOcean Managed Databases
+  - Any managed PostgreSQL service
 
 ### Migrations
 
@@ -312,4 +283,4 @@ For issues or questions, please open a GitHub issue.
 
 ---
 
-**Note**: This project is fully platform-agnostic and can be deployed on any cloud provider (Azure, AWS, GCP, etc.).
+**Note**: This project is fully platform-agnostic and can be deployed on any cloud provider.
