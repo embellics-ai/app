@@ -87,7 +87,8 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '3000', 10);
-  httpServer.listen(port, 'localhost', () => {
-    log(`serving on port ${port}`);
+  const host = process.env.HOST || '0.0.0.0'; // Bind to all interfaces in production
+  httpServer.listen(port, host, () => {
+    log(`serving on ${host}:${port}`);
   });
 })();

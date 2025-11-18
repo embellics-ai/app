@@ -91,10 +91,10 @@ export default function WidgetConfigPage() {
   useEffect(() => {
     if (config) {
       form.reset({
-        primaryColor: config.primaryColor,
-        position: config.position,
-        greeting: config.greeting,
-        placeholder: config.placeholder,
+        primaryColor: config.primaryColor || '#3b82f6',
+        position: (config.position as 'bottom-right' | 'bottom-left') || 'bottom-right',
+        greeting: config.greeting || 'Hi! How can I help you today?',
+        placeholder: config.placeholder || 'Type your message...',
         allowedDomains: config.allowedDomains?.join(', ') || '',
         customCss: config.customCss || '',
       });
