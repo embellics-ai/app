@@ -35,12 +35,12 @@ import {
   humanAgents,
   userInvitations,
   passwordResetTokens,
-} from "@shared/schema";
-import { randomUUID } from "crypto";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import { eq, desc, and, or, gte, lte, gt, sql } from "drizzle-orm";
-import { encryptApiKey, decryptApiKey } from "./encryption";
+} from '@shared/schema';
+import { randomUUID } from 'crypto';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { eq, desc, and, or, gte, lte, gt, sql } from 'drizzle-orm';
+import { encryptApiKey, decryptApiKey } from './encryption';
 
 export interface IStorage {
   // Legacy User methods (keeping for backward compatibility)
@@ -77,14 +77,21 @@ export interface IStorage {
   // Widget Config methods
   getWidgetConfig(tenantId: string): Promise<WidgetConfig | undefined>;
   createWidgetConfig(config: InsertWidgetConfig): Promise<WidgetConfig>;
-  updateWidgetConfig(tenantId: string, updates: Partial<InsertWidgetConfig>): Promise<WidgetConfig | undefined>;
+  updateWidgetConfig(
+    tenantId: string,
+    updates: Partial<InsertWidgetConfig>,
+  ): Promise<WidgetConfig | undefined>;
 
   // Human Agent methods
   getHumanAgent(id: string): Promise<HumanAgent | undefined>;
   getHumanAgentsByTenant(tenantId: string): Promise<HumanAgent[]>;
   getAvailableHumanAgents(tenantId: string): Promise<HumanAgent[]>;
   createHumanAgent(agent: InsertHumanAgent, tenantId: string): Promise<HumanAgent>;
-  updateHumanAgent(id: string, updates: Partial<InsertHumanAgent>, tenantId: string): Promise<HumanAgent | undefined>;
+  updateHumanAgent(
+    id: string,
+    updates: Partial<InsertHumanAgent>,
+    tenantId: string,
+  ): Promise<HumanAgent | undefined>;
   updateHumanAgentStatus(id: string, status: string, tenantId: string): Promise<void>;
   incrementActiveChats(id: string, tenantId: string): Promise<void>;
   decrementActiveChats(id: string, tenantId: string): Promise<void>;
@@ -103,12 +110,12 @@ export interface IStorage {
   updateConversation(
     id: string,
     updates: Partial<InsertConversation>,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation | undefined>;
   updateConversationMetadata(
     id: string,
     metadata: Record<string, any>,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation | undefined>;
   deleteConversation(id: string, tenantId: string): Promise<void>;
 
@@ -130,10 +137,14 @@ export interface IStorage {
   deleteInvitation(id: string): Promise<void>;
   cleanupExpiredInvitationPasswords(): Promise<number>; // Null out plaintext passwords for expired/accepted invitations
 
-  // Platform Admin methods  
+  // Platform Admin methods
   getAllUsers(): Promise<ClientUser[]>; // Get all users across all tenants (platform admin only)
   getPlatformAdmins(): Promise<ClientUser[]>; // Get all platform admins
-  updateUserRole(userId: string, role: string, isPlatformAdmin: boolean): Promise<ClientUser | undefined>;
+  updateUserRole(
+    userId: string,
+    role: string,
+    isPlatformAdmin: boolean,
+  ): Promise<ClientUser | undefined>;
 
   // Password Reset Token methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -179,9 +190,7 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    return Array.from(this.users.values()).find((user) => user.username === username);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -202,7 +211,7 @@ export class MemStorage implements IStorage {
 
   async getAllTenants(): Promise<Tenant[]> {
     return Array.from(this.tenants.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }
 
@@ -210,7 +219,11 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const tenant: Tenant = {
       id,
-      ...insertTenant,
+      name: insertTenant.name,
+      email: insertTenant.email,
+      phone: insertTenant.phone ?? null,
+      plan: insertTenant.plan ?? 'free',
+      status: insertTenant.status ?? 'active',
       createdAt: new Date(),
     };
     this.tenants.set(id, tenant);
@@ -246,14 +259,26 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const user: ClientUser = {
       id,
-      ...insertUser,
+      password: insertUser.password,
+      email: insertUser.email,
       createdAt: new Date(),
+      tenantId: insertUser.tenantId ?? null,
+      firstName: insertUser.firstName ?? null,
+      lastName: insertUser.lastName ?? null,
+      phoneNumber: insertUser.phoneNumber ?? null,
+      isPlatformAdmin: insertUser.isPlatformAdmin ?? false,
+      role: insertUser.role ?? 'client_admin',
+      mustChangePassword: insertUser.mustChangePassword ?? false,
+      onboardingCompleted: insertUser.onboardingCompleted ?? false,
     };
     this.clientUsers.set(id, user);
     return user;
   }
 
-  async updateClientUser(id: string, updates: Partial<InsertClientUser>): Promise<ClientUser | undefined> {
+  async updateClientUser(
+    id: string,
+    updates: Partial<InsertClientUser>,
+  ): Promise<ClientUser | undefined> {
     const user = this.clientUsers.get(id);
     if (!user) return undefined;
     const updated = { ...user, ...updates };
@@ -298,8 +323,13 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const apiKey: ApiKey = {
       id,
-      ...insertApiKey,
+      name: insertApiKey.name ?? null,
       createdAt: new Date(),
+      tenantId: insertApiKey.tenantId,
+      keyHash: insertApiKey.keyHash,
+      keyPrefix: insertApiKey.keyPrefix,
+      lastUsed: insertApiKey.lastUsed ?? null,
+      expiresAt: insertApiKey.expiresAt ?? null,
     };
     this.apiKeys.set(id, apiKey);
     return apiKey;
@@ -324,7 +354,7 @@ export class MemStorage implements IStorage {
   async getWidgetConfig(tenantId: string): Promise<WidgetConfig | undefined> {
     const config = Array.from(this.widgetConfigs.values()).find((c) => c.tenantId === tenantId);
     if (!config) return undefined;
-    
+
     // Decrypt the Retell API key if it exists
     if (config.retellApiKey) {
       try {
@@ -333,30 +363,38 @@ export class MemStorage implements IStorage {
           retellApiKey: decryptApiKey(config.retellApiKey),
         };
       } catch (error) {
-        console.error("Error decrypting Retell API key:", error);
+        console.error('Error decrypting Retell API key:', error);
         return config;
       }
     }
-    
+
     return config;
   }
 
   async createWidgetConfig(insertConfig: InsertWidgetConfig): Promise<WidgetConfig> {
     const id = randomUUID();
-    
+
     // Encrypt the Retell API key if provided
     const encryptedConfig = { ...insertConfig };
     if (insertConfig.retellApiKey) {
       encryptedConfig.retellApiKey = encryptApiKey(insertConfig.retellApiKey);
     }
-    
+
     const config: WidgetConfig = {
       id,
-      ...encryptedConfig,
+      tenantId: encryptedConfig.tenantId,
+      retellAgentId: encryptedConfig.retellAgentId ?? null,
+      retellApiKey: encryptedConfig.retellApiKey ?? null,
+      primaryColor: encryptedConfig.primaryColor ?? null,
+      position: encryptedConfig.position ?? null,
+      greeting: encryptedConfig.greeting ?? null,
+      placeholder: encryptedConfig.placeholder ?? null,
+      allowedDomains: encryptedConfig.allowedDomains ?? null,
+      customCss: encryptedConfig.customCss ?? null,
       updatedAt: new Date(),
     };
     this.widgetConfigs.set(id, config);
-    
+
     // Return with decrypted API key for immediate use
     return {
       ...config,
@@ -364,19 +402,22 @@ export class MemStorage implements IStorage {
     };
   }
 
-  async updateWidgetConfig(tenantId: string, updates: Partial<InsertWidgetConfig>): Promise<WidgetConfig | undefined> {
+  async updateWidgetConfig(
+    tenantId: string,
+    updates: Partial<InsertWidgetConfig>,
+  ): Promise<WidgetConfig | undefined> {
     const config = await this.getWidgetConfig(tenantId);
     if (!config) return undefined;
-    
+
     // Encrypt the Retell API key if being updated
     const encryptedUpdates = { ...updates };
     if (updates.retellApiKey) {
       encryptedUpdates.retellApiKey = encryptApiKey(updates.retellApiKey);
     }
-    
+
     const updated = { ...config, ...encryptedUpdates, updatedAt: new Date() };
     this.widgetConfigs.set(config.id, updated);
-    
+
     // Return with decrypted API key for immediate use
     if (updated.retellApiKey) {
       try {
@@ -385,11 +426,11 @@ export class MemStorage implements IStorage {
           retellApiKey: decryptApiKey(updated.retellApiKey),
         };
       } catch (error) {
-        console.error("Error decrypting Retell API key:", error);
+        console.error('Error decrypting Retell API key:', error);
         return updated;
       }
     }
-    
+
     return updated;
   }
 
@@ -406,10 +447,11 @@ export class MemStorage implements IStorage {
 
   async getAvailableHumanAgents(tenantId: string): Promise<HumanAgent[]> {
     return Array.from(this.humanAgents.values())
-      .filter((agent) => 
-        agent.tenantId === tenantId && 
-        agent.status === "available" && 
-        agent.activeChats < agent.maxChats
+      .filter(
+        (agent) =>
+          agent.tenantId === tenantId &&
+          agent.status === 'available' &&
+          agent.activeChats < agent.maxChats,
       )
       .sort((a, b) => a.activeChats - b.activeChats);
   }
@@ -420,7 +462,7 @@ export class MemStorage implements IStorage {
       id,
       ...insertAgent,
       tenantId,
-      status: insertAgent.status ?? "available",
+      status: insertAgent.status ?? 'available',
       activeChats: 0,
       maxChats: insertAgent.maxChats ?? 5,
       createdAt: new Date(),
@@ -430,13 +472,13 @@ export class MemStorage implements IStorage {
   }
 
   async updateHumanAgent(
-    id: string, 
-    updates: Partial<InsertHumanAgent>, 
-    tenantId: string
+    id: string,
+    updates: Partial<InsertHumanAgent>,
+    tenantId: string,
   ): Promise<HumanAgent | undefined> {
     const agent = this.humanAgents.get(id);
     if (!agent || agent.tenantId !== tenantId) return undefined;
-    
+
     const updated = { ...agent, ...updates };
     this.humanAgents.set(id, updated);
     return updated;
@@ -445,7 +487,7 @@ export class MemStorage implements IStorage {
   async updateHumanAgentStatus(id: string, status: string, tenantId: string): Promise<void> {
     const agent = this.humanAgents.get(id);
     if (!agent || agent.tenantId !== tenantId) return;
-    
+
     agent.status = status;
     this.humanAgents.set(id, agent);
   }
@@ -453,7 +495,7 @@ export class MemStorage implements IStorage {
   async incrementActiveChats(id: string, tenantId: string): Promise<void> {
     const agent = this.humanAgents.get(id);
     if (!agent || agent.tenantId !== tenantId) return;
-    
+
     agent.activeChats += 1;
     this.humanAgents.set(id, agent);
   }
@@ -461,7 +503,7 @@ export class MemStorage implements IStorage {
   async decrementActiveChats(id: string, tenantId: string): Promise<void> {
     const agent = this.humanAgents.get(id);
     if (!agent || agent.tenantId !== tenantId) return;
-    
+
     if (agent.activeChats > 0) {
       agent.activeChats -= 1;
       this.humanAgents.set(id, agent);
@@ -475,10 +517,7 @@ export class MemStorage implements IStorage {
       .filter((message) => {
         return message.conversationId === conversationId && message.tenantId === tenantId;
       })
-      .sort(
-        (a, b) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }
 
   async createMessage(insertMessage: InsertMessage, tenantId: string): Promise<Message> {
@@ -487,7 +526,7 @@ export class MemStorage implements IStorage {
       ...insertMessage,
       id,
       tenantId, // Server-injected for security
-      senderType: insertMessage.senderType ?? "user",
+      senderType: insertMessage.senderType ?? 'user',
       humanAgentId: insertMessage.humanAgentId ?? null,
       timestamp: new Date(),
     };
@@ -519,19 +558,19 @@ export class MemStorage implements IStorage {
 
   async getActiveHandoffs(tenantId: string): Promise<Conversation[]> {
     return Array.from(this.conversations.values())
-      .filter((c) => c.tenantId === tenantId && c.handoffStatus === "with_human")
+      .filter((c) => c.tenantId === tenantId && c.handoffStatus === 'with_human')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async getPendingHandoffs(tenantId: string): Promise<Conversation[]> {
     return Array.from(this.conversations.values())
-      .filter((c) => c.tenantId === tenantId && c.handoffStatus === "pending_handoff")
+      .filter((c) => c.tenantId === tenantId && c.handoffStatus === 'pending_handoff')
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async createConversation(
     insertConversation: InsertConversation,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation> {
     const id = randomUUID();
     const conversation: Conversation = {
@@ -542,7 +581,7 @@ export class MemStorage implements IStorage {
       agentId: insertConversation.agentId ?? null,
       endUserId: insertConversation.endUserId ?? null,
       metadata: insertConversation.metadata ?? null,
-      handoffStatus: insertConversation.handoffStatus ?? "ai",
+      handoffStatus: insertConversation.handoffStatus ?? 'ai',
       humanAgentId: insertConversation.humanAgentId ?? null,
       conversationSummary: insertConversation.conversationSummary ?? null,
       handoffTimestamp: insertConversation.handoffTimestamp ?? null,
@@ -556,7 +595,7 @@ export class MemStorage implements IStorage {
   async updateConversation(
     id: string,
     updates: Partial<InsertConversation>,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation | undefined> {
     const conversation = this.conversations.get(id);
     if (!conversation) return undefined;
@@ -572,7 +611,7 @@ export class MemStorage implements IStorage {
   async updateConversationMetadata(
     id: string,
     metadata: Record<string, any>,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation | undefined> {
     const conversation = this.conversations.get(id);
     if (!conversation) return undefined;
@@ -582,7 +621,7 @@ export class MemStorage implements IStorage {
     // Only update metadata, don't allow other fields to be modified
     const updated = {
       ...conversation,
-      metadata: { ...conversation.metadata, ...metadata },
+      metadata: { ...(conversation.metadata ?? {}), ...(metadata ?? {}) },
     };
     this.conversations.set(id, updated);
     return updated;
@@ -605,14 +644,21 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const event: AnalyticsEvent = {
       id,
-      ...insertEvent,
+      tenantId: insertEvent.tenantId,
+      conversationId: insertEvent.conversationId ?? null,
+      eventType: insertEvent.eventType,
+      eventData: insertEvent.eventData ?? null,
       timestamp: new Date(),
     };
     this.analyticsEvents.set(id, event);
     return event;
   }
 
-  async getAnalyticsEvents(tenantId: string, startDate: Date, endDate: Date): Promise<AnalyticsEvent[]> {
+  async getAnalyticsEvents(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<AnalyticsEvent[]> {
     return Array.from(this.analyticsEvents.values())
       .filter((e) => {
         const matchesTenant = e.tenantId === tenantId;
@@ -622,7 +668,11 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }
 
-  async getDailyAnalytics(tenantId: string, startDate: Date, endDate: Date): Promise<DailyAnalytics[]> {
+  async getDailyAnalytics(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<DailyAnalytics[]> {
     return Array.from(this.dailyAnalytics.values())
       .filter((a) => {
         const matchesTenant = a.tenantId === tenantId;
@@ -632,11 +682,14 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }
 
-  async createOrUpdateDailyAnalytics(insertAnalytics: InsertDailyAnalytics): Promise<DailyAnalytics> {
+  async createOrUpdateDailyAnalytics(
+    insertAnalytics: InsertDailyAnalytics,
+  ): Promise<DailyAnalytics> {
     // Find existing analytics for this tenant and date
     const existing = Array.from(this.dailyAnalytics.values()).find(
-      (a) => a.tenantId === insertAnalytics.tenantId && 
-             a.date.toDateString() === insertAnalytics.date.toDateString()
+      (a) =>
+        a.tenantId === insertAnalytics.tenantId &&
+        a.date.toDateString() === insertAnalytics.date.toDateString(),
     );
 
     if (existing) {
@@ -645,7 +698,16 @@ export class MemStorage implements IStorage {
       return updated;
     } else {
       const id = randomUUID();
-      const analytics: DailyAnalytics = { id, ...insertAnalytics };
+      const analytics: DailyAnalytics = {
+        id,
+        date: insertAnalytics.date,
+        tenantId: insertAnalytics.tenantId,
+        conversationCount: insertAnalytics.conversationCount ?? 0,
+        messageCount: insertAnalytics.messageCount ?? 0,
+        uniqueUsers: insertAnalytics.uniqueUsers ?? 0,
+        avgInteractions: insertAnalytics.avgInteractions ?? 0,
+        bookingActions: insertAnalytics.bookingActions ?? 0,
+      };
       this.dailyAnalytics.set(id, analytics);
       return analytics;
     }
@@ -669,7 +731,6 @@ export class MemStorage implements IStorage {
       status: insertInvitation.status ?? 'pending',
       companyName: insertInvitation.companyName ?? null,
       companyPhone: insertInvitation.companyPhone ?? null,
-      retellApiKey: insertInvitation.retellApiKey ?? null,
       plainTemporaryPassword: insertInvitation.plainTemporaryPassword ?? null,
       lastSentAt: insertInvitation.lastSentAt ?? null,
       invitedUserId: insertInvitation.invitedUserId ?? null,
@@ -686,9 +747,10 @@ export class MemStorage implements IStorage {
   async getPendingInvitationByEmail(email: string): Promise<UserInvitation | undefined> {
     const now = new Date();
     return Array.from(this.userInvitations.values()).find(
-      (inv) => inv.email === email && 
-               (inv.status === 'pending' || inv.status === 'sent') && 
-               inv.expiresAt > now
+      (inv) =>
+        inv.email === email &&
+        (inv.status === 'pending' || inv.status === 'sent') &&
+        inv.expiresAt > now,
     );
   }
 
@@ -709,10 +771,7 @@ export class MemStorage implements IStorage {
   async getPendingInvitations(): Promise<UserInvitation[]> {
     const now = new Date();
     return Array.from(this.userInvitations.values())
-      .filter((inv) => 
-        (inv.status === 'pending' || inv.status === 'sent') && 
-        inv.expiresAt > now
-      )
+      .filter((inv) => (inv.status === 'pending' || inv.status === 'sent') && inv.expiresAt > now)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
@@ -757,16 +816,16 @@ export class MemStorage implements IStorage {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     let cleanedCount = 0;
 
-    for (const [id, invitation] of this.userInvitations.entries()) {
+    for (const [id, invitation] of Array.from(this.userInvitations.entries())) {
       // Null out plaintext password if:
       // 1. Invitation is expired (past expiresAt date) OR
       // 2. Invitation is accepted (status === 'accepted') OR
       // 3. Invitation is older than 7 days AND still has plaintext password
-      const shouldCleanup = invitation.plainTemporaryPassword !== null && (
-        invitation.expiresAt < now ||
-        invitation.status === 'accepted' ||
-        invitation.createdAt < sevenDaysAgo
-      );
+      const shouldCleanup =
+        invitation.plainTemporaryPassword !== null &&
+        (invitation.expiresAt < now ||
+          invitation.status === 'accepted' ||
+          invitation.createdAt < sevenDaysAgo);
 
       if (shouldCleanup) {
         invitation.plainTemporaryPassword = null;
@@ -783,7 +842,10 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newToken: PasswordResetToken = {
       id,
-      ...token,
+      userId: token.userId,
+      token: token.token,
+      expiresAt: token.expiresAt,
+      used: token.used ?? false,
       createdAt: new Date(),
     };
     // For MemStorage, use a Map to store tokens (in real DB, this would be a table)
@@ -797,7 +859,7 @@ export class MemStorage implements IStorage {
   async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
     if (!this.passwordResetTokens) return undefined;
     return Array.from(this.passwordResetTokens.values()).find(
-      (t) => t.token === token && !t.used && t.expiresAt > new Date()
+      (t) => t.token === token && !t.used && t.expiresAt > new Date(),
     );
   }
 
@@ -805,7 +867,7 @@ export class MemStorage implements IStorage {
     if (!this.passwordResetTokens) return [];
     const now = new Date();
     return Array.from(this.passwordResetTokens.values()).filter(
-      (t) => !t.used && t.expiresAt > now
+      (t) => !t.used && t.expiresAt > now,
     );
   }
 
@@ -831,7 +893,7 @@ export class MemStorage implements IStorage {
     if (!this.passwordResetTokens) return 0;
     const now = new Date();
     let cleanedCount = 0;
-    for (const [id, token] of this.passwordResetTokens.entries()) {
+    for (const [id, token] of Array.from(this.passwordResetTokens.entries())) {
       if (token.used || token.expiresAt < now) {
         this.passwordResetTokens.delete(id);
         cleanedCount++;
@@ -843,7 +905,7 @@ export class MemStorage implements IStorage {
   // Platform Admin methods
   async getAllUsers(): Promise<ClientUser[]> {
     return Array.from(this.clientUsers.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }
 
@@ -853,7 +915,11 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  async updateUserRole(userId: string, role: string, isPlatformAdmin: boolean): Promise<ClientUser | undefined> {
+  async updateUserRole(
+    userId: string,
+    role: string,
+    isPlatformAdmin: boolean,
+  ): Promise<ClientUser | undefined> {
     const user = this.clientUsers.get(userId);
     if (!user) return undefined;
     const updated = { ...user, role, isPlatformAdmin };
@@ -868,17 +934,15 @@ export class DbStorage implements IStorage {
 
   constructor() {
     if (!process.env.DATABASE_URL) {
-      throw new Error(
-        "DATABASE_URL environment variable is required for database storage"
-      );
+      throw new Error('DATABASE_URL environment variable is required for database storage');
     }
-    
+
     try {
       const sql = neon(process.env.DATABASE_URL);
       this.db = drizzle(sql);
     } catch (error) {
-      console.error("Failed to initialize database connection:", error);
-      throw new Error("Database initialization failed");
+      console.error('Failed to initialize database connection:', error);
+      throw new Error('Database initialization failed');
     }
   }
 
@@ -889,18 +953,12 @@ export class DbStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.username, username));
+    const result = await this.db.select().from(users).where(eq(users.username, username));
     return result[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await this.db
-      .insert(users)
-      .values(insertUser)
-      .returning();
+    const result = await this.db.insert(users).values(insertUser).returning();
     return result[0];
   }
 
@@ -911,76 +969,52 @@ export class DbStorage implements IStorage {
   }
 
   async getTenantByEmail(email: string): Promise<Tenant | undefined> {
-    const result = await this.db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.email, email));
+    const result = await this.db.select().from(tenants).where(eq(tenants.email, email));
     return result[0];
   }
 
   async getAllTenants(): Promise<Tenant[]> {
-    return await this.db
-      .select()
-      .from(tenants)
-      .orderBy(desc(tenants.createdAt));
+    return await this.db.select().from(tenants).orderBy(desc(tenants.createdAt));
   }
 
   async createTenant(insertTenant: InsertTenant): Promise<Tenant> {
-    const result = await this.db
-      .insert(tenants)
-      .values(insertTenant)
-      .returning();
+    const result = await this.db.insert(tenants).values(insertTenant).returning();
     return result[0];
   }
 
   async updateTenant(id: string, updates: Partial<InsertTenant>): Promise<Tenant | undefined> {
-    const result = await this.db
-      .update(tenants)
-      .set(updates)
-      .where(eq(tenants.id, id))
-      .returning();
+    const result = await this.db.update(tenants).set(updates).where(eq(tenants.id, id)).returning();
     return result[0];
   }
 
   async deleteTenant(id: string): Promise<void> {
-    await this.db
-      .delete(tenants)
-      .where(eq(tenants.id, id));
+    await this.db.delete(tenants).where(eq(tenants.id, id));
   }
 
   // Client User methods
   async getClientUser(id: string): Promise<ClientUser | undefined> {
-    const result = await this.db
-      .select()
-      .from(clientUsers)
-      .where(eq(clientUsers.id, id));
+    const result = await this.db.select().from(clientUsers).where(eq(clientUsers.id, id));
     return result[0];
   }
 
   async getClientUserByEmail(email: string): Promise<ClientUser | undefined> {
-    const result = await this.db
-      .select()
-      .from(clientUsers)
-      .where(eq(clientUsers.email, email));
+    const result = await this.db.select().from(clientUsers).where(eq(clientUsers.email, email));
     return result[0];
   }
 
   async getClientUsersByTenant(tenantId: string): Promise<ClientUser[]> {
-    return await this.db
-      .select()
-      .from(clientUsers)
-      .where(eq(clientUsers.tenantId, tenantId));
+    return await this.db.select().from(clientUsers).where(eq(clientUsers.tenantId, tenantId));
   }
 
   async createClientUser(insertUser: InsertClientUser): Promise<ClientUser> {
-    const result = await this.db
-      .insert(clientUsers)
-      .values(insertUser)
-      .returning();
+    const result = await this.db.insert(clientUsers).values(insertUser).returning();
     return result[0];
   }
 
-  async updateClientUser(id: string, updates: Partial<InsertClientUser>): Promise<ClientUser | undefined> {
+  async updateClientUser(
+    id: string,
+    updates: Partial<InsertClientUser>,
+  ): Promise<ClientUser | undefined> {
     const result = await this.db
       .update(clientUsers)
       .set(updates)
@@ -990,9 +1024,7 @@ export class DbStorage implements IStorage {
   }
 
   async deleteClientUser(id: string): Promise<void> {
-    await this.db
-      .delete(clientUsers)
-      .where(eq(clientUsers.id, id));
+    await this.db.delete(clientUsers).where(eq(clientUsers.id, id));
   }
 
   async updateClientUserPassword(id: string, hashedPassword: string): Promise<void> {
@@ -1011,41 +1043,26 @@ export class DbStorage implements IStorage {
 
   // API Key methods
   async getApiKey(id: string): Promise<ApiKey | undefined> {
-    const result = await this.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.id, id));
+    const result = await this.db.select().from(apiKeys).where(eq(apiKeys.id, id));
     return result[0];
   }
 
   async getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
-    const result = await this.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.keyHash, keyHash));
+    const result = await this.db.select().from(apiKeys).where(eq(apiKeys.keyHash, keyHash));
     return result[0];
   }
 
   async getApiKeysByTenant(tenantId: string): Promise<ApiKey[]> {
-    return await this.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.tenantId, tenantId));
+    return await this.db.select().from(apiKeys).where(eq(apiKeys.tenantId, tenantId));
   }
 
   async createApiKey(insertApiKey: InsertApiKey): Promise<ApiKey> {
-    const result = await this.db
-      .insert(apiKeys)
-      .values(insertApiKey)
-      .returning();
+    const result = await this.db.insert(apiKeys).values(insertApiKey).returning();
     return result[0];
   }
 
   async updateApiKeyLastUsed(id: string): Promise<void> {
-    await this.db
-      .update(apiKeys)
-      .set({ lastUsed: new Date() })
-      .where(eq(apiKeys.id, id));
+    await this.db.update(apiKeys).set({ lastUsed: new Date() }).where(eq(apiKeys.id, id));
   }
 
   async deleteApiKey(id: string): Promise<void> {
@@ -1058,10 +1075,10 @@ export class DbStorage implements IStorage {
       .select()
       .from(widgetConfigs)
       .where(eq(widgetConfigs.tenantId, tenantId));
-    
+
     const config = result[0];
     if (!config) return undefined;
-    
+
     // Decrypt the Retell API key if it exists
     if (config.retellApiKey) {
       try {
@@ -1070,11 +1087,11 @@ export class DbStorage implements IStorage {
           retellApiKey: decryptApiKey(config.retellApiKey),
         };
       } catch (error) {
-        console.error("Error decrypting Retell API key:", error);
+        console.error('Error decrypting Retell API key:', error);
         return config;
       }
     }
-    
+
     return config;
   }
 
@@ -1084,14 +1101,11 @@ export class DbStorage implements IStorage {
     if (insertConfig.retellApiKey) {
       configToInsert.retellApiKey = encryptApiKey(insertConfig.retellApiKey);
     }
-    
-    const result = await this.db
-      .insert(widgetConfigs)
-      .values(configToInsert)
-      .returning();
-    
+
+    const result = await this.db.insert(widgetConfigs).values(configToInsert).returning();
+
     const config = result[0];
-    
+
     // Decrypt the API key for immediate use
     if (config.retellApiKey) {
       try {
@@ -1100,30 +1114,33 @@ export class DbStorage implements IStorage {
           retellApiKey: decryptApiKey(config.retellApiKey),
         };
       } catch (error) {
-        console.error("Error decrypting Retell API key:", error);
+        console.error('Error decrypting Retell API key:', error);
         return config;
       }
     }
-    
+
     return config;
   }
 
-  async updateWidgetConfig(tenantId: string, updates: Partial<InsertWidgetConfig>): Promise<WidgetConfig | undefined> {
+  async updateWidgetConfig(
+    tenantId: string,
+    updates: Partial<InsertWidgetConfig>,
+  ): Promise<WidgetConfig | undefined> {
     // Encrypt the Retell API key if being updated
     const updatesToApply = { ...updates };
     if (updates.retellApiKey) {
       updatesToApply.retellApiKey = encryptApiKey(updates.retellApiKey);
     }
-    
+
     const result = await this.db
       .update(widgetConfigs)
       .set({ ...updatesToApply, updatedAt: new Date() })
       .where(eq(widgetConfigs.tenantId, tenantId))
       .returning();
-    
+
     const config = result[0];
     if (!config) return undefined;
-    
+
     // Decrypt the API key for immediate use
     if (config.retellApiKey) {
       try {
@@ -1132,20 +1149,17 @@ export class DbStorage implements IStorage {
           retellApiKey: decryptApiKey(config.retellApiKey),
         };
       } catch (error) {
-        console.error("Error decrypting Retell API key:", error);
+        console.error('Error decrypting Retell API key:', error);
         return config;
       }
     }
-    
+
     return config;
   }
 
   // Human Agent methods
   async getHumanAgent(id: string): Promise<HumanAgent | undefined> {
-    const result = await this.db
-      .select()
-      .from(humanAgents)
-      .where(eq(humanAgents.id, id));
+    const result = await this.db.select().from(humanAgents).where(eq(humanAgents.id, id));
     return result[0];
   }
 
@@ -1161,11 +1175,13 @@ export class DbStorage implements IStorage {
     const result = await this.db
       .select()
       .from(humanAgents)
-      .where(and(
-        eq(humanAgents.tenantId, tenantId),
-        eq(humanAgents.status, "available"),
-        sql`${humanAgents.activeChats} < ${humanAgents.maxChats}`
-      ))
+      .where(
+        and(
+          eq(humanAgents.tenantId, tenantId),
+          eq(humanAgents.status, 'available'),
+          sql`${humanAgents.activeChats} < ${humanAgents.maxChats}`,
+        ),
+      )
       .orderBy(humanAgents.activeChats);
     return result;
   }
@@ -1182,17 +1198,14 @@ export class DbStorage implements IStorage {
   }
 
   async updateHumanAgent(
-    id: string, 
-    updates: Partial<InsertHumanAgent>, 
-    tenantId: string
+    id: string,
+    updates: Partial<InsertHumanAgent>,
+    tenantId: string,
   ): Promise<HumanAgent | undefined> {
     const result = await this.db
       .update(humanAgents)
       .set(updates)
-      .where(and(
-        eq(humanAgents.id, id),
-        eq(humanAgents.tenantId, tenantId)
-      ))
+      .where(and(eq(humanAgents.id, id), eq(humanAgents.tenantId, tenantId)))
       .returning();
     return result[0];
   }
@@ -1201,30 +1214,21 @@ export class DbStorage implements IStorage {
     await this.db
       .update(humanAgents)
       .set({ status })
-      .where(and(
-        eq(humanAgents.id, id),
-        eq(humanAgents.tenantId, tenantId)
-      ));
+      .where(and(eq(humanAgents.id, id), eq(humanAgents.tenantId, tenantId)));
   }
 
   async incrementActiveChats(id: string, tenantId: string): Promise<void> {
     await this.db
       .update(humanAgents)
       .set({ activeChats: sql`${humanAgents.activeChats} + 1` })
-      .where(and(
-        eq(humanAgents.id, id),
-        eq(humanAgents.tenantId, tenantId)
-      ));
+      .where(and(eq(humanAgents.id, id), eq(humanAgents.tenantId, tenantId)));
   }
 
   async decrementActiveChats(id: string, tenantId: string): Promise<void> {
     await this.db
       .update(humanAgents)
       .set({ activeChats: sql`GREATEST(${humanAgents.activeChats} - 1, 0)` })
-      .where(and(
-        eq(humanAgents.id, id),
-        eq(humanAgents.tenantId, tenantId)
-      ));
+      .where(and(eq(humanAgents.id, id), eq(humanAgents.tenantId, tenantId)));
   }
 
   // Message methods (tenant-scoped) - tenantId is REQUIRED
@@ -1233,17 +1237,14 @@ export class DbStorage implements IStorage {
     return await this.db
       .select()
       .from(messages)
-      .where(and(
-        eq(messages.conversationId, conversationId),
-        eq(messages.tenantId, tenantId)
-      ))
+      .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
       .orderBy(messages.timestamp);
   }
 
   async createMessage(insertMessage: InsertMessage, tenantId: string): Promise<Message> {
     // Defensively require tenantId for multi-tenant isolation
     if (!tenantId || tenantId.trim() === '') {
-      throw new Error("tenantId is required and must not be empty for creating messages");
+      throw new Error('tenantId is required and must not be empty for creating messages');
     }
 
     const result = await this.db
@@ -1258,10 +1259,7 @@ export class DbStorage implements IStorage {
 
   async deleteMessage(id: string, tenantId: string): Promise<void> {
     // ALWAYS filter by both id AND tenantId for security
-    await this.db.delete(messages).where(and(
-      eq(messages.id, id),
-      eq(messages.tenantId, tenantId)
-    ));
+    await this.db.delete(messages).where(and(eq(messages.id, id), eq(messages.tenantId, tenantId)));
   }
 
   // Conversation methods (tenant-scoped) - tenantId is REQUIRED
@@ -1270,10 +1268,7 @@ export class DbStorage implements IStorage {
     const result = await this.db
       .select()
       .from(conversations)
-      .where(and(
-        eq(conversations.id, id),
-        eq(conversations.tenantId, tenantId)
-      ));
+      .where(and(eq(conversations.id, id), eq(conversations.tenantId, tenantId)));
     return result[0];
   }
 
@@ -1289,10 +1284,9 @@ export class DbStorage implements IStorage {
     return await this.db
       .select()
       .from(conversations)
-      .where(and(
-        eq(conversations.tenantId, tenantId),
-        eq(conversations.handoffStatus, "with_human")
-      ))
+      .where(
+        and(eq(conversations.tenantId, tenantId), eq(conversations.handoffStatus, 'with_human')),
+      )
       .orderBy(desc(conversations.createdAt));
   }
 
@@ -1300,20 +1294,22 @@ export class DbStorage implements IStorage {
     return await this.db
       .select()
       .from(conversations)
-      .where(and(
-        eq(conversations.tenantId, tenantId),
-        eq(conversations.handoffStatus, "pending_handoff")
-      ))
+      .where(
+        and(
+          eq(conversations.tenantId, tenantId),
+          eq(conversations.handoffStatus, 'pending_handoff'),
+        ),
+      )
       .orderBy(desc(conversations.createdAt));
   }
 
   async createConversation(
     insertConversation: InsertConversation,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation> {
     // Defensively require tenantId for multi-tenant isolation
     if (!tenantId || tenantId.trim() === '') {
-      throw new Error("tenantId is required and must not be empty for creating conversations");
+      throw new Error('tenantId is required and must not be empty for creating conversations');
     }
 
     const result = await this.db
@@ -1329,17 +1325,14 @@ export class DbStorage implements IStorage {
   async updateConversation(
     id: string,
     updates: Partial<InsertConversation>,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation | undefined> {
     // ALWAYS filter by both id AND tenantId for security
     // (tenantId is already not in InsertConversation schema, so no need to filter it out)
     const result = await this.db
       .update(conversations)
       .set(updates)
-      .where(and(
-        eq(conversations.id, id),
-        eq(conversations.tenantId, tenantId)
-      ))
+      .where(and(eq(conversations.id, id), eq(conversations.tenantId, tenantId)))
       .returning();
     return result[0];
   }
@@ -1347,14 +1340,14 @@ export class DbStorage implements IStorage {
   async updateConversationMetadata(
     id: string,
     metadata: Record<string, any>,
-    tenantId: string
+    tenantId: string,
   ): Promise<Conversation | undefined> {
     // Get current conversation - MUST filter by tenantId for security
     const current = await this.getConversation(id, tenantId);
     if (!current) return undefined;
 
     // Merge new metadata with existing
-    const updatedMetadata = { ...current.metadata, ...metadata };
+    const updatedMetadata = { ...(current.metadata ?? {}), ...(metadata ?? {}) };
 
     const conditions = tenantId
       ? and(eq(conversations.id, id), eq(conversations.tenantId, tenantId))
@@ -1371,27 +1364,26 @@ export class DbStorage implements IStorage {
   async deleteConversation(id: string, tenantId: string): Promise<void> {
     // ALWAYS filter by both id AND tenantId for security
     // Delete associated messages first
-    await this.db.delete(messages).where(and(
-      eq(messages.conversationId, id),
-      eq(messages.tenantId, tenantId)
-    ));
+    await this.db
+      .delete(messages)
+      .where(and(eq(messages.conversationId, id), eq(messages.tenantId, tenantId)));
     // Then delete the conversation
-    await this.db.delete(conversations).where(and(
-      eq(conversations.id, id),
-      eq(conversations.tenantId, tenantId)
-    ));
+    await this.db
+      .delete(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.tenantId, tenantId)));
   }
 
   // Analytics methods
   async createAnalyticsEvent(insertEvent: InsertAnalyticsEvent): Promise<AnalyticsEvent> {
-    const result = await this.db
-      .insert(analyticsEvents)
-      .values(insertEvent)
-      .returning();
+    const result = await this.db.insert(analyticsEvents).values(insertEvent).returning();
     return result[0];
   }
 
-  async getAnalyticsEvents(tenantId: string, startDate: Date, endDate: Date): Promise<AnalyticsEvent[]> {
+  async getAnalyticsEvents(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<AnalyticsEvent[]> {
     return await this.db
       .select()
       .from(analyticsEvents)
@@ -1399,13 +1391,17 @@ export class DbStorage implements IStorage {
         and(
           eq(analyticsEvents.tenantId, tenantId),
           gte(analyticsEvents.timestamp, startDate),
-          lte(analyticsEvents.timestamp, endDate)
-        )
+          lte(analyticsEvents.timestamp, endDate),
+        ),
       )
       .orderBy(analyticsEvents.timestamp);
   }
 
-  async getDailyAnalytics(tenantId: string, startDate: Date, endDate: Date): Promise<DailyAnalytics[]> {
+  async getDailyAnalytics(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<DailyAnalytics[]> {
     return await this.db
       .select()
       .from(dailyAnalytics)
@@ -1413,13 +1409,15 @@ export class DbStorage implements IStorage {
         and(
           eq(dailyAnalytics.tenantId, tenantId),
           gte(dailyAnalytics.date, startDate),
-          lte(dailyAnalytics.date, endDate)
-        )
+          lte(dailyAnalytics.date, endDate),
+        ),
       )
       .orderBy(dailyAnalytics.date);
   }
 
-  async createOrUpdateDailyAnalytics(insertAnalytics: InsertDailyAnalytics): Promise<DailyAnalytics> {
+  async createOrUpdateDailyAnalytics(
+    insertAnalytics: InsertDailyAnalytics,
+  ): Promise<DailyAnalytics> {
     // Try to find existing record
     const existing = await this.db
       .select()
@@ -1427,8 +1425,8 @@ export class DbStorage implements IStorage {
       .where(
         and(
           eq(dailyAnalytics.tenantId, insertAnalytics.tenantId),
-          eq(dailyAnalytics.date, insertAnalytics.date)
-        )
+          eq(dailyAnalytics.date, insertAnalytics.date),
+        ),
       );
 
     if (existing.length > 0) {
@@ -1441,20 +1439,14 @@ export class DbStorage implements IStorage {
       return result[0];
     } else {
       // Create new
-      const result = await this.db
-        .insert(dailyAnalytics)
-        .values(insertAnalytics)
-        .returning();
+      const result = await this.db.insert(dailyAnalytics).values(insertAnalytics).returning();
       return result[0];
     }
   }
 
   // User Invitation methods
   async createUserInvitation(insertInvitation: InsertUserInvitation): Promise<UserInvitation> {
-    const result = await this.db
-      .insert(userInvitations)
-      .values(insertInvitation)
-      .returning();
+    const result = await this.db.insert(userInvitations).values(insertInvitation).returning();
     return result[0];
   }
 
@@ -1474,19 +1466,16 @@ export class DbStorage implements IStorage {
       .where(
         and(
           eq(userInvitations.email, email),
-          or(
-            eq(userInvitations.status, 'pending'),
-            eq(userInvitations.status, 'sent')
-          ),
-          gt(userInvitations.expiresAt, now)
-        )
+          or(eq(userInvitations.status, 'pending'), eq(userInvitations.status, 'sent')),
+          gt(userInvitations.expiresAt, now),
+        ),
       );
     return result[0];
   }
 
   async getActiveInvitations(tenantId?: string): Promise<UserInvitation[]> {
     const now = new Date();
-    
+
     if (tenantId) {
       return await this.db
         .select()
@@ -1495,8 +1484,8 @@ export class DbStorage implements IStorage {
           and(
             sql`${userInvitations.status} != 'accepted'`,
             gt(userInvitations.expiresAt, now),
-            eq(userInvitations.tenantId, tenantId)
-          )
+            eq(userInvitations.tenantId, tenantId),
+          ),
         )
         .orderBy(desc(userInvitations.createdAt));
     } else {
@@ -1504,10 +1493,7 @@ export class DbStorage implements IStorage {
         .select()
         .from(userInvitations)
         .where(
-          and(
-            sql`${userInvitations.status} != 'accepted'`,
-            gt(userInvitations.expiresAt, now)
-          )
+          and(sql`${userInvitations.status} != 'accepted'`, gt(userInvitations.expiresAt, now)),
         )
         .orderBy(desc(userInvitations.createdAt));
     }
@@ -1520,12 +1506,9 @@ export class DbStorage implements IStorage {
       .from(userInvitations)
       .where(
         and(
-          or(
-            eq(userInvitations.status, 'pending'),
-            eq(userInvitations.status, 'sent')
-          ),
-          gt(userInvitations.expiresAt, now)
-        )
+          or(eq(userInvitations.status, 'pending'), eq(userInvitations.status, 'sent')),
+          gt(userInvitations.expiresAt, now),
+        ),
       )
       .orderBy(desc(userInvitations.createdAt));
   }
@@ -1535,21 +1518,18 @@ export class DbStorage implements IStorage {
     if (lastSentAt) {
       updates.lastSentAt = lastSentAt;
     }
-    await this.db
-      .update(userInvitations)
-      .set(updates)
-      .where(eq(userInvitations.id, id));
+    await this.db.update(userInvitations).set(updates).where(eq(userInvitations.id, id));
   }
 
   async markInvitationAccepted(id: string, userId: string): Promise<void> {
     await this.db
       .update(userInvitations)
-      .set({ 
+      .set({
         status: 'accepted',
         invitedUserId: userId,
         acceptedAt: new Date(),
         // SECURITY: Null out plaintext password immediately after acceptance
-        plainTemporaryPassword: null
+        plainTemporaryPassword: null,
       })
       .where(eq(userInvitations.id, id));
   }
@@ -1563,9 +1543,7 @@ export class DbStorage implements IStorage {
   }
 
   async deleteInvitation(id: string): Promise<void> {
-    await this.db
-      .delete(userInvitations)
-      .where(eq(userInvitations.id, id));
+    await this.db.delete(userInvitations).where(eq(userInvitations.id, id));
   }
 
   async cleanupExpiredInvitationPasswords(): Promise<number> {
@@ -1585,9 +1563,9 @@ export class DbStorage implements IStorage {
           or(
             sql`${userInvitations.expiresAt} < ${now}`,
             eq(userInvitations.status, 'accepted'),
-            sql`${userInvitations.createdAt} < ${sevenDaysAgo}`
-          )
-        )
+            sql`${userInvitations.createdAt} < ${sevenDaysAgo}`,
+          ),
+        ),
       );
 
     // Return number of rows updated
@@ -1596,10 +1574,7 @@ export class DbStorage implements IStorage {
 
   // Platform Admin methods
   async getAllUsers(): Promise<ClientUser[]> {
-    return await this.db
-      .select()
-      .from(clientUsers)
-      .orderBy(desc(clientUsers.createdAt));
+    return await this.db.select().from(clientUsers).orderBy(desc(clientUsers.createdAt));
   }
 
   async getPlatformAdmins(): Promise<ClientUser[]> {
@@ -1610,7 +1585,11 @@ export class DbStorage implements IStorage {
       .orderBy(desc(clientUsers.createdAt));
   }
 
-  async updateUserRole(userId: string, role: string, isPlatformAdmin: boolean): Promise<ClientUser | undefined> {
+  async updateUserRole(
+    userId: string,
+    role: string,
+    isPlatformAdmin: boolean,
+  ): Promise<ClientUser | undefined> {
     const result = await this.db
       .update(clientUsers)
       .set({ role, isPlatformAdmin })
@@ -1621,10 +1600,7 @@ export class DbStorage implements IStorage {
 
   // Password Reset Token methods
   async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken> {
-    const result = await this.db
-      .insert(passwordResetTokens)
-      .values(token)
-      .returning();
+    const result = await this.db.insert(passwordResetTokens).values(token).returning();
     return result[0];
   }
 
@@ -1637,8 +1613,8 @@ export class DbStorage implements IStorage {
         and(
           eq(passwordResetTokens.token, token),
           eq(passwordResetTokens.used, false),
-          gt(passwordResetTokens.expiresAt, now)
-        )
+          gt(passwordResetTokens.expiresAt, now),
+        ),
       );
     return result[0];
   }
@@ -1648,12 +1624,7 @@ export class DbStorage implements IStorage {
     return await this.db
       .select()
       .from(passwordResetTokens)
-      .where(
-        and(
-          eq(passwordResetTokens.used, false),
-          gt(passwordResetTokens.expiresAt, now)
-        )
-      );
+      .where(and(eq(passwordResetTokens.used, false), gt(passwordResetTokens.expiresAt, now)));
   }
 
   async markTokenAsUsed(token: string): Promise<void> {
@@ -1675,16 +1646,11 @@ export class DbStorage implements IStorage {
     const result = await this.db
       .delete(passwordResetTokens)
       .where(
-        or(
-          eq(passwordResetTokens.used, true),
-          sql`${passwordResetTokens.expiresAt} < ${now}`
-        )
+        or(eq(passwordResetTokens.used, true), sql`${passwordResetTokens.expiresAt} < ${now}`),
       );
     return result.rowCount || 0;
   }
 }
 
 // Use database storage in production, memory storage for testing
-export const storage = process.env.DATABASE_URL
-  ? new DbStorage()
-  : new MemStorage();
+export const storage = process.env.DATABASE_URL ? new DbStorage() : new MemStorage();
