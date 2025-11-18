@@ -179,6 +179,29 @@ export default function TeamManagementPage() {
     },
   });
 
+  const deleteInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      const response = await apiRequest('DELETE', `/api/tenant/invitations/${invitationId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Invitation deleted successfully',
+        description: 'The invitation has been removed.',
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/tenant/invitations/pending'],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to delete invitation',
+        description: error.message || 'An error occurred',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
@@ -443,7 +466,9 @@ export default function TeamManagementPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Invited Date</TableHead>
+                        <TableHead>Sent</TableHead>
+                        <TableHead>Temp Password</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -460,10 +485,54 @@ export default function TeamManagementPage() {
                             <Badge variant="outline">{invitation.role.replace('_', ' ')}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{invitation.status}</Badge>
+                            <Badge variant={invitation.status === 'sent' ? 'default' : 'secondary'}>
+                              {invitation.status}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {new Date(invitation.createdAt).toLocaleDateString()}
+                          <TableCell className="text-muted-foreground text-sm">
+                            {invitation.lastSentAt
+                              ? new Date(invitation.lastSentAt).toLocaleDateString()
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {invitation.plainTemporaryPassword ? (
+                              <code className="text-xs bg-muted px-2 py-1 rounded">
+                                {invitation.plainTemporaryPassword}
+                              </code>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-testid={`button-delete-invitation-${invitation.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Invitation</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this invitation? This action
+                                    cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteInvitationMutation.mutate(invitation.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </TableCell>
                         </TableRow>
                       ))}

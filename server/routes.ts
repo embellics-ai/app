@@ -1304,6 +1304,54 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
+  // Delete invitation for this tenant (Client Admin only)
+  app.delete(
+    '/api/tenant/invitations/:invitationId',
+    requireAuth,
+    requireClientAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenantId = assertTenant(req, res);
+        if (!tenantId) return;
+
+        const { invitationId } = req.params;
+
+        console.log(`[Delete Tenant Invitation] Tenant: ${tenantId}, Invitation: ${invitationId}`);
+
+        // Get all pending invitations to validate ownership
+        const allInvitations = await storage.getPendingInvitations();
+        const invitation = allInvitations.find((inv) => inv.id === invitationId);
+
+        if (!invitation) {
+          console.log(`[Delete Tenant Invitation] ✗ Invitation not found: ${invitationId}`);
+          return res.status(404).json({ error: 'Invitation not found' });
+        }
+
+        // SECURITY: Verify invitation belongs to this tenant
+        if (invitation.tenantId !== tenantId) {
+          console.log(
+            `[Delete Tenant Invitation] ✗ Unauthorized: Invitation belongs to different tenant`,
+          );
+          return res
+            .status(403)
+            .json({ error: 'You can only delete invitations from your own tenant' });
+        }
+
+        // Delete the invitation from database
+        await storage.deleteInvitation(invitationId);
+
+        console.log(
+          `[Delete Tenant Invitation] ✓ Successfully deleted invitation: ${invitationId}`,
+        );
+
+        res.json({ message: 'Invitation deleted successfully' });
+      } catch (error) {
+        console.error('Error deleting invitation:', error);
+        res.status(500).json({ error: 'Failed to delete invitation' });
+      }
+    },
+  );
+
   // Accept invitation and set new password
   app.post('/api/auth/accept-invitation', async (req, res) => {
     try {
