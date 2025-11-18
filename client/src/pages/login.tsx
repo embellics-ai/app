@@ -1,21 +1,35 @@
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MessageSquare, AlertCircle } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
-import { useState } from "react";
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useMutation } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
+import { apiRequest } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MessageSquare, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { useState } from 'react';
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().email('Please enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -28,28 +42,28 @@ export default function Login() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: '',
+      password: '',
     },
   });
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginForm) => {
-      const response = await apiRequest("POST", "/api/auth/login", data);
+      const response = await apiRequest('POST', '/api/auth/login', data);
       return await response.json();
     },
     onSuccess: async (data) => {
       // Clear any previous errors
       setLoginError(null);
-      
+
       // Use auth context's login function to properly set token and trigger auth refresh
       await login(data.token);
-      
+
       // Redirect to home after user is hydrated
-      setLocation("/");
+      setLocation('/');
     },
     onError: (error: any) => {
-      setLoginError("Username or Password is incorrect");
+      setLoginError('Username or Password is incorrect');
     },
   });
 
@@ -68,9 +82,7 @@ export default function Login() {
             <CardTitle className="text-2xl">Embellics</CardTitle>
           </div>
           <CardTitle className="text-2xl">Sign in to your account</CardTitle>
-          <CardDescription>
-            Enter your email and password to access your dashboard
-          </CardDescription>
+          <CardDescription>Enter your email and password to access your dashboard</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -127,9 +139,9 @@ export default function Login() {
                 disabled={loginMutation.isPending}
                 data-testid="button-login"
               >
-                {loginMutation.isPending ? "Signing in..." : "Sign in"}
+                {loginMutation.isPending ? 'Signing in...' : 'Sign in'}
               </Button>
-              
+
               {loginError && (
                 <Alert variant="destructive" data-testid="alert-login-error">
                   <AlertCircle className="h-4 w-4" />

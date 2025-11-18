@@ -132,18 +132,15 @@ This application is **platform agnostic** and can be deployed to:
 ### Deployment Checklist
 
 1. **Set Environment Variables**
-
    - Update `APP_URL` to your production domain
    - Set `NODE_ENV=production`
    - Configure all required API keys
 
 2. **Database Setup**
-
    - Provision PostgreSQL database
    - Run migrations: `npm run db:push`
 
 3. **Email Configuration**
-
    - Verify your sending domain in Resend
    - Update `RESEND_FROM_EMAIL`
 

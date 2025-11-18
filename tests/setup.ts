@@ -16,7 +16,7 @@ process.env.ENCRYPTION_KEY = 'test-encryption-key-32-characters';
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,

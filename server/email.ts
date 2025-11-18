@@ -1,45 +1,39 @@
-import nodemailer from "nodemailer";
-import type { Transporter } from "nodemailer";
+import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 
 // Check if we should skip email sending in development
-const SKIP_EMAIL_IN_DEV =
-  process.env.SKIP_EMAIL === "true" || process.env.NODE_ENV === "development";
+// const SKIP_EMAIL_IN_DEV =
+//   process.env.SKIP_EMAIL === "true" || process.env.NODE_ENV === "development";
 
+const SKIP_EMAIL_IN_DEV = false;
 /**
  * Get email transporter using SMTP configuration
  * Supports Gmail, Outlook, SendGrid, AWS SES, or any SMTP server
  */
 function getEmailTransporter(): Transporter {
-  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
-  const smtpPort = parseInt(process.env.SMTP_PORT || "587");
-  const smtpSecure = process.env.SMTP_SECURE === "true"; // true for 465, false for other ports
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+  const smtpSecure = process.env.SMTP_SECURE === 'true'; // true for 465, false for other ports
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
-  const fromEmail =
-    process.env.SMTP_FROM_EMAIL ||
-    process.env.SMTP_USER ||
-    "noreply@embellics.com";
+  const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@embellics.com';
 
   if (!smtpUser || !smtpPass) {
     if (SKIP_EMAIL_IN_DEV) {
-      console.log(
-        "[Email] ⚠️  SMTP credentials not configured, but skipping in dev mode"
-      );
+      console.log('[Email] ⚠️  SMTP credentials not configured, but skipping in dev mode');
       // Return a dummy transporter for dev mode
       return nodemailer.createTransport({
         jsonTransport: true,
       });
     }
-    throw new Error(
-      "SMTP_USER and SMTP_PASS environment variables are required"
-    );
+    throw new Error('SMTP_USER and SMTP_PASS environment variables are required');
   }
 
-  console.log("[Email] Configuring SMTP transporter");
-  console.log("[Email] Host:", smtpHost);
-  console.log("[Email] Port:", smtpPort);
-  console.log("[Email] User:", smtpUser);
-  console.log("[Email] From:", fromEmail);
+  console.log('[Email] Configuring SMTP transporter');
+  console.log('[Email] Host:', smtpHost);
+  console.log('[Email] Port:', smtpPort);
+  console.log('[Email] User:', smtpUser);
+  console.log('[Email] From:', fromEmail);
 
   return nodemailer.createTransport({
     host: smtpHost,
@@ -56,11 +50,7 @@ function getEmailTransporter(): Transporter {
  * Get the from email address
  */
 function getFromEmail(): string {
-  return (
-    process.env.SMTP_FROM_EMAIL ||
-    process.env.SMTP_USER ||
-    "noreply@embellics.com"
-  );
+  return process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@embellics.com';
 }
 
 export async function sendInvitationEmail(
@@ -68,23 +58,22 @@ export async function sendInvitationEmail(
   firstName: string,
   lastName: string,
   temporaryPassword: string,
-  role: string
+  role: string,
 ) {
   try {
     const transporter = getEmailTransporter();
     const fromEmail = getFromEmail();
 
     // Get the application URL from environment or default to localhost
-    const appUrl =
-      process.env.APP_URL || `http://localhost:${process.env.PORT || "3000"}`;
+    const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || '3000'}`;
     const loginUrl = `${appUrl}/login`;
 
     const roleDisplay =
-      role === "admin"
-        ? "Platform Administrator"
-        : role === "client_admin"
-        ? "Client Administrator"
-        : "Support Staff";
+      role === 'admin'
+        ? 'Platform Administrator'
+        : role === 'client_admin'
+          ? 'Client Administrator'
+          : 'Support Staff';
 
     const html = `
       <!DOCTYPE html>
@@ -140,45 +129,43 @@ export async function sendInvitationEmail(
 
     // In development mode with SKIP_EMAIL, just log the credentials
     if (SKIP_EMAIL_IN_DEV) {
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("📧 [DEV MODE] Email Skipped - User Invitation");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📧 [DEV MODE] Email Skipped - User Invitation');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log(`To: ${to}`);
       console.log(`Name: ${firstName} ${lastName}`);
       console.log(`Role: ${role}`);
       console.log(`Temporary Password: ${temporaryPassword}`);
       console.log(`Login URL: ${loginUrl}`);
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return {
-        messageId: "dev-mode-skip",
-        message: "Email skipped in development mode",
+        messageId: 'dev-mode-skip',
+        message: 'Email skipped in development mode',
       };
     }
 
     const info = await transporter.sendMail({
       from: `"Embellics Platform" <${fromEmail}>`,
       to,
-      subject: "Welcome to Embellics - Your Invitation to Join",
+      subject: 'Welcome to Embellics - Your Invitation to Join',
       html,
     });
 
-    console.log("✅ Invitation email sent successfully");
-    console.log("Message ID:", info.messageId);
+    console.log('✅ Invitation email sent successfully');
+    console.log('Message ID:', info.messageId);
     return {
       messageId: info.messageId,
-      message: "Invitation email sent successfully",
+      message: 'Invitation email sent successfully',
     };
   } catch (error) {
-    console.error("❌ Error in sendInvitationEmail:", error);
+    console.error('❌ Error in sendInvitationEmail:', error);
 
     // In development, don't throw - just log the error
     if (SKIP_EMAIL_IN_DEV) {
-      console.warn(
-        "⚠️  Email sending failed, but continuing in development mode"
-      );
+      console.warn('⚠️  Email sending failed, but continuing in development mode');
       return {
-        messageId: "dev-mode-error",
-        message: "Email failed but skipped in development",
+        messageId: 'dev-mode-error',
+        message: 'Email failed but skipped in development',
       };
     }
 
@@ -191,15 +178,14 @@ export async function sendPasswordResetEmail(
   to: string,
   firstName: string,
   lastName: string,
-  newTemporaryPassword: string
+  newTemporaryPassword: string,
 ) {
   try {
     const transporter = getEmailTransporter();
     const fromEmail = getFromEmail();
 
     // Get the application URL from environment or default to localhost
-    const appUrl =
-      process.env.APP_URL || `http://localhost:${process.env.PORT || "3000"}`;
+    const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || '3000'}`;
     const loginUrl = `${appUrl}/login`;
 
     const html = `
@@ -255,44 +241,42 @@ export async function sendPasswordResetEmail(
 
     // In development mode with SKIP_EMAIL, just log the credentials
     if (SKIP_EMAIL_IN_DEV) {
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("📧 [DEV MODE] Email Skipped - Password Reset");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📧 [DEV MODE] Email Skipped - Password Reset');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log(`To: ${to}`);
       console.log(`Name: ${firstName} ${lastName}`);
       console.log(`New Temporary Password: ${newTemporaryPassword}`);
       console.log(`Login URL: ${loginUrl}`);
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return {
-        messageId: "dev-mode-skip",
-        message: "Email skipped in development mode",
+        messageId: 'dev-mode-skip',
+        message: 'Email skipped in development mode',
       };
     }
 
     const info = await transporter.sendMail({
       from: `"Embellics Platform" <${fromEmail}>`,
       to,
-      subject: "Embellics - Password Reset",
+      subject: 'Embellics - Password Reset',
       html,
     });
 
-    console.log("✅ Password reset email sent successfully");
-    console.log("Message ID:", info.messageId);
+    console.log('✅ Password reset email sent successfully');
+    console.log('Message ID:', info.messageId);
     return {
       messageId: info.messageId,
-      message: "Password reset email sent successfully",
+      message: 'Password reset email sent successfully',
     };
   } catch (error) {
-    console.error("❌ Error in sendPasswordResetEmail:", error);
+    console.error('❌ Error in sendPasswordResetEmail:', error);
 
     // In development, don't throw - just log the error
     if (SKIP_EMAIL_IN_DEV) {
-      console.warn(
-        "⚠️  Email sending failed, but continuing in development mode"
-      );
+      console.warn('⚠️  Email sending failed, but continuing in development mode');
       return {
-        messageId: "dev-mode-error",
-        message: "Email failed but skipped in development",
+        messageId: 'dev-mode-error',
+        message: 'Email failed but skipped in development',
       };
     }
 
@@ -305,7 +289,7 @@ export async function sendForgotPasswordEmail(
   to: string,
   firstName: string,
   lastName: string,
-  resetUrl: string
+  resetUrl: string,
 ) {
   try {
     const transporter = getEmailTransporter();
@@ -362,18 +346,18 @@ export async function sendForgotPasswordEmail(
     const info = await transporter.sendMail({
       from: `"Embellics Platform" <${fromEmail}>`,
       to,
-      subject: "Reset Your Embellics Password",
+      subject: 'Reset Your Embellics Password',
       html,
     });
 
-    console.log("✅ Forgot password email sent successfully");
-    console.log("Message ID:", info.messageId);
+    console.log('✅ Forgot password email sent successfully');
+    console.log('Message ID:', info.messageId);
     return {
       messageId: info.messageId,
-      message: "Forgot password email sent successfully",
+      message: 'Forgot password email sent successfully',
     };
   } catch (error) {
-    console.error("❌ Error in sendForgotPasswordEmail:", error);
+    console.error('❌ Error in sendForgotPasswordEmail:', error);
     throw error;
   }
 }

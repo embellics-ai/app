@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { useQuery, useMutation, type QueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { queryClient } from "@/lib/queryClient";
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useQuery, useMutation, type QueryClient } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
+import { queryClient } from '@/lib/queryClient';
 
 interface User {
   id: string;
@@ -28,20 +28,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem("auth_token");
+    return localStorage.getItem('auth_token');
   });
   const [, setLocation] = useLocation();
 
   // Fetch current user if token exists
   const { data: user, isLoading } = useQuery<User>({
-    queryKey: ["/api/auth/me"],
+    queryKey: ['/api/auth/me'],
     enabled: !!token,
     retry: false,
     meta: {
       skipDefaultFetch: true,
     },
     queryFn: async () => {
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch('/api/auth/me', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -49,9 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) {
         // Token is invalid, clear it
-        localStorage.removeItem("auth_token");
+        localStorage.removeItem('auth_token');
         setToken(null);
-        throw new Error("Not authenticated");
+        throw new Error('Not authenticated');
       }
 
       return response.json();
@@ -59,35 +59,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const login = async (newToken: string) => {
-    localStorage.setItem("auth_token", newToken);
+    localStorage.setItem('auth_token', newToken);
     setToken(newToken);
     // Explicitly fetch user data to ensure hydration before navigation (prevents UI flash)
     await queryClient.fetchQuery({
-      queryKey: ["/api/auth/me"],
+      queryKey: ['/api/auth/me'],
       queryFn: async () => {
-        const response = await fetch("/api/auth/me", {
+        const response = await fetch('/api/auth/me', {
           headers: {
             Authorization: `Bearer ${newToken}`,
           },
-          credentials: "include",
+          credentials: 'include',
         });
-        
+
         if (!response.ok) {
-          localStorage.removeItem("auth_token");
+          localStorage.removeItem('auth_token');
           setToken(null);
-          throw new Error("Not authenticated");
+          throw new Error('Not authenticated');
         }
-        
+
         return response.json();
       },
     });
   };
 
   const logout = () => {
-    localStorage.removeItem("auth_token");
+    localStorage.removeItem('auth_token');
     setToken(null);
     queryClient.clear();
-    setLocation("/login");
+    setLocation('/login');
   };
 
   const value: AuthContextType = {
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }

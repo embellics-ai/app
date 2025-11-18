@@ -14,29 +14,25 @@
 
 ```typescript
 // Complete onboarding (PROTECTED)
-app.post(
-  "/api/auth/complete-onboarding",
-  requireAuth,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.user!.userId;
-      const isPlatformAdmin = req.user!.isPlatformAdmin;
+app.post('/api/auth/complete-onboarding', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const isPlatformAdmin = req.user!.isPlatformAdmin;
 
-      // Platform admins don't have a tenantId - that's okay
-      // Client admins and support staff should have a tenantId
-      if (!isPlatformAdmin) {
-        const tenantId = assertTenant(req, res);
-        if (!tenantId) return;
-      }
-
-      await storage.markOnboardingComplete(userId);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error completing onboarding:", error);
-      res.status(500).json({ error: "Failed to complete onboarding" });
+    // Platform admins don't have a tenantId - that's okay
+    // Client admins and support staff should have a tenantId
+    if (!isPlatformAdmin) {
+      const tenantId = assertTenant(req, res);
+      if (!tenantId) return;
     }
+
+    await storage.markOnboardingComplete(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error completing onboarding:', error);
+    res.status(500).json({ error: 'Failed to complete onboarding' });
   }
-);
+});
 ```
 
 **What Changed:**
@@ -55,12 +51,12 @@ const handleCompleteOnboarding = async () => {
     await completeOnboarding.mutateAsync();
     // ... success handling
   } catch (error) {
-    console.error("Failed to complete onboarding:", error);
+    console.error('Failed to complete onboarding:', error);
     toast({
-      title: "Setup Error",
+      title: 'Setup Error',
       description:
-        "There was an issue completing your setup. Please try refreshing the page or contact support if the issue persists.",
-      variant: "destructive",
+        'There was an issue completing your setup. Please try refreshing the page or contact support if the issue persists.',
+      variant: 'destructive',
     });
   }
 };
@@ -70,12 +66,12 @@ const handleSkipOnboarding = async () => {
     await completeOnboarding.mutateAsync();
     // ... success handling
   } catch (error) {
-    console.error("Failed to skip onboarding:", error);
+    console.error('Failed to skip onboarding:', error);
     toast({
-      title: "Setup Error",
+      title: 'Setup Error',
       description:
-        "There was an issue completing your setup. Please try refreshing the page or contact support if the issue persists.",
-      variant: "destructive",
+        'There was an issue completing your setup. Please try refreshing the page or contact support if the issue persists.',
+      variant: 'destructive',
     });
   }
 };

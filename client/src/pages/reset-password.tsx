@@ -1,25 +1,34 @@
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
-import { useLocation, useSearch } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MessageSquare, CheckCircle, AlertCircle } from "lucide-react";
-import { Link } from "wouter";
-import { useState, useEffect } from "react";
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useMutation } from '@tanstack/react-query';
+import { useLocation, useSearch } from 'wouter';
+import { apiRequest } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import { Link } from 'wouter';
+import { useState, useEffect } from 'react';
 
-const resetPasswordSchema = z.object({
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
-}).refine(data => data.newPassword === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+const resetPasswordSchema = z
+  .object({
+    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
 
@@ -36,24 +45,24 @@ export default function ResetPassword() {
     if (tokenParam) {
       setToken(tokenParam);
     } else {
-      setErrorMessage("Invalid or missing reset token. Please request a new password reset link.");
+      setErrorMessage('Invalid or missing reset token. Please request a new password reset link.');
     }
   }, [search]);
 
   const form = useForm<ResetPasswordForm>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      newPassword: "",
-      confirmPassword: "",
+      newPassword: '',
+      confirmPassword: '',
     },
   });
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (data: ResetPasswordForm) => {
       if (!token) {
-        throw new Error("No reset token found");
+        throw new Error('No reset token found');
       }
-      const response = await apiRequest("POST", "/api/auth/reset-password", {
+      const response = await apiRequest('POST', '/api/auth/reset-password', {
         token,
         newPassword: data.newPassword,
       });
@@ -63,14 +72,15 @@ export default function ResetPassword() {
       setSuccessMessage(data.message);
       setErrorMessage(null);
       form.reset();
-      
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
-        setLocation("/login");
+        setLocation('/login');
       }, 3000);
     },
     onError: (error: any) => {
-      const errorText = error?.message || "Failed to reset password. The link may be expired or invalid.";
+      const errorText =
+        error?.message || 'Failed to reset password. The link may be expired or invalid.';
       setErrorMessage(errorText);
       setSuccessMessage(null);
     },
@@ -91,18 +101,14 @@ export default function ResetPassword() {
             <CardTitle className="text-2xl">Embellics</CardTitle>
           </div>
           <CardTitle className="text-2xl">Set new password</CardTitle>
-          <CardDescription>
-            Enter your new password below
-          </CardDescription>
+          <CardDescription>Enter your new password below</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {successMessage ? (
             <div className="space-y-4">
               <Alert className="bg-green-50 border-green-200" data-testid="alert-success">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
-                  {successMessage}
-                </AlertDescription>
+                <AlertDescription className="text-green-800">{successMessage}</AlertDescription>
               </Alert>
               <p className="text-sm text-center text-muted-foreground">
                 Redirecting to login page...
@@ -153,9 +159,9 @@ export default function ResetPassword() {
                   disabled={resetPasswordMutation.isPending || !token}
                   data-testid="button-submit"
                 >
-                  {resetPasswordMutation.isPending ? "Resetting..." : "Reset password"}
+                  {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset password'}
                 </Button>
-                
+
                 {errorMessage && (
                   <Alert variant="destructive" data-testid="alert-error">
                     <AlertCircle className="h-4 w-4" />

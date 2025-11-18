@@ -4,15 +4,15 @@ export function TypingIndicator() {
       <div className="flex gap-1">
         <div
           className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
-          style={{ animationDelay: "0ms", animationDuration: "1s" }}
+          style={{ animationDelay: '0ms', animationDuration: '1s' }}
         />
         <div
           className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
-          style={{ animationDelay: "150ms", animationDuration: "1s" }}
+          style={{ animationDelay: '150ms', animationDuration: '1s' }}
         />
         <div
           className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
-          style={{ animationDelay: "300ms", animationDuration: "1s" }}
+          style={{ animationDelay: '300ms', animationDuration: '1s' }}
         />
       </div>
       <span className="ml-2 text-xs text-muted-foreground">AI is typing...</span>

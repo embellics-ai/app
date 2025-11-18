@@ -1,31 +1,39 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Settings, Palette, MessageSquare, Code } from "lucide-react";
-import type { WidgetConfig } from "@shared/schema";
-import { useEffect } from "react";
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Settings, Palette, MessageSquare, Code } from 'lucide-react';
+import type { WidgetConfig } from '@shared/schema';
+import { useEffect } from 'react';
 
 const widgetConfigSchema = z.object({
-  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color (e.g., #3B82F6)"),
-  position: z.enum(["bottom-right", "bottom-left"]),
-  greeting: z.string().min(1, "Greeting is required").max(200),
-  placeholder: z.string().min(1, "Placeholder is required").max(100),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color (e.g., #3B82F6)'),
+  position: z.enum(['bottom-right', 'bottom-left']),
+  greeting: z.string().min(1, 'Greeting is required').max(200),
+  placeholder: z.string().min(1, 'Placeholder is required').max(100),
   allowedDomains: z.string().optional(),
   customCss: z.string().optional(),
 });
@@ -36,28 +44,33 @@ export default function WidgetConfigPage() {
   const { toast } = useToast();
 
   // Query for current widget config (404 means no config exists yet, which is OK)
-  const { data: config, isLoading, isError, error } = useQuery<WidgetConfig>({
-    queryKey: ["/api/widget-config"],
+  const {
+    data: config,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<WidgetConfig>({
+    queryKey: ['/api/widget-config'],
     retry: false, // Don't retry on 404
     meta: {
       skipDefaultFetch: true,
     },
     queryFn: async () => {
-      const response = await fetch("/api/widget-config", {
+      const response = await fetch('/api/widget-config', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
       });
-      
+
       // 404 is OK - it just means no config exists yet
       if (response.status === 404) {
         return null;
       }
-      
+
       if (!response.ok) {
-        throw new Error("Failed to fetch widget configuration");
+        throw new Error('Failed to fetch widget configuration');
       }
-      
+
       return response.json();
     },
   });
@@ -65,12 +78,12 @@ export default function WidgetConfigPage() {
   const form = useForm<WidgetConfigFormData>({
     resolver: zodResolver(widgetConfigSchema),
     defaultValues: {
-      primaryColor: "#3B82F6",
-      position: "bottom-right",
-      greeting: "Hi! How can I help you today?",
-      placeholder: "Type your message...",
-      allowedDomains: "",
-      customCss: "",
+      primaryColor: '#3B82F6',
+      position: 'bottom-right',
+      greeting: 'Hi! How can I help you today?',
+      placeholder: 'Type your message...',
+      allowedDomains: '',
+      customCss: '',
     },
   });
 
@@ -82,8 +95,8 @@ export default function WidgetConfigPage() {
         position: config.position,
         greeting: config.greeting,
         placeholder: config.placeholder,
-        allowedDomains: config.allowedDomains?.join(", ") || "",
-        customCss: config.customCss || "",
+        allowedDomains: config.allowedDomains?.join(', ') || '',
+        customCss: config.customCss || '',
       });
     }
   }, [config]);
@@ -94,27 +107,30 @@ export default function WidgetConfigPage() {
       const payload = {
         ...data,
         allowedDomains: data.allowedDomains
-          ? data.allowedDomains.split(",").map((d) => d.trim()).filter(Boolean)
+          ? data.allowedDomains
+              .split(',')
+              .map((d) => d.trim())
+              .filter(Boolean)
           : [],
       };
-      
+
       // Use POST if config doesn't exist, PATCH if it does
-      const method = config ? "PATCH" : "POST";
-      const response = await apiRequest(method, "/api/widget-config", payload);
+      const method = config ? 'PATCH' : 'POST';
+      const response = await apiRequest(method, '/api/widget-config', payload);
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/widget-config"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/widget-config'] });
       toast({
-        title: "Widget configuration updated",
-        description: "Your changes have been saved successfully.",
+        title: 'Widget configuration updated',
+        description: 'Your changes have been saved successfully.',
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update widget configuration.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update widget configuration.',
+        variant: 'destructive',
       });
     },
   });
@@ -149,9 +165,7 @@ export default function WidgetConfigPage() {
                 <Palette className="h-5 w-5" />
                 Appearance
               </CardTitle>
-              <CardDescription>
-                Customize the visual style of your chat widget
-              </CardDescription>
+              <CardDescription>Customize the visual style of your chat widget</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField
@@ -168,14 +182,16 @@ export default function WidgetConfigPage() {
                           className="w-24 h-12 cursor-pointer"
                           data-testid="input-primary-color"
                         />
-                        <span className="text-sm text-muted-foreground font-mono" key={field.value} data-testid="text-color-value">
+                        <span
+                          className="text-sm text-muted-foreground font-mono"
+                          key={field.value}
+                          data-testid="text-color-value"
+                        >
                           {field.value}
                         </span>
                       </div>
                     </FormControl>
-                    <FormDescription>
-                      Click the color box to pick your brand color
-                    </FormDescription>
+                    <FormDescription>Click the color box to pick your brand color</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -187,10 +203,7 @@ export default function WidgetConfigPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Position</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-position">
                           <SelectValue placeholder="Select position" />
@@ -201,9 +214,7 @@ export default function WidgetConfigPage() {
                         <SelectItem value="bottom-left">Bottom Left</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription>
-                      Where the widget appears on your website
-                    </FormDescription>
+                    <FormDescription>Where the widget appears on your website</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -218,9 +229,7 @@ export default function WidgetConfigPage() {
                 <MessageSquare className="h-5 w-5" />
                 Content
               </CardTitle>
-              <CardDescription>
-                Set the default messages for your chat widget
-              </CardDescription>
+              <CardDescription>Set the default messages for your chat widget</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField
@@ -257,9 +266,7 @@ export default function WidgetConfigPage() {
                         data-testid="input-placeholder"
                       />
                     </FormControl>
-                    <FormDescription>
-                      Placeholder text in the message input field
-                    </FormDescription>
+                    <FormDescription>Placeholder text in the message input field</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -274,9 +281,7 @@ export default function WidgetConfigPage() {
                 <Settings className="h-5 w-5" />
                 Security & Advanced
               </CardTitle>
-              <CardDescription>
-                Configure security settings and custom styles
-              </CardDescription>
+              <CardDescription>Configure security settings and custom styles</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField
@@ -293,7 +298,8 @@ export default function WidgetConfigPage() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Comma-separated list of domains where the widget can be embedded (leave empty to allow all)
+                      Comma-separated list of domains where the widget can be embedded (leave empty
+                      to allow all)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -334,12 +340,8 @@ export default function WidgetConfigPage() {
             >
               Reset
             </Button>
-            <Button
-              type="submit"
-              disabled={updateConfig.isPending}
-              data-testid="button-save"
-            >
-              {updateConfig.isPending ? "Saving..." : "Save Changes"}
+            <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save">
+              {updateConfig.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </form>

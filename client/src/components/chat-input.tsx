@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
+import { useState, useRef, useEffect } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Send } from 'lucide-react';
 
 type ChatInputProps = {
   onSendMessage: (message: string) => void;
@@ -12,23 +12,23 @@ type ChatInputProps = {
 export function ChatInput({
   onSendMessage,
   disabled = false,
-  placeholder = "Type your message...",
+  placeholder = 'Type your message...',
 }: ChatInputProps) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
     if (message.trim() && !disabled) {
       onSendMessage(message.trim());
-      setMessage("");
+      setMessage('');
       if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = 'auto';
       }
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -36,7 +36,7 @@ export function ChatInput({
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [message]);

@@ -1,28 +1,34 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  AreaChart, 
-  Area, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   Legend,
   BarChart,
-  Bar
-} from "recharts";
-import { Phone, Clock, Activity, CheckCircle, CalendarIcon, Building2 } from "lucide-react";
-import { useState } from "react";
-import { format, subDays } from "date-fns";
-import type { DateRange } from "react-day-picker";
+  Bar,
+} from 'recharts';
+import { Phone, Clock, Activity, CheckCircle, CalendarIcon, Building2 } from 'lucide-react';
+import { useState } from 'react';
+import { format, subDays } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 
 interface Tenant {
   id: string;
@@ -37,19 +43,22 @@ interface Tenant {
 const formatLabel = (label: string): string => {
   // Handle common abbreviations
   const abbreviations: Record<string, string> = {
-    'avg': 'Average',
+    avg: 'Average',
   };
-  
+
   // Split camelCase and capitalize each word
   const formatted = label
     .replace(/([A-Z])/g, ' $1') // Add space before capital letters
     .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
     .trim();
-  
+
   // Replace abbreviations
-  return formatted.split(' ').map(word => 
-    abbreviations[word.toLowerCase()] || word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ');
+  return formatted
+    .split(' ')
+    .map(
+      (word) => abbreviations[word.toLowerCase()] || word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join(' ');
 };
 
 interface AgentMetric {
@@ -113,10 +122,10 @@ export default function PlatformAnalytics() {
   const getDefaultDateRange = () => {
     const today = new Date();
     today.setHours(23, 59, 59, 999); // End of today
-    
+
     const sevenDaysAgo = subDays(new Date(), 7);
     sevenDaysAgo.setHours(0, 0, 0, 0); // Start of 7 days ago
-    
+
     return {
       from: sevenDaysAgo,
       to: today,
@@ -135,13 +144,13 @@ export default function PlatformAnalytics() {
 
   // Fetch all tenants for the dropdown
   const { data: tenants = [], isLoading: tenantsLoading } = useQuery<Tenant[]>({
-    queryKey: ["/api/platform/tenants"],
+    queryKey: ['/api/platform/tenants'],
   });
 
   // Fetch analytics for selected tenant
   const { data, isLoading } = useQuery<RetellAnalytics>({
     queryKey: [
-      "/api/platform/analytics/retell",
+      '/api/platform/analytics/retell',
       selectedTenantId,
       dateRange?.from?.toISOString(),
       dateRange?.to?.toISOString(),
@@ -152,52 +161,76 @@ export default function PlatformAnalytics() {
         return null;
       }
 
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem('auth_token');
       const headers: Record<string, string> = {};
-      
+
       if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
+        headers['Authorization'] = `Bearer ${token}`;
       }
-      
+
       let url = `/api/platform/analytics/retell/${selectedTenantId}`;
       const params = new URLSearchParams();
-      
+
       if (dateRange?.from) {
-        const startOfDay = new Date(Date.UTC(
-          dateRange.from.getFullYear(),
-          dateRange.from.getMonth(),
-          dateRange.from.getDate(),
-          0, 0, 0, 0
-        ));
+        const startOfDay = new Date(
+          Date.UTC(
+            dateRange.from.getFullYear(),
+            dateRange.from.getMonth(),
+            dateRange.from.getDate(),
+            0,
+            0,
+            0,
+            0,
+          ),
+        );
         const startISO = startOfDay.toISOString();
-        params.append("start_date", startISO);
-        console.log('[Platform Analytics] Start date:', dateRange.from, '→', startISO, '→', startOfDay.getTime());
+        params.append('start_date', startISO);
+        console.log(
+          '[Platform Analytics] Start date:',
+          dateRange.from,
+          '→',
+          startISO,
+          '→',
+          startOfDay.getTime(),
+        );
       }
       if (dateRange?.to) {
-        const endOfDay = new Date(Date.UTC(
-          dateRange.to.getFullYear(),
-          dateRange.to.getMonth(),
-          dateRange.to.getDate(),
-          23, 59, 59, 999
-        ));
+        const endOfDay = new Date(
+          Date.UTC(
+            dateRange.to.getFullYear(),
+            dateRange.to.getMonth(),
+            dateRange.to.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ),
+        );
         const endISO = endOfDay.toISOString();
-        params.append("end_date", endISO);
-        console.log('[Platform Analytics] End date:', dateRange.to, '→', endISO, '→', endOfDay.getTime());
+        params.append('end_date', endISO);
+        console.log(
+          '[Platform Analytics] End date:',
+          dateRange.to,
+          '→',
+          endISO,
+          '→',
+          endOfDay.getTime(),
+        );
       }
-      
+
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
-      
+
       const response = await fetch(url, {
         headers,
-        credentials: "include",
+        credentials: 'include',
       });
-      
+
       if (!response.ok) {
-        throw new Error("Failed to fetch analytics");
+        throw new Error('Failed to fetch analytics');
       }
-      
+
       return response.json();
     },
   });
@@ -212,14 +245,14 @@ export default function PlatformAnalytics() {
 
   const metrics = [
     {
-      title: "Total Calls",
+      title: 'Total Calls',
       value: data?.totalCalls || 0,
       icon: Phone,
-      iconColor: "text-blue-500",
-      testId: "total-calls",
+      iconColor: 'text-blue-500',
+      testId: 'total-calls',
     },
     {
-      title: "Average Duration",
+      title: 'Average Duration',
       value: (() => {
         const totalSeconds = Math.round(data?.averageDuration || 0);
         const minutes = Math.floor(totalSeconds / 60);
@@ -227,74 +260,81 @@ export default function PlatformAnalytics() {
         return `${minutes}m ${seconds}s`;
       })(),
       icon: Clock,
-      iconColor: "text-green-500",
-      testId: "avg-duration",
+      iconColor: 'text-green-500',
+      testId: 'avg-duration',
     },
     {
-      title: "Avg Latency",
+      title: 'Avg Latency',
       value: `${data?.averageLatency || 0}ms`,
       icon: Activity,
-      iconColor: "text-purple-500",
-      testId: "avg-latency",
+      iconColor: 'text-purple-500',
+      testId: 'avg-latency',
     },
     {
-      title: "Success Rate",
+      title: 'Success Rate',
       value: `${data?.successRate || 0}%`,
       icon: CheckCircle,
-      iconColor: "text-orange-500",
-      testId: "success-rate",
+      iconColor: 'text-orange-500',
+      testId: 'success-rate',
     },
   ];
 
   // Prep data for area charts using per-date metrics
-  const rateChartData = data?.dailyMetrics.map((d) => ({
-    date: format(new Date(d.date), "MMM dd"),
-    pickupRate: d.pickupRate,
-    successRate: d.successRate,
-    transferRate: d.transferRate,
-    voicemailRate: d.voicemailRate,
-    avgDuration: d.avgDuration,
-    avgLatency: d.avgLatency,
-  })) || [];
+  const rateChartData =
+    data?.dailyMetrics.map((d) => ({
+      date: format(new Date(d.date), 'MMM dd'),
+      pickupRate: d.pickupRate,
+      successRate: d.successRate,
+      transferRate: d.transferRate,
+      voicemailRate: d.voicemailRate,
+      avgDuration: d.avgDuration,
+      avgLatency: d.avgLatency,
+    })) || [];
 
   // Stacked bar data
-  const successByDate = data?.callsByDateStacked.map(d => ({
-    date: format(new Date(d.date), "MMM dd"),
-    successful: d.successful,
-    unsuccessful: d.unsuccessful,
-  })) || [];
+  const successByDate =
+    data?.callsByDateStacked.map((d) => ({
+      date: format(new Date(d.date), 'MMM dd'),
+      successful: d.successful,
+      unsuccessful: d.unsuccessful,
+    })) || [];
 
-  const disconnectionByDate = data?.callsByDateStacked.map(d => ({
-    date: format(new Date(d.date), "MMM dd"),
-    agentHangup: d.agentHangup,
-    callTransfer: d.callTransfer,
-    userHangup: d.userHangup,
-    other: d.otherDisconnection,
-  })) || [];
+  const disconnectionByDate =
+    data?.callsByDateStacked.map((d) => ({
+      date: format(new Date(d.date), 'MMM dd'),
+      agentHangup: d.agentHangup,
+      callTransfer: d.callTransfer,
+      userHangup: d.userHangup,
+      other: d.otherDisconnection,
+    })) || [];
 
-  const sentimentByDate = data?.callsByDateStacked.map(d => ({
-    date: format(new Date(d.date), "MMM dd"),
-    positive: d.positive,
-    neutral: d.neutral,
-    negative: d.negative,
-    other: d.otherSentiment,
-  })) || [];
+  const sentimentByDate =
+    data?.callsByDateStacked.map((d) => ({
+      date: format(new Date(d.date), 'MMM dd'),
+      positive: d.positive,
+      neutral: d.neutral,
+      negative: d.negative,
+      other: d.otherSentiment,
+    })) || [];
 
   // Agent metrics for horizontal bar charts
-  const agentSuccessData = data?.agentMetrics.map(a => ({
-    agent: a.agentName,
-    rate: Math.round(a.successRate),
-  })) || [];
+  const agentSuccessData =
+    data?.agentMetrics.map((a) => ({
+      agent: a.agentName,
+      rate: Math.round(a.successRate),
+    })) || [];
 
-  const agentPickupData = data?.agentMetrics.map(a => ({
-    agent: a.agentName,
-    rate: Math.round(a.pickupRate),
-  })) || [];
+  const agentPickupData =
+    data?.agentMetrics.map((a) => ({
+      agent: a.agentName,
+      rate: Math.round(a.pickupRate),
+    })) || [];
 
-  const agentTransferData = data?.agentMetrics.map(a => ({
-    agent: a.agentName,
-    rate: Math.round(a.transferRate),
-  })) || [];
+  const agentTransferData =
+    data?.agentMetrics.map((a) => ({
+      agent: a.agentName,
+      rate: Math.round(a.transferRate),
+    })) || [];
 
   // If no tenant selected, show tenant selector
   if (!selectedTenantId) {
@@ -304,11 +344,9 @@ export default function PlatformAnalytics() {
           <h1 className="text-3xl font-semibold mb-2" data-testid="text-page-title">
             Analytics Dashboard
           </h1>
-          <p className="text-sm text-muted-foreground">
-            View analytics for any client account
-          </p>
+          <p className="text-sm text-muted-foreground">View analytics for any client account</p>
         </div>
-        
+
         <Card className="max-w-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -325,13 +363,17 @@ export default function PlatformAnalytics() {
             ) : tenants.length === 0 ? (
               <div className="text-sm text-muted-foreground">No clients found</div>
             ) : (
-              <Select value={selectedTenantId || ""} onValueChange={setSelectedTenantId}>
+              <Select value={selectedTenantId || ''} onValueChange={setSelectedTenantId}>
                 <SelectTrigger data-testid="select-client">
                   <SelectValue placeholder="Select a client" />
                 </SelectTrigger>
                 <SelectContent>
                   {tenants.map((tenant) => (
-                    <SelectItem key={tenant.id} value={tenant.id} data-testid={`option-tenant-${tenant.id}`}>
+                    <SelectItem
+                      key={tenant.id}
+                      value={tenant.id}
+                      data-testid={`option-tenant-${tenant.id}`}
+                    >
                       {tenant.name} ({tenant.email})
                     </SelectItem>
                   ))}
@@ -358,13 +400,17 @@ export default function PlatformAnalytics() {
             </p>
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedTenantId || ""} onValueChange={setSelectedTenantId}>
+              <Select value={selectedTenantId || ''} onValueChange={setSelectedTenantId}>
                 <SelectTrigger className="w-[250px]" data-testid="select-client">
                   <SelectValue placeholder="Select a client" />
                 </SelectTrigger>
                 <SelectContent>
                   {tenants.map((tenant) => (
-                    <SelectItem key={tenant.id} value={tenant.id} data-testid={`option-tenant-${tenant.id}`}>
+                    <SelectItem
+                      key={tenant.id}
+                      value={tenant.id}
+                      data-testid={`option-tenant-${tenant.id}`}
+                    >
                       {tenant.name}
                     </SelectItem>
                   ))}
@@ -375,9 +421,9 @@ export default function PlatformAnalytics() {
         </div>
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
-            <Button 
-              variant="outline" 
-              className="w-[280px] justify-start" 
+            <Button
+              variant="outline"
+              className="w-[280px] justify-start"
               data-testid="button-date-range"
               disabled={isLoading}
             >
@@ -387,11 +433,11 @@ export default function PlatformAnalytics() {
               ) : dateRange?.from ? (
                 dateRange.to ? (
                   <>
-                    {format(dateRange.from, "MMM dd, yyyy")} -{" "}
-                    {format(dateRange.to, "MMM dd, yyyy")}
+                    {format(dateRange.from, 'MMM dd, yyyy')} -{' '}
+                    {format(dateRange.to, 'MMM dd, yyyy')}
                   </>
                 ) : (
-                  format(dateRange.from, "MMM dd, yyyy")
+                  format(dateRange.from, 'MMM dd, yyyy')
                 )
               ) : (
                 <span>Pick a date range</span>
@@ -419,18 +465,14 @@ export default function PlatformAnalytics() {
           return (
             <Card key={metric.title} data-testid={`card-metric-${metric.testId}`}>
               <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {metric.title}
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
                 <Icon className={`h-4 w-4 ${metric.iconColor}`} />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid={`value-${metric.testId}`}>
                   {metric.value}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  From selected period
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">From selected period</p>
               </CardContent>
             </Card>
           );
@@ -458,7 +500,12 @@ export default function PlatformAnalytics() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value, name) => [value, formatLabel(String(name))]} />
-                  <Area type="monotone" dataKey="pickupRate" stroke="#3b82f6" fill="url(#pickupGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="pickupRate"
+                    stroke="#3b82f6"
+                    fill="url(#pickupGradient)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -484,7 +531,12 @@ export default function PlatformAnalytics() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value, name) => [value, formatLabel(String(name))]} />
-                  <Area type="monotone" dataKey="successRate" stroke="#10b981" fill="url(#successGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="successRate"
+                    stroke="#10b981"
+                    fill="url(#successGradient)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -510,7 +562,12 @@ export default function PlatformAnalytics() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value, name) => [value, formatLabel(String(name))]} />
-                  <Area type="monotone" dataKey="transferRate" stroke="#f59e0b" fill="url(#transferGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="transferRate"
+                    stroke="#f59e0b"
+                    fill="url(#transferGradient)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -539,7 +596,12 @@ export default function PlatformAnalytics() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value, name) => [value, formatLabel(String(name))]} />
-                  <Area type="monotone" dataKey="voicemailRate" stroke="#8b5cf6" fill="url(#voicemailGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="voicemailRate"
+                    stroke="#8b5cf6"
+                    fill="url(#voicemailGradient)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -565,7 +627,12 @@ export default function PlatformAnalytics() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value, name) => [value, formatLabel(String(name))]} />
-                  <Area type="monotone" dataKey="avgDuration" stroke="#06b6d4" fill="url(#durationGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="avgDuration"
+                    stroke="#06b6d4"
+                    fill="url(#durationGradient)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -591,7 +658,12 @@ export default function PlatformAnalytics() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value, name) => [value, formatLabel(String(name))]} />
-                  <Area type="monotone" dataKey="avgLatency" stroke="#ec4899" fill="url(#latencyGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="avgLatency"
+                    stroke="#ec4899"
+                    fill="url(#latencyGradient)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -613,7 +685,10 @@ export default function PlatformAnalytics() {
                 <BarChart data={successByDate}>
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip cursor={{ fill: 'transparent' }} formatter={(value, name) => [value, formatLabel(String(name))]} />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    formatter={(value, name) => [value, formatLabel(String(name))]}
+                  />
                   <Bar dataKey="successful" stackId="a" fill="#3b82f6" />
                   <Bar dataKey="unsuccessful" stackId="a" fill="#f97316" />
                 </BarChart>
@@ -634,7 +709,10 @@ export default function PlatformAnalytics() {
                 <BarChart data={disconnectionByDate}>
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip cursor={{ fill: 'transparent' }} formatter={(value, name) => [value, formatLabel(String(name))]} />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    formatter={(value, name) => [value, formatLabel(String(name))]}
+                  />
                   <Bar dataKey="agentHangup" stackId="a" fill="#ef4444" />
                   <Bar dataKey="callTransfer" stackId="a" fill="#3b82f6" />
                   <Bar dataKey="userHangup" stackId="a" fill="#10b981" />
@@ -657,7 +735,10 @@ export default function PlatformAnalytics() {
                 <BarChart data={sentimentByDate}>
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip cursor={{ fill: 'transparent' }} formatter={(value, name) => [value, formatLabel(String(name))]} />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    formatter={(value, name) => [value, formatLabel(String(name))]}
+                  />
                   <Bar dataKey="negative" stackId="a" fill="#ef4444" />
                   <Bar dataKey="neutral" stackId="a" fill="#f97316" />
                   <Bar dataKey="positive" stackId="a" fill="#10b981" />
@@ -683,7 +764,10 @@ export default function PlatformAnalytics() {
                 <BarChart data={agentSuccessData} layout="vertical">
                   <XAxis type="number" tick={{ fontSize: 10 }} />
                   <YAxis dataKey="agent" type="category" tick={{ fontSize: 9 }} width={180} />
-                  <Tooltip cursor={{ fill: 'transparent' }} formatter={(value, name) => [value, formatLabel(String(name))]} />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    formatter={(value, name) => [value, formatLabel(String(name))]}
+                  />
                   <Bar dataKey="rate" fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>
@@ -703,7 +787,10 @@ export default function PlatformAnalytics() {
                 <BarChart data={agentPickupData} layout="vertical">
                   <XAxis type="number" tick={{ fontSize: 10 }} />
                   <YAxis dataKey="agent" type="category" tick={{ fontSize: 9 }} width={180} />
-                  <Tooltip cursor={{ fill: 'transparent' }} formatter={(value, name) => [value, formatLabel(String(name))]} />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    formatter={(value, name) => [value, formatLabel(String(name))]}
+                  />
                   <Bar dataKey="rate" fill="#10b981" />
                 </BarChart>
               </ResponsiveContainer>
@@ -723,7 +810,10 @@ export default function PlatformAnalytics() {
                 <BarChart data={agentTransferData} layout="vertical">
                   <XAxis type="number" tick={{ fontSize: 10 }} />
                   <YAxis dataKey="agent" type="category" tick={{ fontSize: 9 }} width={180} />
-                  <Tooltip cursor={{ fill: 'transparent' }} formatter={(value, name) => [value, formatLabel(String(name))]} />
+                  <Tooltip
+                    cursor={{ fill: 'transparent' }}
+                    formatter={(value, name) => [value, formatLabel(String(name))]}
+                  />
                   <Bar dataKey="rate" fill="#f59e0b" />
                 </BarChart>
               </ResponsiveContainer>

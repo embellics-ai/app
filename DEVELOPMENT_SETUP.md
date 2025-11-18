@@ -233,12 +233,10 @@ export $(cat .env | xargs) && npm run dev
 ### Modified Files:
 
 1. `server/index.ts`
-
    - Changed default port to 3000
    - Fixed listen() call for macOS compatibility
 
 2. `server/email.ts`
-
    - Added development mode detection
    - Added console logging for credentials in dev mode
    - Added graceful error handling

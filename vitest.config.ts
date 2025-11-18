@@ -13,13 +13,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['client/src/**/*.{ts,tsx}', 'server/**/*.ts'],
-      exclude: [
-        'node_modules/**',
-        'tests/**',
-        '**/*.config.ts',
-        '**/types.ts',
-        '**/schema.ts',
-      ],
+      exclude: ['node_modules/**', 'tests/**', '**/*.config.ts', '**/types.ts', '**/schema.ts'],
     },
   },
   resolve: {

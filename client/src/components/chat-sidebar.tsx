@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from '@tanstack/react-query';
 import {
   Sidebar,
   SidebarContent,
@@ -6,27 +6,24 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-} from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Bot, Calendar, BarChart3 } from "lucide-react";
-import { useLocation } from "wouter";
-import type { Conversation } from "@shared/schema";
+} from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { MessageSquare, Bot, Calendar, BarChart3 } from 'lucide-react';
+import { useLocation } from 'wouter';
+import type { Conversation } from '@shared/schema';
 
 type ChatSidebarProps = {
   currentConversationId?: string | null;
   onConversationSelect?: (id: string) => void;
 };
 
-export function ChatSidebar({
-  currentConversationId,
-  onConversationSelect,
-}: ChatSidebarProps) {
+export function ChatSidebar({ currentConversationId, onConversationSelect }: ChatSidebarProps) {
   const [location, setLocation] = useLocation();
 
   // Query for all conversations
   const { data: conversations = [] } = useQuery<Conversation[]>({
-    queryKey: ["/api/conversations"],
+    queryKey: ['/api/conversations'],
   });
 
   return (
@@ -43,18 +40,18 @@ export function ChatSidebar({
           <SidebarGroupContent className="px-3 py-2">
             <div className="space-y-1">
               <Button
-                variant={location === "/" ? "secondary" : "ghost"}
+                variant={location === '/' ? 'secondary' : 'ghost'}
                 className="w-full justify-start hover-elevate"
-                onClick={() => setLocation("/")}
+                onClick={() => setLocation('/')}
                 data-testid="nav-chat"
               >
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Chat
               </Button>
               <Button
-                variant={location === "/analytics" ? "secondary" : "ghost"}
+                variant={location === '/analytics' ? 'secondary' : 'ghost'}
                 className="w-full justify-start hover-elevate"
-                onClick={() => setLocation("/analytics")}
+                onClick={() => setLocation('/analytics')}
                 data-testid="nav-analytics"
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
@@ -70,9 +67,8 @@ export function ChatSidebar({
             <div className="space-y-3">
               <div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  A custom AI chat interface built with OpenAI integration. All
-                  conversations are saved to PostgreSQL for history and
-                  analytics.
+                  A custom AI chat interface built with OpenAI integration. All conversations are
+                  saved to PostgreSQL for history and analytics.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -89,41 +85,29 @@ export function ChatSidebar({
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>
-            Recent Conversations ({conversations.length})
-          </SidebarGroupLabel>
+          <SidebarGroupLabel>Recent Conversations ({conversations.length})</SidebarGroupLabel>
           <SidebarGroupContent className="px-3 py-2">
             {conversations.length === 0 ? (
               <div className="text-center py-8 px-4">
                 <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-                <p className="text-xs text-muted-foreground">
-                  No conversations yet
-                </p>
+                <p className="text-xs text-muted-foreground">No conversations yet</p>
               </div>
             ) : (
               <div className="space-y-1">
                 {conversations.slice(0, 10).map((conversation) => (
                   <Button
                     key={conversation.id}
-                    variant={
-                      currentConversationId === conversation.id
-                        ? "secondary"
-                        : "ghost"
-                    }
+                    variant={currentConversationId === conversation.id ? 'secondary' : 'ghost'}
                     className="w-full justify-start text-left hover-elevate"
                     onClick={() => onConversationSelect?.(conversation.id)}
                     data-testid={`conversation-${conversation.id}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {conversation.title}
-                      </div>
+                      <div className="text-sm font-medium truncate">{conversation.title}</div>
                       {conversation.createdAt && (
                         <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                           <Calendar className="h-3 w-3" />
-                          {new Date(
-                            conversation.createdAt
-                          ).toLocaleDateString()}
+                          {new Date(conversation.createdAt).toLocaleDateString()}
                         </div>
                       )}
                     </div>

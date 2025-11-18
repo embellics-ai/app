@@ -1,31 +1,31 @@
-import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { AppSidebar } from "@/components/app-sidebar";
-import { AuthProvider, useAuth } from "@/contexts/auth-context";
-import { useWebSocket } from "@/hooks/use-websocket";
-import { ProtectedRoute } from "@/components/protected-route";
-import { ChangePasswordRequired } from "@/components/change-password-required";
-import Chat from "@/pages/chat";
-import Analytics from "@/pages/analytics";
-import PlatformAnalytics from "@/pages/platform-analytics";
-import WidgetConfigPage from "@/pages/widget-config";
-import ApiKeysPage from "@/pages/api-keys";
-import AgentDashboard from "@/pages/agent-dashboard";
-import PlatformAdminPage from "@/pages/platform-admin";
-import TeamManagementPage from "@/pages/team-management";
-import ChangePasswordPage from "@/pages/change-password";
-import OnboardingPage from "@/pages/onboarding";
-import Login from "@/pages/login";
-import ForgotPassword from "@/pages/forgot-password";
-import ResetPassword from "@/pages/reset-password";
-import NotFound from "@/pages/not-found";
-import { useEffect } from "react";
+import { Switch, Route, useLocation } from 'wouter';
+import { queryClient } from './lib/queryClient';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { ThemeProvider } from '@/components/theme-provider';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { AppSidebar } from '@/components/app-sidebar';
+import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { useWebSocket } from '@/hooks/use-websocket';
+import { ProtectedRoute } from '@/components/protected-route';
+import { ChangePasswordRequired } from '@/components/change-password-required';
+import Chat from '@/pages/chat';
+import Analytics from '@/pages/analytics';
+import PlatformAnalytics from '@/pages/platform-analytics';
+import WidgetConfigPage from '@/pages/widget-config';
+import ApiKeysPage from '@/pages/api-keys';
+import AgentDashboard from '@/pages/agent-dashboard';
+import PlatformAdminPage from '@/pages/platform-admin';
+import TeamManagementPage from '@/pages/team-management';
+import ChangePasswordPage from '@/pages/change-password';
+import OnboardingPage from '@/pages/onboarding';
+import Login from '@/pages/login';
+import ForgotPassword from '@/pages/forgot-password';
+import ResetPassword from '@/pages/reset-password';
+import NotFound from '@/pages/not-found';
+import { useEffect } from 'react';
 
 function Router() {
   return (
@@ -131,12 +131,12 @@ function ProtectedAppContent() {
   const [location, setLocation] = useLocation();
 
   const style = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "3rem",
+    '--sidebar-width': '16rem',
+    '--sidebar-width-icon': '3rem',
   };
 
   // Public routes that don't require authentication
-  const publicRoutes = ["/login", "/forgot-password", "/reset-password"];
+  const publicRoutes = ['/login', '/forgot-password', '/reset-password'];
   const isPublicRoute = (path: string) => {
     // Check exact matches
     if (publicRoutes.includes(path)) return true;
@@ -147,7 +147,7 @@ function ProtectedAppContent() {
   // Redirect to login if not authenticated (except for public routes)
   useEffect(() => {
     if (!isLoading && !user && !isPublicRoute(location)) {
-      setLocation("/login");
+      setLocation('/login');
     }
   }, [user, isLoading, location, setLocation]);
 
@@ -155,16 +155,16 @@ function ProtectedAppContent() {
 
   // Redirect users from home page to their appropriate dashboard
   useEffect(() => {
-    if (!isLoading && user && location === "/") {
+    if (!isLoading && user && location === '/') {
       if (user.isPlatformAdmin) {
-        setLocation("/platform-admin");
-      } else if (user.role === "support_staff") {
-        setLocation("/agent-dashboard");
-      } else if (user.role === "client_admin") {
-        setLocation("/analytics");
+        setLocation('/platform-admin');
+      } else if (user.role === 'support_staff') {
+        setLocation('/agent-dashboard');
+      } else if (user.role === 'client_admin') {
+        setLocation('/analytics');
       } else {
         // Fallback for any other role
-        setLocation("/analytics");
+        setLocation('/analytics');
       }
     }
   }, [user, isLoading, location, setLocation]);

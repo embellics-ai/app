@@ -12,3 +12,4 @@ build/
 *.tfstate
 *.tfstate.*
 .terraform/
+.vercel

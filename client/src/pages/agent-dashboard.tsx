@@ -1,17 +1,17 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { Users, Clock, CheckCircle, AlertCircle, MessageSquare } from "lucide-react";
-import { useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { AgentChatInterface } from "@/components/agent-chat-interface";
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { Users, Clock, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { AgentChatInterface } from '@/components/agent-chat-interface';
 
 type HumanAgent = {
   id: string;
@@ -38,41 +38,47 @@ export default function AgentDashboard() {
 
   // Fetch all human agents with auto-refresh
   const { data: agents = [], isLoading: agentsLoading } = useQuery<HumanAgent[]>({
-    queryKey: ["/api/human-agents"],
+    queryKey: ['/api/human-agents'],
     refetchInterval: 5000, // Refresh every 5 seconds for agent status
   });
 
   // Fetch pending handoffs with auto-refresh every 3 seconds
   const { data: pendingHandoffs = [], isLoading: pendingLoading } = useQuery<Conversation[]>({
-    queryKey: ["/api/handoff/pending"],
+    queryKey: ['/api/handoff/pending'],
     refetchInterval: 3000, // Refresh every 3 seconds for new handoffs
   });
 
   // Fetch ALL active handoffs for tenant (all agents) with auto-refresh
   const { data: activeChats = [], isLoading: activeChatsLoading } = useQuery<Conversation[]>({
-    queryKey: ["/api/handoff/active"],
+    queryKey: ['/api/handoff/active'],
     refetchInterval: 3000, // Refresh every 3 seconds for status updates
   });
 
   // Assign handoff mutation
   const assignMutation = useMutation({
-    mutationFn: async ({ conversationId, humanAgentId }: { conversationId: string; humanAgentId: string }) => {
-      return apiRequest("POST", "/api/handoff/assign", { conversationId, humanAgentId });
+    mutationFn: async ({
+      conversationId,
+      humanAgentId,
+    }: {
+      conversationId: string;
+      humanAgentId: string;
+    }) => {
+      return apiRequest('POST', '/api/handoff/assign', { conversationId, humanAgentId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/handoff/pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/handoff/active"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/human-agents"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/handoff/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/handoff/active'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/human-agents'] });
       toast({
-        title: "Handoff assigned",
+        title: 'Handoff assigned',
         description: "You've been assigned to this conversation",
       });
     },
     onError: () => {
       toast({
-        title: "Assignment failed",
-        description: "Could not assign handoff",
-        variant: "destructive",
+        title: 'Assignment failed',
+        description: 'Could not assign handoff',
+        variant: 'destructive',
       });
     },
   });
@@ -93,25 +99,25 @@ export default function AgentDashboard() {
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case "available":
-        return "default";
-      case "busy":
-        return "secondary";
-      case "offline":
-        return "outline";
+      case 'available':
+        return 'default';
+      case 'busy':
+        return 'secondary';
+      case 'offline':
+        return 'outline';
       default:
-        return "outline";
+        return 'outline';
     }
   };
 
   const getHandoffReasonLabel = (reason?: string) => {
     switch (reason) {
-      case "user_request":
-        return "User requested";
-      case "ai_limitation":
-        return "AI limitation";
+      case 'user_request':
+        return 'User requested';
+      case 'ai_limitation':
+        return 'AI limitation';
       default:
-        return reason || "Unknown";
+        return reason || 'Unknown';
     }
   };
 
@@ -120,7 +126,9 @@ export default function AgentDashboard() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-page-title">Agent Dashboard</h1>
+          <h1 className="text-2xl font-semibold" data-testid="text-page-title">
+            Agent Dashboard
+          </h1>
           <p className="text-sm text-muted-foreground" data-testid="text-page-description">
             Manage human agent handoffs and live conversations
           </p>
@@ -147,7 +155,7 @@ export default function AgentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-available-agents">
-                {agents.filter((a) => a.status === "available").length}
+                {agents.filter((a) => a.status === 'available').length}
               </div>
             </CardContent>
           </Card>
@@ -184,7 +192,9 @@ export default function AgentDashboard() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="agents" data-testid="tab-agents">Agents</TabsTrigger>
+            <TabsTrigger value="agents" data-testid="tab-agents">
+              Agents
+            </TabsTrigger>
           </TabsList>
 
           {/* Pending Handoffs Tab */}
@@ -199,7 +209,9 @@ export default function AgentDashboard() {
                   <div className="text-center text-muted-foreground" data-testid="text-no-pending">
                     <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p>No pending handoffs</p>
-                    <p className="text-sm">Conversations will appear here when users request human support</p>
+                    <p className="text-sm">
+                      Conversations will appear here when users request human support
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -210,14 +222,19 @@ export default function AgentDashboard() {
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 space-y-1">
-                          <CardTitle className="text-base" data-testid={`text-conversation-${conversation.id}`}>
+                          <CardTitle
+                            className="text-base"
+                            data-testid={`text-conversation-${conversation.id}`}
+                          >
                             Conversation {conversation.id.slice(0, 8)}
                           </CardTitle>
                           <CardDescription className="flex items-center gap-2">
                             <Clock className="h-3 w-3" />
                             {conversation.handoffTimestamp
-                              ? formatDistanceToNow(new Date(conversation.handoffTimestamp), { addSuffix: true })
-                              : "Just now"}
+                              ? formatDistanceToNow(new Date(conversation.handoffTimestamp), {
+                                  addSuffix: true,
+                                })
+                              : 'Just now'}
                           </CardDescription>
                         </div>
                         <Badge variant="secondary" data-testid={`badge-reason-${conversation.id}`}>
@@ -230,8 +247,8 @@ export default function AgentDashboard() {
                       {conversation.conversationSummary && (
                         <div>
                           <h4 className="text-sm font-medium mb-2">Summary</h4>
-                          <div 
-                            className="text-sm text-muted-foreground bg-muted p-3 rounded-md" 
+                          <div
+                            className="text-sm text-muted-foreground bg-muted p-3 rounded-md"
                             data-testid={`text-summary-${conversation.id}`}
                           >
                             {conversation.conversationSummary}
@@ -244,7 +261,10 @@ export default function AgentDashboard() {
                       {/* Action Buttons */}
                       <div className="flex gap-2">
                         {agents
-                          .filter((agent) => agent.status === "available" && agent.activeChats < agent.maxChats)
+                          .filter(
+                            (agent) =>
+                              agent.status === 'available' && agent.activeChats < agent.maxChats,
+                          )
                           .map((agent) => (
                             <Button
                               key={agent.id}
@@ -256,8 +276,14 @@ export default function AgentDashboard() {
                               Assign to {agent.name}
                             </Button>
                           ))}
-                        {agents.filter((agent) => agent.status === "available" && agent.activeChats < agent.maxChats).length === 0 && (
-                          <p className="text-sm text-muted-foreground" data-testid="text-no-available-agents">
+                        {agents.filter(
+                          (agent) =>
+                            agent.status === 'available' && agent.activeChats < agent.maxChats,
+                        ).length === 0 && (
+                          <p
+                            className="text-sm text-muted-foreground"
+                            data-testid="text-no-available-agents"
+                          >
                             No available agents
                           </p>
                         )}
@@ -292,18 +318,26 @@ export default function AgentDashboard() {
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 space-y-1">
-                          <CardTitle className="text-base" data-testid={`text-active-conversation-${conversation.id}`}>
+                          <CardTitle
+                            className="text-base"
+                            data-testid={`text-active-conversation-${conversation.id}`}
+                          >
                             Conversation {conversation.id.slice(0, 8)}
                           </CardTitle>
                           <CardDescription className="flex items-center gap-2">
                             <Clock className="h-3 w-3" />
-                            Active since{" "}
+                            Active since{' '}
                             {conversation.handoffTimestamp
-                              ? formatDistanceToNow(new Date(conversation.handoffTimestamp), { addSuffix: true })
-                              : "recently"}
+                              ? formatDistanceToNow(new Date(conversation.handoffTimestamp), {
+                                  addSuffix: true,
+                                })
+                              : 'recently'}
                           </CardDescription>
                         </div>
-                        <Badge variant="default" data-testid={`badge-active-status-${conversation.id}`}>
+                        <Badge
+                          variant="default"
+                          data-testid={`badge-active-status-${conversation.id}`}
+                        >
                           In Progress
                         </Badge>
                       </div>
@@ -313,8 +347,8 @@ export default function AgentDashboard() {
                       {conversation.conversationSummary && (
                         <div>
                           <h4 className="text-sm font-medium mb-2">Context</h4>
-                          <div 
-                            className="text-sm text-muted-foreground bg-muted p-3 rounded-md" 
+                          <div
+                            className="text-sm text-muted-foreground bg-muted p-3 rounded-md"
                             data-testid={`text-active-summary-${conversation.id}`}
                           >
                             {conversation.conversationSummary}
@@ -328,8 +362,12 @@ export default function AgentDashboard() {
                       {conversation.humanAgentId && (
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-muted-foreground">Assigned to:</span>
-                          <span className="font-medium" data-testid={`text-assigned-agent-${conversation.id}`}>
-                            {agents.find((a) => a.id === conversation.humanAgentId)?.name || "Unknown Agent"}
+                          <span
+                            className="font-medium"
+                            data-testid={`text-assigned-agent-${conversation.id}`}
+                          >
+                            {agents.find((a) => a.id === conversation.humanAgentId)?.name ||
+                              'Unknown Agent'}
                           </span>
                         </div>
                       )}
@@ -378,14 +416,20 @@ export default function AgentDashboard() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-base" data-testid={`text-agent-name-${agent.id}`}>
+                          <CardTitle
+                            className="text-base"
+                            data-testid={`text-agent-name-${agent.id}`}
+                          >
                             {agent.name}
                           </CardTitle>
                           <CardDescription data-testid={`text-agent-email-${agent.id}`}>
                             {agent.email}
                           </CardDescription>
                         </div>
-                        <Badge variant={getStatusBadgeVariant(agent.status)} data-testid={`badge-status-${agent.id}`}>
+                        <Badge
+                          variant={getStatusBadgeVariant(agent.status)}
+                          data-testid={`badge-status-${agent.id}`}
+                        >
                           {agent.status}
                         </Badge>
                       </div>
@@ -409,10 +453,7 @@ export default function AgentDashboard() {
         <Dialog open={chatDialogOpen} onOpenChange={setChatDialogOpen}>
           <DialogContent className="max-w-4xl p-0" data-testid="dialog-chat">
             {selectedConversation && (
-              <AgentChatInterface
-                conversationId={selectedConversation}
-                onClose={handleCloseChat}
-              />
+              <AgentChatInterface conversationId={selectedConversation} onClose={handleCloseChat} />
             )}
           </DialogContent>
         </Dialog>

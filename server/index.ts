@@ -1,15 +1,10 @@
-import "dotenv/config";
-import express, {
-  type Request,
-  Response,
-  NextFunction,
-  type Express,
-} from "express";
-import expressWs from "express-ws";
-import { createServer } from "http";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { initializeDatabase } from "./db-init";
+import 'dotenv/config';
+import express, { type Request, Response, NextFunction, type Express } from 'express';
+import expressWs from 'express-ws';
+import { createServer } from 'http';
+import { registerRoutes } from './routes';
+import { setupVite, serveStatic, log } from './vite';
+import { initializeDatabase } from './db-init';
 
 const app = express();
 // Create HTTP server first, then add WebSocket support to it
@@ -19,7 +14,7 @@ const { app: wsApp, getWss } = expressWs(app, httpServer);
 // Export WebSocket broadcast function for use in routes
 export { getWss };
 
-declare module "http" {
+declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown;
   }
@@ -30,7 +25,7 @@ app.use(
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
-  })
+  }),
 );
 app.use(express.urlencoded({ extended: false }));
 
@@ -45,16 +40,16 @@ app.use((req, res, next) => {
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
-  res.on("finish", () => {
+  res.on('finish', () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
+    if (path.startsWith('/api')) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
       if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+        logLine = logLine.slice(0, 79) + '…';
       }
 
       log(logLine);
@@ -72,7 +67,7 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const message = err.message || 'Internal Server Error';
 
     res.status(status).json({ message });
     throw err;
@@ -81,7 +76,7 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (app.get('env') === 'development') {
     await setupVite(app, httpServer);
   } else {
     serveStatic(app);
@@ -91,8 +86,8 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 3000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "3000", 10);
-  httpServer.listen(port, "localhost", () => {
+  const port = parseInt(process.env.PORT || '3000', 10);
+  httpServer.listen(port, 'localhost', () => {
     log(`serving on port ${port}`);
   });
 })();

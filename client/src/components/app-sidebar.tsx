@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation } from 'wouter';
 import {
   Sidebar,
   SidebarContent,
@@ -10,11 +10,22 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
-} from "@/components/ui/sidebar";
-import { BarChart3, Settings, Key, MessageSquare, LogOut, Headphones, Shield, Users, Lock, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/contexts/auth-context";
+} from '@/components/ui/sidebar';
+import {
+  BarChart3,
+  Settings,
+  Key,
+  MessageSquare,
+  LogOut,
+  Headphones,
+  Shield,
+  Users,
+  Lock,
+  Sparkles,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/auth-context';
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -27,13 +38,13 @@ export function AppSidebar() {
     if (user.isPlatformAdmin) {
       return [
         {
-          title: "Analytics",
-          url: "/platform-analytics",
+          title: 'Analytics',
+          url: '/platform-analytics',
           icon: BarChart3,
         },
         {
-          title: "Platform Admin",
-          url: "/platform-admin",
+          title: 'Platform Admin',
+          url: '/platform-admin',
           icon: Shield,
         },
       ];
@@ -43,33 +54,33 @@ export function AppSidebar() {
     if (user.role === 'client_admin') {
       return [
         {
-          title: "Analytics",
-          url: "/analytics",
+          title: 'Analytics',
+          url: '/analytics',
           icon: BarChart3,
         },
         {
-          title: "Onboarding",
-          url: "/onboarding",
+          title: 'Onboarding',
+          url: '/onboarding',
           icon: Sparkles,
         },
         {
-          title: "Agent Dashboard",
-          url: "/agent-dashboard",
+          title: 'Agent Dashboard',
+          url: '/agent-dashboard',
           icon: Headphones,
         },
         {
-          title: "Team Management",
-          url: "/team-management",
+          title: 'Team Management',
+          url: '/team-management',
           icon: Users,
         },
         {
-          title: "Widget Config",
-          url: "/widget-config",
+          title: 'Widget Config',
+          url: '/widget-config',
           icon: Settings,
         },
         {
-          title: "API Keys",
-          url: "/api-keys",
+          title: 'API Keys',
+          url: '/api-keys',
           icon: Key,
         },
       ];
@@ -79,13 +90,13 @@ export function AppSidebar() {
     if (user.role === 'support_staff') {
       return [
         {
-          title: "Agent Dashboard",
-          url: "/agent-dashboard",
+          title: 'Agent Dashboard',
+          url: '/agent-dashboard',
           icon: Headphones,
         },
         {
-          title: "Test Chat",
-          url: "/test-chat",
+          title: 'Test Chat',
+          url: '/test-chat',
           icon: MessageSquare,
         },
       ];
@@ -94,13 +105,13 @@ export function AppSidebar() {
     // Default fallback menu
     return [
       {
-        title: "Analytics",
-        url: "/analytics",
+        title: 'Analytics',
+        url: '/analytics',
         icon: BarChart3,
       },
       {
-        title: "Test Chat",
-        url: "/",
+        title: 'Test Chat',
+        url: '/',
         icon: MessageSquare,
       },
     ];
@@ -123,8 +134,8 @@ export function AppSidebar() {
           </div>
           {user && (
             <div className="flex items-center gap-2">
-              <Badge variant={user.isPlatformAdmin ? "default" : "secondary"} className="text-xs">
-                {user.isPlatformAdmin ? "Platform Admin" : user.role.replace('_', ' ')}
+              <Badge variant={user.isPlatformAdmin ? 'default' : 'secondary'} className="text-xs">
+                {user.isPlatformAdmin ? 'Platform Admin' : user.role.replace('_', ' ')}
               </Badge>
               {user.firstName && (
                 <span className="text-xs text-muted-foreground">
@@ -145,7 +156,10 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
-                      <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                      <Link
+                        href={item.url}
+                        data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>

@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useMutation } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -17,26 +17,24 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Lock, AlertCircle, LogOut } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/contexts/auth-context";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { Loader2, Lock, AlertCircle, LogOut } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/auth-context';
 
 const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z
-      .string()
-      .min(8, "New password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
   });
 
 type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
@@ -49,15 +47,15 @@ export function ChangePasswordRequired() {
   const form = useForm<ChangePasswordFormData>({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
     },
   });
 
   const changePasswordMutation = useMutation({
     mutationFn: async (data: ChangePasswordFormData) => {
-      const response = await apiRequest("POST", "/api/auth/change-password", {
+      const response = await apiRequest('POST', '/api/auth/change-password', {
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
       });
@@ -65,25 +63,24 @@ export function ChangePasswordRequired() {
     },
     onSuccess: async () => {
       toast({
-        title: "Password changed successfully",
-        description:
-          "Your password has been updated. You can now access the platform.",
+        title: 'Password changed successfully',
+        description: 'Your password has been updated. You can now access the platform.',
       });
 
       // Force refetch user data to clear mustChangePassword flag
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/auth/me'] });
 
       form.reset();
       setError(null);
     },
     onError: (error: any) => {
-      const errorMessage = error.message || "Failed to change password";
+      const errorMessage = error.message || 'Failed to change password';
       setError(errorMessage);
       toast({
-        title: "Failed to change password",
+        title: 'Failed to change password',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     },
   });
@@ -106,8 +103,8 @@ export function ChangePasswordRequired() {
             Password Change Required
           </DialogTitle>
           <DialogDescription>
-            You're using a temporary password. For security reasons, please
-            change your password before continuing.
+            You're using a temporary password. For security reasons, please change your password
+            before continuing.
           </DialogDescription>
         </DialogHeader>
 
@@ -192,7 +189,7 @@ export function ChangePasswordRequired() {
                   Changing Password...
                 </>
               ) : (
-                "Change Password"
+                'Change Password'
               )}
             </Button>
 
