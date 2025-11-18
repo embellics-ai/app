@@ -1,0 +1,1154 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  AlertCircle,
+  UserPlus,
+  Users,
+  Mail,
+  Loader2,
+  Trash2,
+  Building2,
+  Key,
+  Edit,
+  Eye,
+  EyeOff,
+  Copy,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/auth-context";
+import { useLocation } from "wouter";
+
+const inviteUserSchema = z
+  .object({
+    email: z
+      .string()
+      .email("Invalid email address")
+      .min(1, "Email is required"),
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    role: z.enum(["admin", "client_admin"]),
+    // Client/Tenant onboarding fields
+    companyName: z.string().optional(),
+    companyPhone: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // If role is client_admin, company name is required
+      if (data.role === "client_admin") {
+        return !!data.companyName;
+      }
+      return true;
+    },
+    {
+      message: "Company Name is required for Client Admin",
+      path: ["companyName"],
+    }
+  );
+
+type InviteUserFormData = z.infer<typeof inviteUserSchema>;
+
+export default function PlatformAdminPage() {
+  const { toast } = useToast();
+  const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [showTempPassword, setShowTempPassword] = useState(true); // Auto-show by default
+  const [editApiKeyDialog, setEditApiKeyDialog] = useState<{
+    open: boolean;
+    tenant: any | null;
+  }>({
+    open: false,
+    tenant: null,
+  });
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+
+  // Access control: Only platform admins can view this page
+  useEffect(() => {
+    if (!isLoading && user && !user.isPlatformAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to access this page.",
+        variant: "destructive",
+      });
+      setLocation("/analytics");
+    }
+  }, [user, isLoading, setLocation, toast]);
+
+  // Show loading or redirect while checking access
+  if (isLoading || (user && !user.isPlatformAdmin)) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  const form = useForm<InviteUserFormData>({
+    resolver: zodResolver(inviteUserSchema),
+    defaultValues: {
+      email: "",
+      firstName: "",
+      lastName: "",
+      role: "client_admin",
+      companyName: "",
+      companyPhone: "",
+    },
+  });
+
+  // Watch the role field to show/hide client onboarding fields
+  const selectedRole = form.watch("role");
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<any[]>({
+    queryKey: ["/api/platform/users"],
+  });
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery<
+    any[]
+  >({
+    queryKey: ["/api/platform/invitations/pending"],
+  });
+
+  const isOwner = currentUser?.email === "admin@embellics.com";
+
+  const { data: tenants = [], isLoading: tenantsLoading } = useQuery<any[]>({
+    queryKey: ["/api/platform/tenants"],
+  });
+
+  const inviteUserMutation = useMutation({
+    mutationFn: async (data: InviteUserFormData) => {
+      const response = await apiRequest(
+        "POST",
+        "/api/platform/invite-user",
+        data
+      );
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      setTempPassword(data.temporaryPassword);
+
+      if (data.emailSent) {
+        toast({
+          title: "User invited successfully",
+          description:
+            "Invitation email sent. The temporary password is displayed below.",
+        });
+      } else {
+        toast({
+          title: "Invitation created",
+          description: `Email failed to send: ${
+            data.emailError || "Unknown error"
+          }. Please share the temporary password manually.`,
+          variant: "destructive",
+        });
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/platform/invitations/pending"],
+      });
+      form.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to invite user",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest(
+        "DELETE",
+        `/api/platform/users/${userId}`
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User deleted successfully",
+        description: "The user has been removed from the system.",
+      });
+      // Invalidate ALL queries that might show this user
+      queryClient.invalidateQueries({ queryKey: ["/api/platform/users"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/platform/invitations/pending"],
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/platform/tenants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete user",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (tenantId: string) => {
+      const response = await apiRequest(
+        "DELETE",
+        `/api/platform/tenants/${tenantId}`
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tenant deleted successfully",
+        description: "The tenant and all associated data have been removed.",
+      });
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ["/api/platform/tenants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/platform/users"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/platform/invitations/pending"],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete tenant",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      const response = await apiRequest(
+        "DELETE",
+        `/api/platform/invitations/${invitationId}`
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Invitation deleted successfully",
+        description: "The invitation has been removed from the system.",
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/platform/invitations/pending"],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete invitation",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateRetellApiKeyMutation = useMutation({
+    mutationFn: async ({
+      tenantId,
+      retellApiKey,
+      retellAgentId,
+    }: {
+      tenantId: string;
+      retellApiKey: string;
+      retellAgentId?: string;
+    }) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/platform/tenants/${tenantId}/retell-api-key`,
+        {
+          retellApiKey,
+          retellAgentId,
+        }
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Retell Configuration updated",
+        description:
+          "The Retell AI API key and agent have been successfully assigned.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/platform/tenants"] });
+      setEditApiKeyDialog({ open: false, tenant: null });
+      setApiKeyInput("");
+      setSelectedAgentId("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update configuration",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied to clipboard",
+      description: "Temporary password has been copied to your clipboard.",
+    });
+  };
+
+  const onSubmit = (data: InviteUserFormData) => {
+    setTempPassword(null);
+    setShowTempPassword(true); // Reset for next invitation
+    inviteUserMutation.mutate(data);
+  };
+
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case "owner":
+        return "default";
+      case "admin":
+        return "secondary";
+      case "client_admin":
+        return "outline";
+      default:
+        return "outline";
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Platform Administration</h1>
+        <p className="text-muted-foreground">
+          Manage users, invitations, and platform-wide settings
+        </p>
+      </div>
+
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="users" data-testid="tab-users">
+            <Users className="w-4 h-4 mr-2" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="tenants" data-testid="tab-tenants">
+            <Building2 className="w-4 h-4 mr-2" />
+            Tenants
+          </TabsTrigger>
+          <TabsTrigger value="invitations" data-testid="tab-invitations">
+            <Mail className="w-4 h-4 mr-2" />
+            Invitations
+          </TabsTrigger>
+          <TabsTrigger value="invite" data-testid="tab-invite">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite User
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Users</CardTitle>
+              <CardDescription>
+                View and manage all users across all tenants
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No users found
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Tenant</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user: any) => (
+                        <TableRow
+                          key={user.id}
+                          data-testid={`row-user-${user.id}`}
+                        >
+                          <TableCell
+                            className="font-medium"
+                            data-testid={`text-user-name-${user.id}`}
+                          >
+                            {user.firstName} {user.lastName}
+                          </TableCell>
+                          <TableCell data-testid={`text-user-email-${user.id}`}>
+                            {user.email}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={getRoleBadgeVariant(user.role)}
+                              data-testid={`badge-user-role-${user.id}`}
+                            >
+                              {user.role.replace("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell
+                            className="text-muted-foreground"
+                            data-testid={`text-user-tenant-${user.id}`}
+                          >
+                            {user.tenantId
+                              ? user.tenantId.slice(0, 8)
+                              : "Platform"}
+                          </TableCell>
+                          <TableCell>
+                            {user.isPlatformAdmin && (
+                              <Badge
+                                variant="default"
+                                data-testid={`badge-platform-admin-${user.id}`}
+                              >
+                                Platform Admin
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {!user.isPlatformAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    data-testid={`button-delete-user-${user.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Delete User
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete{" "}
+                                      {user.firstName} {user.lastName}? This
+                                      action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel
+                                      data-testid={`button-cancel-delete-${user.id}`}
+                                    >
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() =>
+                                        deleteUserMutation.mutate(user.id)
+                                      }
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      data-testid={`button-confirm-delete-${user.id}`}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tenants" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Client Tenants</CardTitle>
+              <CardDescription>
+                Manage client tenants and assign Retell AI API keys
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tenantsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : tenants.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No tenants found
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Retell API Key</TableHead>
+                        <TableHead className="w-[120px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tenants.map((tenant: any) => (
+                        <TableRow
+                          key={tenant.id}
+                          data-testid={`row-tenant-${tenant.id}`}
+                        >
+                          <TableCell
+                            className="font-medium"
+                            data-testid={`text-tenant-name-${tenant.id}`}
+                          >
+                            {tenant.name}
+                          </TableCell>
+                          <TableCell
+                            data-testid={`text-tenant-email-${tenant.id}`}
+                          >
+                            {tenant.email}
+                          </TableCell>
+                          <TableCell
+                            className="text-muted-foreground"
+                            data-testid={`text-tenant-phone-${tenant.id}`}
+                          >
+                            {tenant.phone || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {tenant.hasRetellApiKey ? (
+                              <Badge
+                                variant="default"
+                                data-testid={`badge-api-key-configured-${tenant.id}`}
+                              >
+                                <Key className="w-3 h-3 mr-1" />
+                                Configured
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="secondary"
+                                data-testid={`badge-api-key-not-configured-${tenant.id}`}
+                              >
+                                Not Set
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setEditApiKeyDialog({ open: true, tenant });
+                                  setApiKeyInput("");
+                                }}
+                                data-testid={`button-edit-api-key-${tenant.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    data-testid={`button-delete-tenant-${tenant.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Delete Tenant?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete{" "}
+                                      <strong>{tenant.name}</strong> and all
+                                      associated data including:
+                                      <ul className="list-disc list-inside mt-2 space-y-1">
+                                        <li>All users in this tenant</li>
+                                        <li>Widget configuration</li>
+                                        <li>API keys</li>
+                                        <li>Chat history and analytics</li>
+                                      </ul>
+                                      <p className="mt-2 font-semibold text-destructive">
+                                        This action cannot be undone!
+                                      </p>
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() =>
+                                        deleteTenantMutation.mutate(tenant.id)
+                                      }
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Delete Tenant
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="invitations" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Invitations</CardTitle>
+              <CardDescription>
+                Active user invitations waiting to be accepted
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invitationsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : invitations.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No pending invitations
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Sent</TableHead>
+                        {isOwner && <TableHead>Temp Password</TableHead>}
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invitations.map((invitation: any) => (
+                        <TableRow
+                          key={invitation.id}
+                          data-testid={`row-invitation-${invitation.id}`}
+                        >
+                          <TableCell
+                            className="font-medium"
+                            data-testid={`text-invitation-name-${invitation.id}`}
+                          >
+                            {invitation.firstName} {invitation.lastName}
+                          </TableCell>
+                          <TableCell
+                            data-testid={`text-invitation-email-${invitation.id}`}
+                          >
+                            {invitation.email}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={getRoleBadgeVariant(invitation.role)}
+                              data-testid={`badge-invitation-role-${invitation.id}`}
+                            >
+                              {invitation.role.replace("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell
+                            className="text-muted-foreground text-sm"
+                            data-testid={`text-invitation-company-${invitation.id}`}
+                          >
+                            {invitation.companyName || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                invitation.status === "sent"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              data-testid={`badge-invitation-status-${invitation.id}`}
+                            >
+                              {invitation.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell
+                            className="text-muted-foreground text-sm"
+                            data-testid={`text-invitation-sent-${invitation.id}`}
+                          >
+                            {invitation.lastSentAt
+                              ? new Date(
+                                  invitation.lastSentAt
+                                ).toLocaleDateString()
+                              : "-"}
+                          </TableCell>
+                          {isOwner && (
+                            <TableCell>
+                              {invitation.plainTemporaryPassword ? (
+                                <code
+                                  className="text-xs bg-muted px-2 py-1 rounded"
+                                  data-testid={`code-temp-password-${invitation.id}`}
+                                >
+                                  {invitation.plainTemporaryPassword}
+                                </code>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">
+                                  -
+                                </span>
+                              )}
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-testid={`button-delete-invitation-${invitation.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Delete Invitation
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete the
+                                    invitation for {invitation.email}? This
+                                    action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel
+                                    data-testid={`button-cancel-delete-${invitation.id}`}
+                                  >
+                                    Cancel
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() =>
+                                      deleteInvitationMutation.mutate(
+                                        invitation.id
+                                      )
+                                    }
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    data-testid={`button-confirm-delete-invitation-${invitation.id}`}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="invite" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Invite New User</CardTitle>
+              <CardDescription>
+                Send an invitation to join the platform
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Email <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="user@example.com"
+                            {...field}
+                            data-testid="input-email"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="John"
+                              {...field}
+                              data-testid="input-firstName"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Doe"
+                              {...field}
+                              data-testid="input-lastName"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-role">
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="admin">
+                              Admin (Platform Admin)
+                            </SelectItem>
+                            <SelectItem value="client_admin">
+                              Client Admin
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {selectedRole === "client_admin" && (
+                    <>
+                      <div className="border-t pt-4 mt-4">
+                        <h3 className="text-sm font-medium mb-3">
+                          Client Onboarding Details
+                        </h3>
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="companyName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>
+                                    Company Name{" "}
+                                    <span className="text-destructive">*</span>
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Acme Corporation"
+                                      {...field}
+                                      data-testid="input-companyName"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="companyPhone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>
+                                    Company Phone (Optional)
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="tel"
+                                      placeholder="+1 (555) 123-4567"
+                                      {...field}
+                                      data-testid="input-companyPhone"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {tempPassword && (
+                    <Alert data-testid="alert-temp-password">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <p className="font-medium mb-2">Temporary Password:</p>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Input
+                            value={
+                              showTempPassword ? tempPassword : "••••••••••••"
+                            }
+                            readOnly
+                            className="font-mono text-sm flex-1"
+                            data-testid="text-temp-password"
+                          />
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() =>
+                              setShowTempPassword(!showTempPassword)
+                            }
+                            title={
+                              showTempPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                            data-testid="button-toggle-temp-password"
+                          >
+                            {showTempPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => copyToClipboard(tempPassword)}
+                            title="Copy password"
+                            data-testid="button-copy-temp-password"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          Please share this with the invited user. They will be
+                          prompted to change it on first login.
+                        </span>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={inviteUserMutation.isPending}
+                    data-testid="button-invite"
+                    className="w-full"
+                  >
+                    {inviteUserMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sending Invitation...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Send Invitation
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Retell API Key Dialog */}
+      <Dialog
+        open={editApiKeyDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditApiKeyDialog({ open: false, tenant: null });
+            setApiKeyInput("");
+            setSelectedAgentId("");
+          }
+        }}
+      >
+        <DialogContent data-testid="dialog-edit-api-key">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              Assign Retell AI Configuration
+            </DialogTitle>
+            <DialogDescription>
+              Set or update the Retell AI API key and chat agent for{" "}
+              {editApiKeyDialog.tenant?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="retell-api-key">Retell AI API Key</Label>
+              <Input
+                id="retell-api-key"
+                type="password"
+                placeholder="Enter Retell AI API key"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                data-testid="input-retell-api-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                This key will be encrypted and stored securely. It will be used
+                for analytics and chat functionality.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="retell-agent-id">Retell Chat Agent ID</Label>
+              <Input
+                id="retell-agent-id"
+                type="text"
+                placeholder="Enter Retell Chat Agent ID (optional)"
+                value={selectedAgentId}
+                onChange={(e) => setSelectedAgentId(e.target.value)}
+                data-testid="input-retell-agent-id"
+              />
+              <p className="text-xs text-muted-foreground">
+                The agent ID to use for this tenant's chat widget. This will be
+                used for end-user chat interactions.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditApiKeyDialog({ open: false, tenant: null });
+                setApiKeyInput("");
+                setSelectedAgentId("");
+              }}
+              data-testid="button-cancel-api-key"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (editApiKeyDialog.tenant && apiKeyInput.trim()) {
+                  updateRetellApiKeyMutation.mutate({
+                    tenantId: editApiKeyDialog.tenant.id,
+                    retellApiKey: apiKeyInput.trim(),
+                    retellAgentId: selectedAgentId || undefined,
+                  });
+                }
+              }}
+              disabled={
+                !apiKeyInput.trim() || updateRetellApiKeyMutation.isPending
+              }
+              data-testid="button-save-api-key"
+            >
+              {updateRetellApiKeyMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Key className="w-4 h-4 mr-2" />
+                  Save Configuration
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
