@@ -120,14 +120,27 @@ npm run db:push
 
 ## 🌐 Deployment
 
-This application is **platform agnostic** and can be deployed to:
+This application requires a **long-running Node.js server** with WebSocket support.
 
-- ✅ Any cloud platform
-- ✅ DigitalOcean
-- ✅ Heroku
-- ✅ Railway
-- ✅ Render
-- ✅ Any VPS with Node.js
+### ✅ Recommended Platform: Render.com
+
+Render.com is a straightforward option for hosting web services and supports WebSockets and long-running Node processes. If you prefer another host, ensure it supports persistent connections and WebSocket transport.
+
+**Quick deploy notes**
+
+See `DEPLOYMENT_GUIDE.md` for full deployment instructions and environment variable examples.
+
+### 🚫 Not Compatible With (typical limitations)
+
+- Serverless-only platforms that do not provide long-running processes or WebSocket support are not recommended for this architecture. Use a host that supports persistent Node.js servers and WebSocket connections.
+
+### ✅ Other Compatible Platforms:
+
+- Render.com (Recommended - Free tier)
+- Heroku ($5/month minimum)
+- DigitalOcean App Platform
+- Fly.io
+- Any VPS with Node.js 20+
 
 ### Deployment Checklist
 
@@ -135,20 +148,20 @@ This application is **platform agnostic** and can be deployed to:
    - Update `APP_URL` to your production domain
    - Set `NODE_ENV=production`
    - Configure all required API keys
+   - See `.env.example` for all required variables
 
 2. **Database Setup**
-   - Provision PostgreSQL database
-   - Run migrations: `npm run db:push`
+   - Use Neon (https://neon.tech) for free PostgreSQL
+   - Database is automatically initialized on first deploy
 
 3. **Email Configuration**
-   - Configure your SMTP settings
+   - Configure SMTP settings (Gmail, SendGrid, etc.)
    - Update email from address
 
-4. **Build & Deploy**
-   ```bash
-   npm run build
-   npm start
-   ```
+4. **Deploy**
+   - Push to GitHub
+   - Platform auto-builds and deploys
+   - No manual build steps required
 
 ## 🗃️ Database
 

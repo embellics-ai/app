@@ -201,30 +201,9 @@ Run `npm audit` to verify (recommended before deployment)
 
 ## 🚀 Deployment Steps
 
-### For Vercel
+### For server hosts
 
-1. **Install Vercel CLI** (optional)
-
-   ```bash
-   npm i -g vercel
-   ```
-
-2. **Connect Repository**
-   - Go to [vercel.com](https://vercel.com)
-   - Click "Add New Project"
-   - Import your Git repository
-
-3. **Configure Build Settings**
-   - Build Command: `npm run build`
-   - Output Directory: `dist`
-   - Install Command: `npm install`
-
-4. **Set Environment Variables**
-   Add all required environment variables in Vercel dashboard
-
-5. **Deploy**
-   - Click "Deploy"
-   - Vercel will auto-detect Node.js and deploy
+This application is designed to run on hosting providers that offer long-running Node.js processes and WebSocket support. Serverless-only providers that restrict long-running processes or WebSocket connections are not recommended.
 
 ### For Other Platforms
 
