@@ -136,6 +136,8 @@ export interface IStorage {
   markInvitationUsed(id: string): Promise<void>; // Legacy - keeping for backward compatibility
   deleteInvitation(id: string): Promise<void>;
   cleanupExpiredInvitationPasswords(): Promise<number>; // Null out plaintext passwords for expired/accepted invitations
+  // Clear plaintext temporary password for a specific invitation (immediate)
+  clearInvitationPlainPassword(id: string): Promise<void>;
 
   // Platform Admin methods
   getAllUsers(): Promise<ClientUser[]>; // Get all users across all tenants (platform admin only)
@@ -793,6 +795,14 @@ export class MemStorage implements IStorage {
       invitation.invitedUserId = userId;
       invitation.acceptedAt = new Date();
       // SECURITY: Null out plaintext password immediately after acceptance
+      invitation.plainTemporaryPassword = null;
+      this.userInvitations.set(id, invitation);
+    }
+  }
+
+  async clearInvitationPlainPassword(id: string): Promise<void> {
+    const invitation = this.userInvitations.get(id);
+    if (invitation) {
       invitation.plainTemporaryPassword = null;
       this.userInvitations.set(id, invitation);
     }
@@ -1531,6 +1541,13 @@ export class DbStorage implements IStorage {
         // SECURITY: Null out plaintext password immediately after acceptance
         plainTemporaryPassword: null,
       })
+      .where(eq(userInvitations.id, id));
+  }
+
+  async clearInvitationPlainPassword(id: string): Promise<void> {
+    await this.db
+      .update(userInvitations)
+      .set({ plainTemporaryPassword: null })
       .where(eq(userInvitations.id, id));
   }
 

@@ -1,49 +1,52 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
-// Check if we should skip email sending in development
-// const SKIP_EMAIL_IN_DEV =
-//   process.env.SKIP_EMAIL === "true" || process.env.NODE_ENV === "development";
+// Development behavior:
+// - If SMTP_HOST is provided we attempt to send via that host (allows MailDev on localhost)
+// - If no SMTP_HOST and NODE_ENV=development, we skip sending and log the email (dev convenience)
+// - SKIP_EMAIL env var forces skip when set to 'true'
+const SKIP_EMAIL_IN_DEV =
+  process.env.SKIP_EMAIL === 'true' ||
+  (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST);
 
-const SKIP_EMAIL_IN_DEV = false;
+// Overall send timeout to avoid hanging requests (ms)
+const SEND_TIMEOUT_MS = Number(process.env.EMAIL_SEND_TIMEOUT_MS || '8000');
 /**
  * Get email transporter using SMTP configuration
  * Supports Gmail, Outlook, SendGrid, AWS SES, or any SMTP server
  */
 function getEmailTransporter(): Transporter {
-  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const smtpPort = parseInt(process.env.SMTP_PORT || '587');
-  const smtpSecure = process.env.SMTP_SECURE === 'true'; // true for 465, false for other ports
+  const smtpHost = process.env.SMTP_HOST; // undefined by default
+  const smtpPort = parseInt(process.env.SMTP_PORT || '0');
+  const smtpSecure = process.env.SMTP_SECURE === 'true';
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
   const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@embellics.com';
 
-  if (!smtpUser || !smtpPass) {
+  // If no SMTP host configured and we're skipping in dev, return jsonTransport for logging
+  if (!smtpHost) {
     if (SKIP_EMAIL_IN_DEV) {
-      console.log('[Email] ⚠️  SMTP credentials not configured, but skipping in dev mode');
-      // Return a dummy transporter for dev mode
-      return nodemailer.createTransport({
-        jsonTransport: true,
-      });
+      console.log(
+        '[Email] ⚠️  No SMTP_HOST configured; running in dev skip mode (emails will be logged)',
+      );
+      return nodemailer.createTransport({ jsonTransport: true } as any);
     }
-    throw new Error('SMTP_USER and SMTP_PASS environment variables are required');
+    throw new Error('SMTP_HOST is required when not running in development skip mode');
   }
 
   console.log('[Email] Configuring SMTP transporter');
   console.log('[Email] Host:', smtpHost);
-  console.log('[Email] Port:', smtpPort);
-  console.log('[Email] User:', smtpUser);
+  console.log('[Email] Port:', smtpPort || '(default)');
+  console.log('[Email] User:', smtpUser ? smtpUser : '(none - unauthenticated)');
   console.log('[Email] From:', fromEmail);
 
-  return nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
+  const transportOptions: any = { host: smtpHost };
+  if (smtpPort) transportOptions.port = smtpPort;
+  if (smtpSecure) transportOptions.secure = true;
+  // If credentials provided, use them; otherwise allow unauthenticated SMTP (useful for MailDev/MailHog)
+  if (smtpUser && smtpPass) transportOptions.auth = { user: smtpUser, pass: smtpPass };
+
+  return nodemailer.createTransport(transportOptions);
 }
 
 /**
@@ -144,17 +147,38 @@ export async function sendInvitationEmail(
       };
     }
 
-    const info = await transporter.sendMail({
+    // Attempt a quick verify (non-fatal) to surface obvious connection issues early
+    try {
+      await Promise.race([
+        transporter.verify(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SMTP verify timeout')), 2500)),
+      ] as any);
+    } catch (verifyErr) {
+      console.warn(
+        '[Email] transporter.verify failed (continuing to send):',
+        verifyErr instanceof Error ? verifyErr.message : verifyErr,
+      );
+    }
+
+    // Send with timeout to avoid hanging requests
+    const sendPromise = transporter.sendMail({
       from: `"Embellics Platform" <${fromEmail}>`,
       to,
       subject: 'Welcome to Embellics - Your Invitation to Join',
       html,
     });
 
+    const info = await Promise.race([
+      sendPromise,
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error('SMTP send timeout')), SEND_TIMEOUT_MS),
+      ),
+    ] as any);
+
     console.log('✅ Invitation email sent successfully');
-    console.log('Message ID:', info.messageId);
+    console.log('Message ID:', (info as any).messageId);
     return {
-      messageId: info.messageId,
+      messageId: (info as any).messageId,
       message: 'Invitation email sent successfully',
     };
   } catch (error) {
