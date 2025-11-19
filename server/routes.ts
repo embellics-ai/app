@@ -28,6 +28,7 @@ import {
   requireClientOrSupport,
   assertTenant,
 } from './auth';
+import { inviteUser } from './services/inviteService';
 import { registerClient, broadcastToTenant } from './websocket';
 import type { WebSocket } from 'ws';
 
@@ -138,45 +139,64 @@ export async function registerRoutes(app: Express): Promise<void> {
             }
           }
 
-          // Create user account
+          // Create user account from invitation (first login using temporary password)
+          // Hash the provided temporary password and create the user record.
+          const hashedPassword = await hashPassword(password);
 
           user = await storage.createClientUser({
             email: pendingInvitation.email,
-            password: pendingInvitation.temporaryPassword, // Keep temp password for now (already hashed)
+            password: hashedPassword,
             firstName: pendingInvitation.firstName,
             lastName: pendingInvitation.lastName,
             tenantId: tenantId,
             role: pendingInvitation.role,
-            isPlatformAdmin: pendingInvitation.role === 'admin',
+            isPlatformAdmin:
+              pendingInvitation.role === 'owner' || pendingInvitation.role === 'admin',
             phoneNumber: pendingInvitation.phoneNumber || null,
             mustChangePassword: true, // Force password change on first login with temp password
-            onboardingCompleted: false, // User must complete onboarding after changing password
           });
 
-          console.log(
-            `[Login] User created with password hash (first 10 chars): ${user.password.substring(
-              0,
-              10,
-            )}...`,
-          );
+          // Mark the invitation as used and clear plaintext immediately
+          await storage.markInvitationUsed(pendingInvitation.id);
 
-          // Mark invitation as accepted
-          await storage.markInvitationAccepted(pendingInvitation.id, user.id);
+          // Generate JWT token and return same shape as normal login
+          const token = generateToken({
+            userId: user.id,
+            tenantId: user.tenantId,
+            email: user.email,
+            role: user.role,
+            isPlatformAdmin: user.isPlatformAdmin,
+          });
 
-          console.log(`User account created from invitation: ${user.email}`);
-        } else {
-          // No user and no pending invitation
-          return res.status(401).json({ error: 'Invalid credentials' });
-        }
-      } else {
-        // STEP 4: User exists, verify password
-        const isValidPassword = await verifyPassword(password, user.password);
-        if (!isValidPassword) {
-          return res.status(401).json({ error: 'Invalid credentials' });
+          return res.json({
+            token,
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              role: user.role,
+              tenantId: user.tenantId,
+              isPlatformAdmin: user.isPlatformAdmin,
+              onboardingCompleted: user.onboardingCompleted,
+              mustChangePassword: user.mustChangePassword, // Use dedicated field from database
+            },
+          });
         }
       }
 
-      // STEP 5: Generate JWT token with role information
+      // If user still not found after checking invitations, deny access
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Verify password for existing user
+      const isValidPassword = await verifyPassword(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Generate JWT token for existing user
       const token = generateToken({
         userId: user.id,
         tenantId: user.tenantId,
@@ -185,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         isPlatformAdmin: user.isPlatformAdmin,
       });
 
-      res.json({
+      return res.json({
         token,
         user: {
           id: user.id,
@@ -196,7 +216,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           tenantId: user.tenantId,
           isPlatformAdmin: user.isPlatformAdmin,
           onboardingCompleted: user.onboardingCompleted,
-          mustChangePassword: user.mustChangePassword, // Use dedicated field from database
+          mustChangePassword: user.mustChangePassword,
         },
       });
     } catch (error) {
@@ -476,130 +496,42 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         const data = invitationSchema.parse(req.body);
 
-        console.log(`[Invite User] Attempting to invite: ${data.email}`);
-
-        // Check if user already exists
-        const existingUser = await storage.getClientUserByEmail(data.email);
-        if (existingUser) {
-          console.log(`[Invite User] ❌ User already exists: ${data.email}`, existingUser);
-          return res.status(400).json({ error: 'User with this email already exists' });
-        }
-
-        console.log(`[Invite User] ✓ Email is available: ${data.email}`);
-
-        // Check if there's already a pending invitation for this email
-        // If so, delete it and create a fresh one (allows resending invitations)
-        const existingInvitation = await storage.getPendingInvitationByEmail(data.email);
-        if (existingInvitation) {
-          console.log(`Deleting old pending invitation for ${data.email} before creating new one`);
-          await storage.deleteInvitation(existingInvitation.id);
-        }
-
-        // Generate temporary password
-        const tempPassword = randomBytes(8).toString('hex');
-        const hashedPassword = await hashPassword(tempPassword);
-
-        // Determine tenant ID for client admins
-        let tenantId: string | null = null;
-        if (data.role === 'client_admin') {
-          // Two scenarios:
-          // 1. Inviting to existing tenant (tenantId provided) - additional admin
-          // 2. Creating new tenant (no tenantId) - first admin
-
-          if (data.tenantId) {
-            // Validate that the tenant exists
-            const existingTenant = await storage.getTenant(data.tenantId);
-            if (!existingTenant) {
-              return res.status(400).json({
-                error: 'Specified tenant does not exist',
-              });
-            }
-            tenantId = data.tenantId;
-            console.log(`[Invite User] Inviting to existing tenant: ${tenantId}`);
-          } else {
-            // Creating new tenant - require company name
-            if (!data.companyName) {
-              return res.status(400).json({
-                error: 'Company name is required when creating a new tenant',
-              });
-            }
-            // Tenant will be created on first login
-            tenantId = null;
-            console.log(`[Invite User] Will create new tenant on first login`);
-          }
-        }
-
-        // Create invitation record with pending status
-        // Do NOT create user account yet - that happens on first login
-        const invitation = await storage.createUserInvitation({
-          email: data.email,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          temporaryPassword: hashedPassword,
-          plainTemporaryPassword: tempPassword, // Store plain text for platform owner to view (cleared after 24h)
-          role: data.role,
-          tenantId: tenantId,
-          companyName: data.companyName || null,
-          companyPhone: data.companyPhone || null,
-          invitedBy: req.user!.userId,
-          status: 'pending',
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        });
-
-        // Send invitation email with temporary password
-        let emailSent = false;
-        let emailError: any = null;
+        // Delegate invite creation to centralized invite service
         try {
-          await sendInvitationEmail(
-            data.email,
-            data.firstName,
-            data.lastName,
-            tempPassword,
-            data.role,
-          );
+          const inviter = {
+            userId: req.user!.userId,
+            role: req.user!.role,
+            tenantId: req.user!.tenantId,
+            isPlatformAdmin: req.user!.isPlatformAdmin,
+            email: req.user!.email,
+          };
 
-          // Update invitation status to 'sent'
-          await storage.updateInvitationStatus(invitation.id, 'sent', new Date());
+          const payload = {
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role,
+            tenantId: data.tenantId ?? null,
+            companyName: data.companyName ?? null,
+            companyPhone: data.companyPhone ?? null,
+          };
 
-          console.log(`✅ Invitation email sent successfully to ${data.email}`);
-          emailSent = true;
-        } catch (err) {
-          emailError = err;
-          console.error('❌ Failed to send invitation email:', err);
-          console.error('Email error details:', {
-            message: err instanceof Error ? err.message : String(err),
-            stack: err instanceof Error ? err.stack : undefined,
-          });
-          // Don't fail the whole request if email fails
-          // Invitation is still created and temp password can be viewed by platform owner
+          const result = await inviteUser(inviter, payload);
+
+          // Return service result directly (invitation metadata + email flags)
+          return res.json(result);
+        } catch (serviceErr) {
+          console.error('Error creating invitation via inviteService:', serviceErr);
+          if (serviceErr instanceof z.ZodError) {
+            return res.status(400).json({ error: serviceErr.errors });
+          }
+          // inviteUser throws HttpError for 4xx cases
+          if (serviceErr instanceof Error && (serviceErr as any).status) {
+            const s = (serviceErr as any).status;
+            return res.status(s).json({ error: serviceErr.message });
+          }
+          return res.status(500).json({ error: 'Failed to create invitation' });
         }
-
-        // Return invitation with temp password (only for platform owner)
-        // Frontend will show this to admin@embellics.com only
-        res.json({
-          invitation: {
-            id: invitation.id,
-            email: invitation.email,
-            firstName: invitation.firstName,
-            lastName: invitation.lastName,
-            role: invitation.role,
-            status: invitation.status,
-            createdAt: invitation.createdAt,
-            expiresAt: invitation.expiresAt,
-            tenantId: invitation.tenantId, // Include tenantId for test verification
-          },
-          temporaryPassword: tempPassword, // Only visible to platform owner (backward compatibility)
-          plainTemporaryPassword: tempPassword, // Only visible to platform owner (consistent naming)
-          emailSent,
-          emailError: emailError
-            ? emailError instanceof Error
-              ? emailError.message
-              : String(emailError)
-            : null,
-          message: emailSent
-            ? 'Invitation created and email sent successfully'
-            : 'Invitation created but email failed to send. Share the temporary password manually.',
-        });
       } catch (error) {
         console.error('Error inviting user:', error);
         if (error instanceof z.ZodError) {
@@ -635,8 +567,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           createdAt: inv.createdAt,
           expiresAt: inv.expiresAt,
           lastSentAt: inv.lastSentAt || null,
-          // Only show temp password to platform owner
-          plainTemporaryPassword: isOwner ? inv.plainTemporaryPassword : null,
+          // Note: plaintext temporary passwords are no longer returned by the API for security
         }));
 
         res.json(sanitizedInvitations);
@@ -1014,6 +945,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         await storage.updateClientUser(userId, { onboardingCompleted: false });
 
         // Send password reset email
+        let emailSent = false;
         try {
           await sendPasswordResetEmail(
             user.email,
@@ -1022,15 +954,16 @@ export async function registerRoutes(app: Express): Promise<void> {
             tempPassword,
           );
           console.log(`Password reset email sent to ${user.email}`);
+          emailSent = true;
         } catch (emailError) {
           console.error('Failed to send password reset email:', emailError);
-          // Don't fail the request if email fails - temp password is still returned
+          // Don't fail the whole request if email fails
         }
 
         res.json({
           message: 'Password reset successfully',
-          temporaryPassword: tempPassword,
           email: user.email,
+          emailSent,
         });
       } catch (error) {
         console.error('Error resetting password:', error);
@@ -1047,7 +980,23 @@ export async function registerRoutes(app: Express): Promise<void> {
     async (req: AuthenticatedRequest, res) => {
       try {
         const invitations = await storage.getActiveInvitations();
-        res.json(invitations);
+        // Sanitize invitations before returning to avoid leaking any password fields
+        const sanitizedInvitations = invitations.map((inv) => ({
+          id: inv.id,
+          email: inv.email,
+          firstName: inv.firstName,
+          lastName: inv.lastName,
+          role: inv.role,
+          status: inv.status,
+          tenantId: inv.tenantId ?? null,
+          companyName: inv.companyName ?? null,
+          createdAt: inv.createdAt,
+          expiresAt: inv.expiresAt,
+          lastSentAt: inv.lastSentAt || null,
+          invitedBy: inv.invitedBy || null,
+        }));
+
+        res.json(sanitizedInvitations);
       } catch (error) {
         console.error('Error fetching invitations:', error);
         res.status(500).json({ error: 'Failed to fetch invitations' });
@@ -1125,64 +1074,36 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         const data = invitationSchema.parse(req.body);
 
-        // Generate temporary password
-        const tempPassword = randomBytes(8).toString('hex');
-        const hashedPassword = await hashPassword(tempPassword);
-
-        // Security: Force invitation to use caller's tenantId (prevent cross-tenant invitation)
-        const invitation = await storage.createUserInvitation({
-          email: data.email,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          temporaryPassword: hashedPassword,
-          plainTemporaryPassword: tempPassword, // Store plain text for viewing in Invitations tab
-          role: data.role,
-          tenantId: tenantId, // Always use authenticated user's tenant
-          invitedBy: req.user?.userId ?? null,
-          status: 'pending',
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        });
-
-        // Send invitation email
-        let emailSent = false;
-        let emailError: string | null = null;
-
+        // Delegate invite creation to centralized invite service (ensures RBAC and consistent behavior)
         try {
-          await sendInvitationEmail(
-            data.email,
-            data.firstName,
-            data.lastName,
-            tempPassword,
-            data.role,
-          );
-          await storage.updateInvitationStatus(invitation.id, 'sent', new Date());
-          console.log(`✅ Team member invitation email sent successfully to ${data.email}`);
-          emailSent = true;
-        } catch (err) {
-          emailError = err instanceof Error ? err.message : String(err);
-          console.error('❌ Failed to send team member invitation email:', err);
-        }
+          const inviter = {
+            userId: req.user!.userId,
+            role: req.user!.role,
+            tenantId: tenantId,
+            isPlatformAdmin: req.user!.isPlatformAdmin,
+            email: req.user!.email,
+          };
 
-        res.json({
-          invitation: {
-            id: invitation.id,
-            email: invitation.email,
-            firstName: invitation.firstName,
-            lastName: invitation.lastName,
-            role: invitation.role,
-            status: invitation.status,
-            createdAt: invitation.createdAt,
-            expiresAt: invitation.expiresAt,
-            tenantId: invitation.tenantId,
-          },
-          temporaryPassword: tempPassword,
-          plainTemporaryPassword: tempPassword,
-          emailSent,
-          emailError,
-          message: emailSent
-            ? 'Team member invitation created and email sent successfully'
-            : 'Team member invitation created but email failed to send. Share the temporary password manually.',
-        });
+          const payload = {
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role,
+            // Do NOT set tenantId here; inviteService will enforce inviter's tenant for client_admin
+          } as any;
+
+          const result = await inviteUser(inviter, payload);
+          return res.json(result);
+        } catch (serviceErr) {
+          console.error('Error creating tenant invitation via inviteService:', serviceErr);
+          if (serviceErr instanceof z.ZodError) {
+            return res.status(400).json({ error: serviceErr.errors });
+          }
+          if (serviceErr instanceof Error && (serviceErr as any).status) {
+            return res.status((serviceErr as any).status).json({ error: serviceErr.message });
+          }
+          return res.status(500).json({ error: 'Failed to create invitation' });
+        }
       } catch (error) {
         console.error('Error inviting team member:', error);
         if (error instanceof z.ZodError) {

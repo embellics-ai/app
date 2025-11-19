@@ -9,9 +9,11 @@ afterEach(() => {
 
 // Mock environment variables
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+// Use in-memory storage for tests (avoid connecting to real DB)
+process.env.DATABASE_URL = '';
 process.env.SESSION_SECRET = 'test-secret-key-for-testing-only';
-process.env.ENCRYPTION_KEY = 'test-encryption-key-32-characters';
+// Use a valid 32-byte hex string (64 hex characters) for tests
+process.env.ENCRYPTION_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

@@ -683,16 +683,16 @@ export default function PlatformAdminPage() {
                           </TableCell>
                           {isOwner && (
                             <TableCell>
-                              {invitation.plainTemporaryPassword ? (
-                                <code
-                                  className="text-xs bg-muted px-2 py-1 rounded"
-                                  data-testid={`code-temp-password-${invitation.id}`}
-                                >
-                                  {invitation.plainTemporaryPassword}
-                                </code>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
+                              {/* For security we no longer return plaintext temporary passwords from the API.
+                                  Show a short explanatory message instead and suggest using the
+                                  "Resend invite" action or checking email logs (MailDev) to retrieve
+                                  the temporary password if needed. */}
+                              <span
+                                className="text-muted-foreground text-sm"
+                                data-testid={`text-temp-password-info-${invitation.id}`}
+                              >
+                                {invitation.status === 'sent' ? 'Sent via email' : '-'}
+                              </span>
                             </TableCell>
                           )}
                           <TableCell>

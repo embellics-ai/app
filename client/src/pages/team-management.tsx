@@ -495,13 +495,11 @@ export default function TeamManagementPage() {
                               : '-'}
                           </TableCell>
                           <TableCell>
-                            {invitation.plainTemporaryPassword ? (
-                              <code className="text-xs bg-muted px-2 py-1 rounded">
-                                {invitation.plainTemporaryPassword}
-                              </code>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
+                            {/* Plaintext temporary passwords are not returned by the API.
+                                Show a friendly status instead. */}
+                            <span className="text-muted-foreground text-sm">
+                              {invitation.status === 'sent' ? 'Sent via email' : '-'}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <AlertDialog>
