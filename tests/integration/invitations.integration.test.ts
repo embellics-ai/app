@@ -1,35 +1,44 @@
 // Integration test: hit running dev server endpoints to ensure no password fields are returned
 process.env.SKIP_EMAIL = 'true';
 process.env.NODE_ENV = 'test';
-// Provide a platform token for tests (use value from local dev environment)
-const PLATFORM_TOKEN =
-  process.env.PLATFORM_TOKEN ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2ODJhMzA0MS02ZGYyLTQzY2ItOWQ0OS1kY2Q2YWExMDBkNzYiLCJ0ZW5hbnRJZCI6bnVsbCwiZW1haWwiOiJhZG1pbkBlbWJlbGxpY3MuY29tIiwicm9sZSI6Im93bmVyIiwiaXNQbGF0Zm9ybUFkbWluIjp0cnVlLCJpYXQiOjE3NjM1NjUxNTIsImV4cCI6MTc2NDE2OTk1Mn0.sFzBgkv5oW8TcJ06oba3x1sj5958mssCSiJRaa2kE3Q';
 
-import { describe, it, expect } from 'vitest';
+import express from 'express';
+import request from 'supertest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { registerRoutes } from '../../server/routes';
+import { generateToken } from '../../server/auth';
 
-async function getJson(path: string, token?: string) {
-  const res = await fetch(`http://localhost:3000${path}`, {
-    headers: token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {},
-  });
-  const body = await res.text();
-  let json: any;
-  try {
-    json = JSON.parse(body || 'null');
-  } catch (err) {
-    throw new Error(`Invalid JSON from ${path}: ${body}`);
-  }
-  return { status: res.status, body: json };
-}
+// Create a platform admin token using the test SESSION_SECRET
+const PLATFORM_TOKEN = generateToken({
+  userId: 'test-platform-admin',
+  tenantId: null,
+  email: 'admin@example.com',
+  role: 'owner',
+  isPlatformAdmin: true,
+});
+
+let app: express.Express;
+
+beforeAll(async () => {
+  app = express();
+  app.use(express.json());
+  // express-ws augments the app with a .ws() method; registerRoutes expects it.
+  // Provide a no-op .ws implementation for tests (we don't exercise websockets here).
+  (app as any).ws = (path: string, handler: any) => {
+    // no-op
+  };
+  // Register routes directly on the test app instance
+  await registerRoutes(app);
+});
 
 describe('Invitation endpoints (integration)', () => {
   it('GET /api/platform/invitations does not include password fields', async () => {
-    const { status, body } = await getJson('/api/platform/invitations', PLATFORM_TOKEN);
-    expect(status).toBe(200);
+    const res = await request(app)
+      .get('/api/platform/invitations')
+      .set('Authorization', `Bearer ${PLATFORM_TOKEN}`)
+      .expect(200);
+
+    const body = res.body;
     expect(Array.isArray(body)).toBe(true);
     for (const inv of body) {
       expect(inv).not.toHaveProperty('temporaryPassword');

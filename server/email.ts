@@ -5,10 +5,12 @@ import type { Transporter } from 'nodemailer';
 // - If SMTP_HOST is provided we attempt to send via that host (allows MailDev on localhost)
 // - If no SMTP_HOST and NODE_ENV=development, we skip sending and log the email (dev convenience)
 // - SKIP_EMAIL env var forces skip when set to 'true'
-const SKIP_EMAIL_IN_DEV =
-  process.env.SKIP_EMAIL === 'true' ||
-  (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST);
-
+function isSkipEmailInDev(): boolean {
+  return (
+    process.env.SKIP_EMAIL === 'true' ||
+    (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST)
+  );
+}
 // Overall send timeout to avoid hanging requests (ms)
 const SEND_TIMEOUT_MS = Number(process.env.EMAIL_SEND_TIMEOUT_MS || '8000');
 /**
@@ -25,7 +27,7 @@ function getEmailTransporter(): Transporter {
 
   // If no SMTP host configured and we're skipping in dev, return jsonTransport for logging
   if (!smtpHost) {
-    if (SKIP_EMAIL_IN_DEV) {
+    if (isSkipEmailInDev()) {
       console.log(
         '[Email] ⚠️  No SMTP_HOST configured; running in dev skip mode (emails will be logged)',
       );
@@ -131,7 +133,7 @@ export async function sendInvitationEmail(
     `;
 
     // In development mode with SKIP_EMAIL, just log the credentials
-    if (SKIP_EMAIL_IN_DEV) {
+    if (isSkipEmailInDev()) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('📧 [DEV MODE] Email Skipped - User Invitation');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -185,7 +187,7 @@ export async function sendInvitationEmail(
     console.error('❌ Error in sendInvitationEmail:', error);
 
     // In development, don't throw - just log the error
-    if (SKIP_EMAIL_IN_DEV) {
+    if (isSkipEmailInDev()) {
       console.warn('⚠️  Email sending failed, but continuing in development mode');
       return {
         messageId: 'dev-mode-error',
@@ -264,7 +266,7 @@ export async function sendPasswordResetEmail(
     `;
 
     // In development mode with SKIP_EMAIL, just log the credentials
-    if (SKIP_EMAIL_IN_DEV) {
+    if (isSkipEmailInDev()) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('📧 [DEV MODE] Email Skipped - Password Reset');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -296,7 +298,7 @@ export async function sendPasswordResetEmail(
     console.error('❌ Error in sendPasswordResetEmail:', error);
 
     // In development, don't throw - just log the error
-    if (SKIP_EMAIL_IN_DEV) {
+    if (isSkipEmailInDev()) {
       console.warn('⚠️  Email sending failed, but continuing in development mode');
       return {
         messageId: 'dev-mode-error',
