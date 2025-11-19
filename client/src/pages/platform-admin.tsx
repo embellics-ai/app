@@ -101,8 +101,6 @@ export default function PlatformAdminPage() {
   const { toast } = useToast();
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
-  const [showTempPassword, setShowTempPassword] = useState(true); // Auto-show by default
   const [editApiKeyDialog, setEditApiKeyDialog] = useState<{
     open: boolean;
     tenant: any | null;
@@ -177,14 +175,14 @@ export default function PlatformAdminPage() {
         toast({
           title: 'User invited successfully',
           description:
-            'Invitation email sent. Check the Invitations tab for the temporary password.',
+            'Invitation email sent with login credentials. They can now log in and will be prompted to change their password.',
         });
       } else {
         toast({
-          title: 'Invitation created',
-          description: `Email failed to send: ${
+          title: 'Invitation created but email failed to send',
+          description: `Email error: ${
             data.emailError || 'Unknown error'
-          }. Check the Invitations tab for the temporary password.`,
+          }. Please contact the user directly to share the invitation.`,
           variant: 'destructive',
         });
       }
@@ -318,17 +316,7 @@ export default function PlatformAdminPage() {
     },
   });
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: 'Copied to clipboard',
-      description: 'Temporary password has been copied to your clipboard.',
-    });
-  };
-
   const onSubmit = (data: InviteUserFormData) => {
-    setTempPassword(null);
-    setShowTempPassword(true); // Reset for next invitation
     inviteUserMutation.mutate(data);
   };
 
@@ -871,49 +859,6 @@ export default function PlatformAdminPage() {
                         </div>
                       </div>
                     </>
-                  )}
-
-                  {tempPassword && (
-                    <Alert data-testid="alert-temp-password">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        <p className="font-medium mb-2">Temporary Password:</p>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Input
-                            value={showTempPassword ? tempPassword : '••••••••••••'}
-                            readOnly
-                            className="font-mono text-sm flex-1"
-                            data-testid="text-temp-password"
-                          />
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => setShowTempPassword(!showTempPassword)}
-                            title={showTempPassword ? 'Hide password' : 'Show password'}
-                            data-testid="button-toggle-temp-password"
-                          >
-                            {showTempPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => copyToClipboard(tempPassword)}
-                            title="Copy password"
-                            data-testid="button-copy-temp-password"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          Please share this with the invited user. They will be prompted to change
-                          it on first login.
-                        </span>
-                      </AlertDescription>
-                    </Alert>
                   )}
 
                   <Button

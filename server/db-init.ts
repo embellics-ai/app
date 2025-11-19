@@ -3,7 +3,8 @@ import { hashPassword } from './auth';
 
 /**
  * Initialize the database with the platform owner
- * This runs on every startup to ensure the platform owner exists with the correct password
+ * This runs on every startup to ensure the platform owner exists.
+ * Note: Passwords are NOT reset on startup - only set during initial creation.
  */
 export async function initializeDatabase() {
   try {
@@ -35,18 +36,15 @@ export async function initializeDatabase() {
       });
 
       console.log('[DB Init] ✓ Platform owner created successfully');
+      console.log('[DB Init] === INITIAL LOGIN CREDENTIALS ===');
+      console.log('[DB Init] Email: admin@embellics.com');
+      console.log('[DB Init] Password: admin123');
+      console.log('[DB Init] =======================================');
+      console.log('[DB Init] IMPORTANT: Please change this password after first login!');
     } else {
-      // Platform owner exists - ensure password is correct
-      console.log('[DB Init] Platform owner found. Resetting password to ensure consistency...');
-      const hashedPassword = await hashPassword(PLATFORM_OWNER_PASSWORD);
-      await storage.updateClientUserPassword(platformOwner.id, hashedPassword);
-      console.log('[DB Init] ✓ Platform owner password reset');
+      // Platform owner exists - do NOT reset password to preserve user changes
+      console.log('[DB Init] ✓ Platform owner already exists');
     }
-
-    console.log('[DB Init] === LOGIN CREDENTIALS ===');
-    console.log('[DB Init] Email: admin@embellics.com');
-    console.log('[DB Init] Password: admin123');
-    console.log('[DB Init] ========================');
   } catch (error) {
     console.error('[DB Init] Failed to initialize database:', error);
     // Don't throw - allow the app to start even if init fails
