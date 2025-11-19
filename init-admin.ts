@@ -22,9 +22,15 @@ async function initializeAdmin() {
   const existing = await db.select().from(clientUsers).where(eq(clientUsers.email, ADMIN_EMAIL));
 
   if (existing.length > 0) {
-    console.log('[Init Admin] ✅ Platform owner already exists');
+    console.log('[Init Admin] ⚠️  Platform owner already exists');
     console.log('[Init Admin] Email:', ADMIN_EMAIL);
-    console.log('[Init Admin] Resetting password to: admin123');
+    console.log('[Init Admin] ⚠️  WARNING: This script will RESET the password to: admin123');
+    console.log('[Init Admin] ⚠️  This will OVERWRITE any custom password that was set!');
+    console.log('[Init Admin] ⚠️  Use this only if you are locked out of your account.');
+    console.log('[Init Admin] Proceeding with password reset in 3 seconds...');
+
+    // Give user time to cancel
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Reset password
     const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
@@ -52,12 +58,12 @@ async function initializeAdmin() {
     });
 
     console.log('[Init Admin] ✅ Platform owner created');
+    console.log('\n=== INITIAL LOGIN CREDENTIALS ===');
+    console.log('Email: admin@embellics.com');
+    console.log('Password: admin123');
+    console.log('IMPORTANT: Change this password after first login!');
+    console.log('==================================\n');
   }
-
-  console.log('\n=== LOGIN CREDENTIALS ===');
-  console.log('Email: admin@embellics.com');
-  console.log('Password: admin123');
-  console.log('========================\n');
 }
 
 initializeAdmin()
