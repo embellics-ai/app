@@ -36,7 +36,7 @@ export default function ApiKeysPage() {
   const [newKeyName, setNewKeyName] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
-  const [showNewKey, setShowNewKey] = useState(true); // Auto-show new keys by default
+  const [showNewKey, setShowNewKey] = useState(false); // Hide key by default for security
 
   // Query for API keys
   const { data: apiKeys = [], isLoading } = useQuery<ApiKey[]>({
@@ -52,11 +52,12 @@ export default function ApiKeysPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/api-keys'] });
       setNewlyCreatedKey(data.apiKey);
+      setShowNewKey(false); // Hide by default, user must click eye icon to see
       setNewKeyName('');
       setIsCreateDialogOpen(false);
       toast({
         title: 'API key created',
-        description: 'Your new API key has been generated. Make sure to copy it now!',
+        description: 'Your new API key has been generated. Click the eye icon to view it!',
       });
     },
     onError: () => {
