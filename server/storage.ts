@@ -1142,6 +1142,10 @@ export class DbStorage implements IStorage {
       updatesToApply.retellApiKey = encryptApiKey(updates.retellApiKey);
     }
 
+    console.log(
+      `[Storage] updateWidgetConfig - tenantId: ${tenantId}, retellAgentId: ${updatesToApply.retellAgentId || 'not in updates'}`,
+    );
+
     const result = await this.db
       .update(widgetConfigs)
       .set({ ...updatesToApply, updatedAt: new Date() })
@@ -1150,6 +1154,10 @@ export class DbStorage implements IStorage {
 
     const config = result[0];
     if (!config) return undefined;
+
+    console.log(
+      `[Storage] updateWidgetConfig - Saved to DB, retellAgentId: ${config.retellAgentId || 'null'}`,
+    );
 
     // Decrypt the API key for immediate use
     if (config.retellApiKey) {

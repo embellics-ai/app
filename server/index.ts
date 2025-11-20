@@ -60,6 +60,28 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Serve widget test HTML file BEFORE registerRoutes and Vite middleware
+  // This ensures this specific route is not intercepted by the SPA
+  const fs = await import('fs');
+  const path = await import('path');
+
+  app.get('/widget-simple-test.html', async (req, res) => {
+    try {
+      const filePath = path.resolve(process.cwd(), 'docs', 'widget-simple-test.html');
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).send('Test file not found');
+      }
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      const content = fs.readFileSync(filePath, 'utf-8');
+      res.send(content);
+    } catch (error) {
+      console.error('Error serving test HTML:', error);
+      res.status(500).send('Failed to load test file');
+    }
+  });
+
   await registerRoutes(wsApp as any as Express);
 
   // Initialize database with platform owner if needed

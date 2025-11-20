@@ -299,23 +299,35 @@ export default function ApiKeysPage() {
             Add this code snippet to your website to embed the chat widget
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="bg-muted p-4 rounded-md font-mono text-sm overflow-x-auto">
             <code>
               {`<script>
   (function() {
     var script = document.createElement('script');
-    script.src = 'https://embellics.com/widget.js';
+    script.src = '${window.location.origin}/widget.js';
     script.setAttribute('data-api-key', 'YOUR_API_KEY');
     document.head.appendChild(script);
   })();
 </script>`}
             </code>
           </div>
-          <p className="text-sm text-muted-foreground mt-3">
-            Replace <code className="bg-muted px-1 py-0.5 rounded">YOUR_API_KEY</code> with your
-            actual API key
-          </p>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Replace <code className="bg-muted px-1 py-0.5 rounded">YOUR_API_KEY</code> with your
+              actual API key
+            </p>
+            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>💡 Installation:</strong> Add this code snippet just before the closing{' '}
+                <code className="bg-blue-100 dark:bg-blue-900 px-1 py-0.5 rounded">
+                  {'</body>'}
+                </code>{' '}
+                tag of your HTML file. The widget will appear as a floating button in the
+                bottom-right corner of your website.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

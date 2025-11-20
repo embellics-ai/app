@@ -38,11 +38,9 @@ const retellClient = new Retell({
   apiKey: process.env.RETELL_API_KEY || '',
 });
 
-// DEPRECATED: Legacy global Retell agent ID - kept for reference only
-// IMPORTANT: All chat sessions and analytics now use tenant-specific agent IDs from widget_configs.retellAgentId
-// Tenants MUST configure their own Retell agent ID during onboarding
-// TODO: Remove this constant once all legacy references are cleaned up
-const RETELL_AGENT_ID = 'agent_de94cbe24ccb0228908b12dac3';
+// NOTE: The system uses tenant-specific Retell Agent IDs from widget_configs.retellAgentId
+// Platform Admins configure these via: PATCH /api/platform/tenants/:tenantId/retell-api-key
+// No hardcoded agent IDs are used - each tenant has their own agent configuration
 
 export async function registerRoutes(app: Express): Promise<void> {
   // SECURITY: Cleanup expired invitation passwords on startup
@@ -688,8 +686,32 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(400).json({ error: 'Retell API key is required' });
         }
 
+        // Validate Retell API key format
+        if (!retellApiKey.trim().startsWith('key_')) {
+          return res.status(400).json({
+            error: 'Invalid Retell API key format. API keys must start with "key_"',
+          });
+        }
+
+        // Validate Retell Agent ID format if provided
+        if (retellAgentId) {
+          if (typeof retellAgentId !== 'string') {
+            return res.status(400).json({ error: 'Retell Agent ID must be a string' });
+          }
+
+          if (!retellAgentId.trim().startsWith('agent_')) {
+            return res.status(400).json({
+              error:
+                'Invalid Retell Agent ID format. Agent IDs must start with "agent_". Did you accidentally provide an API key instead?',
+            });
+          }
+        }
+
         console.log(
           `[Update Retell API Key] Platform admin updating API key for tenant: ${tenantId}`,
+        );
+        console.log(
+          `[Update Retell API Key] Received - API Key: ${retellApiKey.substring(0, 12)}..., Agent ID: ${retellAgentId || 'not provided'}`,
         );
 
         // Check if tenant exists
@@ -707,8 +729,16 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Include retellAgentId if provided
         if (retellAgentId) {
-          updateData.retellAgentId = retellAgentId;
+          updateData.retellAgentId = retellAgentId.trim();
         }
+
+        console.log(
+          `[Update Retell API Key] Data to save:`,
+          JSON.stringify({
+            retellApiKey: updateData.retellApiKey.substring(0, 12) + '...',
+            retellAgentId: updateData.retellAgentId || 'null',
+          }),
+        );
 
         if (!widgetConfig) {
           // Create a new widget config with the Retell API key
@@ -728,6 +758,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         if (!widgetConfig) {
           return res.status(500).json({ error: 'Failed to update Retell API key' });
         }
+
+        console.log(
+          `[Update Retell API Key] Saved config - Agent ID in DB: ${widgetConfig.retellAgentId || 'null'}`,
+        );
 
         console.log(
           `[Update Retell API Key] ✓ Successfully updated Retell API key for tenant: ${tenantId}`,
@@ -3288,6 +3322,213 @@ export async function registerRoutes(app: Express): Promise<void> {
       console.error('Error completing handoff:', error);
       res.status(500).json({ error: 'Failed to complete handoff' });
     }
+  });
+
+  // ===== Widget Embed Endpoints (Public) =====
+
+  // Serve widget.js with CORS headers for embedding
+  app.get('/widget.js', async (_req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/javascript');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+
+      // In production, serve from dist/public
+      // In development, serve from client/public
+      const fs = await import('fs');
+      const path = await import('path');
+
+      const isDev = process.env.NODE_ENV !== 'production';
+      const widgetPath = isDev
+        ? path.resolve(process.cwd(), 'client/public/widget.js')
+        : path.resolve(import.meta.dirname, 'public/widget.js');
+
+      if (!fs.existsSync(widgetPath)) {
+        return res.status(404).json({ error: 'Widget file not found' });
+      }
+
+      const widgetContent = fs.readFileSync(widgetPath, 'utf-8');
+      res.send(widgetContent);
+    } catch (error) {
+      console.error('Error serving widget.js:', error);
+      res.status(500).json({ error: 'Failed to load widget' });
+    }
+  });
+
+  // Widget initialization endpoint - validates API key and returns configuration
+  app.post('/api/widget/init', async (req, res) => {
+    try {
+      const { apiKey, referrer } = z
+        .object({
+          apiKey: z.string(),
+          referrer: z.string().optional(),
+        })
+        .parse(req.body);
+
+      // Enable CORS for widget embedding
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Update last used timestamp
+      await storage.updateApiKeyLastUsed(apiKeyRecord.id);
+
+      // Get widget configuration for this tenant
+      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+
+      if (!widgetConfig) {
+        return res.status(404).json({ error: 'Widget configuration not found' });
+      }
+
+      // Check domain restrictions if configured
+      if (widgetConfig.allowedDomains && widgetConfig.allowedDomains.length > 0 && referrer) {
+        const isAllowed = widgetConfig.allowedDomains.some((domain: string) => {
+          // Support wildcard subdomains (*.example.com)
+          if (domain.startsWith('*.')) {
+            const baseDomain = domain.slice(2);
+            return referrer.endsWith(baseDomain) || referrer === baseDomain.replace('*.', '');
+          }
+          return referrer === domain || referrer.endsWith('.' + domain);
+        });
+
+        if (!isAllowed) {
+          return res.status(403).json({
+            error: 'Domain not allowed',
+            message: `This widget is restricted to: ${widgetConfig.allowedDomains.join(', ')}`,
+          });
+        }
+      }
+
+      // Return safe configuration (exclude sensitive data)
+      res.json({
+        tenantId: apiKeyRecord.tenantId,
+        primaryColor: widgetConfig.primaryColor,
+        greeting: widgetConfig.greeting,
+        placeholder: widgetConfig.placeholder,
+        customCss: widgetConfig.customCss,
+        position: widgetConfig.position || 'bottom-right',
+      });
+    } catch (error) {
+      console.error('Error initializing widget:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid request', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to initialize widget' });
+    }
+  });
+
+  // Handle CORS preflight for widget init
+  app.options('/api/widget/init', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+  });
+
+  // Widget chat endpoint for text-based conversations
+  app.post('/api/widget/chat', async (req, res) => {
+    try {
+      const { apiKey, message, chatId } = z
+        .object({
+          apiKey: z.string(),
+          message: z.string().min(1),
+          chatId: z.string().nullable().optional(),
+        })
+        .parse(req.body);
+
+      // Enable CORS for widget embedding
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Get widget configuration for this tenant
+      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+
+      if (!widgetConfig || !widgetConfig.retellApiKey || !widgetConfig.retellAgentId) {
+        return res.status(400).json({
+          error: 'Widget not configured',
+          message: 'Please configure Retell AI credentials in the admin panel',
+        });
+      }
+
+      // Create a Retell client using the tenant's API key
+      const tenantRetellClient = new Retell({
+        apiKey: widgetConfig.retellApiKey,
+      });
+
+      // Use existing chatId or create new session
+      let retellChatId = chatId;
+
+      if (!retellChatId) {
+        console.log('[Widget Chat] Creating new chat session');
+        const chatSession = await tenantRetellClient.chat.create({
+          agent_id: widgetConfig.retellAgentId,
+          metadata: {
+            tenantId: apiKeyRecord.tenantId,
+            source: 'widget',
+          },
+        });
+        retellChatId = chatSession.chat_id;
+        console.log('[Widget Chat] Created session:', retellChatId);
+      }
+
+      // Send message to Retell and get response
+      console.log('[Widget Chat] Sending message:', message);
+      const completion = await tenantRetellClient.chat.createChatCompletion({
+        chat_id: retellChatId,
+        content: message,
+      });
+
+      // Extract the agent's response
+      const messages = completion.messages || [];
+      const lastAssistantMessage = messages
+        .reverse()
+        .find((msg: any) => msg.role === 'agent' || msg.role === 'assistant');
+
+      let response = "I'm processing your request...";
+      if (lastAssistantMessage && typeof (lastAssistantMessage as any).content === 'string') {
+        response = (lastAssistantMessage as any).content;
+      }
+
+      console.log('[Widget Chat] Response:', response.slice(0, 100));
+
+      // Return response and chatId for continuation
+      res.json({
+        response,
+        chatId: retellChatId,
+      });
+    } catch (error) {
+      console.error('[Widget Chat] Error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid request', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to process chat message' });
+    }
+  });
+
+  // Handle CORS preflight for chat endpoint
+  app.options('/api/widget/chat', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
   });
 }
 
