@@ -6,22 +6,25 @@
 
 **Problem:** When an admin created a new API key, it was immediately visible in plain text.
 
-**Solution:** 
+**Solution:**
+
 - Changed default state of `showNewKey` from `true` to `false`
 - Users must now click the eye icon 👁️ to reveal the key
 - Updated toast message to remind users: "Click the eye icon to view it!"
 
 **Security Benefits:**
+
 - Prevents shoulder surfing (someone looking over the admin's shoulder)
 - Reduces accidental exposure in screen recordings/screenshots
 - Forces intentional action to view sensitive data
 
 **Code Changes:**
+
 ```tsx
 // Before
 const [showNewKey, setShowNewKey] = useState(true); // Auto-show new keys by default
 
-// After  
+// After
 const [showNewKey, setShowNewKey] = useState(false); // Hide key by default for security
 ```
 
@@ -32,6 +35,7 @@ const [showNewKey, setShowNewKey] = useState(false); // Hide key by default for 
 **Status:** Already correctly implemented - NO CHANGES NEEDED
 
 **Current Behavior:**
+
 - Old API keys show only the prefix: `aa1ff891••••••••••••••••`
 - Full keys are NEVER stored in database (only SHA-256 hash)
 - Security message displayed: "Full key was only shown at creation time and is not stored in our database for security."
@@ -39,14 +43,14 @@ const [showNewKey, setShowNewKey] = useState(false); // Hide key by default for 
 **Why No Copy Function for Old Keys:**
 This is the **correct security implementation** because:
 
-1. **Technical Impossibility:** 
+1. **Technical Impossibility:**
    - Database stores: `SHA-256(embellics_[64-char-hex])`
    - Cannot reverse hash to get original key
    - This is cryptographically secure by design
 
 2. **Industry Standard:**
    - GitHub Personal Access Tokens: Show once
-   - AWS Secret Access Keys: Show once  
+   - AWS Secret Access Keys: Show once
    - Stripe API Keys: Show once
    - This is the standard practice for all major platforms
 
@@ -56,6 +60,7 @@ This is the **correct security implementation** because:
    - Audit trail shows when keys were created/deleted
 
 **User Workflow:**
+
 ```
 1. Admin creates API key
 2. Green banner appears with hidden key
@@ -70,6 +75,7 @@ This is the **correct security implementation** because:
 ## Security Architecture
 
 ### Key Storage
+
 ```
 User's Browser    →  Full Key: embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f
 Server Database   →  Hash:     8364c2d56f6bedbd0e185c4846bf909aa0aeb41175bd129a8103c5a0aa8c41f1
@@ -77,6 +83,7 @@ Server Database   →  Prefix:   4c742acc (for display only)
 ```
 
 ### Widget Authentication Flow
+
 ```
 1. Widget sends:  embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f
 2. Server hashes: SHA-256(embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f)
@@ -90,6 +97,7 @@ Server Database   →  Prefix:   4c742acc (for display only)
 ## User Experience
 
 ### Creating a New Key
+
 1. Click "Create API Key" button
 2. Enter optional name
 3. Click "Generate Key"
@@ -100,19 +108,23 @@ Server Database   →  Prefix:   4c742acc (for display only)
 8. Use in widget embed code
 
 ### Using an Old Key
+
 - Admin can see: `aa1ff891••••••••••••••••`
 - Admin **cannot** see full key
 - Admin **cannot** copy full key
 - **If key is lost:** Delete and create new one
 
 ### Key Management Best Practices
+
 ✅ **Do:**
+
 - Copy the key immediately after creation
 - Store it in a secure password manager
 - Use descriptive names for keys (e.g., "Production Website", "Staging")
 - Delete unused keys regularly
 
 ❌ **Don't:**
+
 - Share keys via email/Slack
 - Store keys in plain text files
 - Use the same key across multiple environments
@@ -153,4 +165,5 @@ A: To prevent accidental exposure. You must intentionally click the eye icon to 
 ---
 
 ## Date
+
 Updated: November 20, 2025

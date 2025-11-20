@@ -494,6 +494,7 @@ export default function PlatformAdminPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead>Retell API Key</TableHead>
+                        <TableHead>Agent ID</TableHead>
                         <TableHead className="w-[120px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -534,13 +535,33 @@ export default function PlatformAdminPage() {
                             )}
                           </TableCell>
                           <TableCell>
+                            {tenant.hasRetellAgentId ? (
+                              <Badge
+                                variant="default"
+                                data-testid={`badge-agent-id-configured-${tenant.id}`}
+                              >
+                                <Key className="w-3 h-3 mr-1" />
+                                Configured
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="secondary"
+                                data-testid={`badge-agent-id-not-configured-${tenant.id}`}
+                              >
+                                Not Set
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-2">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
                                   setEditApiKeyDialog({ open: true, tenant });
-                                  setApiKeyInput('');
+                                  // Pre-fill with masked values if already configured
+                                  setApiKeyInput(tenant.maskedRetellApiKey || '');
+                                  setSelectedAgentId(tenant.maskedAgentId || '');
                                 }}
                                 data-testid={`button-edit-api-key-${tenant.id}`}
                               >
@@ -912,15 +933,21 @@ export default function PlatformAdminPage() {
               <Label htmlFor="retell-api-key">Retell AI API Key</Label>
               <Input
                 id="retell-api-key"
-                type="password"
-                placeholder="Enter Retell AI API key"
+                type="text"
+                placeholder={
+                  editApiKeyDialog.tenant?.hasRetellApiKey
+                    ? 'Enter new key to update'
+                    : 'Enter Retell AI API key'
+                }
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 data-testid="input-retell-api-key"
+                className="font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                This key will be encrypted and stored securely. It will be used for analytics and
-                chat functionality.
+                {editApiKeyDialog.tenant?.hasRetellApiKey
+                  ? 'Currently configured. Enter a new key to update, or leave as-is to keep existing.'
+                  : 'This key will be encrypted and stored securely. It will be used for analytics and chat functionality.'}
               </p>
             </div>
 
@@ -929,14 +956,20 @@ export default function PlatformAdminPage() {
               <Input
                 id="retell-agent-id"
                 type="text"
-                placeholder="Enter Retell Chat Agent ID (optional)"
+                placeholder={
+                  editApiKeyDialog.tenant?.hasRetellAgentId
+                    ? 'Enter new agent ID to update'
+                    : 'Enter Retell Chat Agent ID (optional)'
+                }
                 value={selectedAgentId}
                 onChange={(e) => setSelectedAgentId(e.target.value)}
                 data-testid="input-retell-agent-id"
+                className="font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                The agent ID to use for this tenant's chat widget. This will be used for end-user
-                chat interactions.
+                {editApiKeyDialog.tenant?.hasRetellAgentId
+                  ? 'Currently configured. Enter a new agent ID to update, or leave as-is to keep existing.'
+                  : "The agent ID to use for this tenant's chat widget. This will be used for end-user chat interactions."}
               </p>
             </div>
           </div>
@@ -954,15 +987,30 @@ export default function PlatformAdminPage() {
             </Button>
             <Button
               onClick={() => {
-                if (editApiKeyDialog.tenant && apiKeyInput.trim()) {
-                  updateRetellApiKeyMutation.mutate({
+                if (editApiKeyDialog.tenant) {
+                  // Only send values that have been changed (not masked)
+                  const isMaskedApiKey = apiKeyInput.includes('••••••••');
+                  const isMaskedAgentId = selectedAgentId.includes('••••••••');
+                  
+                  const payload: any = {
                     tenantId: editApiKeyDialog.tenant.id,
-                    retellApiKey: apiKeyInput.trim(),
-                    retellAgentId: selectedAgentId || undefined,
-                  });
+                  };
+                  
+                  if (!isMaskedApiKey && apiKeyInput.trim()) {
+                    payload.retellApiKey = apiKeyInput.trim();
+                  }
+                  
+                  if (!isMaskedAgentId && selectedAgentId.trim()) {
+                    payload.retellAgentId = selectedAgentId.trim();
+                  }
+                  
+                  updateRetellApiKeyMutation.mutate(payload);
                 }
               }}
-              disabled={!apiKeyInput.trim() || updateRetellApiKeyMutation.isPending}
+              disabled={
+                (!apiKeyInput.trim() && !selectedAgentId.trim()) ||
+                updateRetellApiKeyMutation.isPending
+              }
               data-testid="button-save-api-key"
             >
               {updateRetellApiKeyMutation.isPending ? (

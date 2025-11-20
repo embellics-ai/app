@@ -659,6 +659,21 @@ export async function registerRoutes(app: Express): Promise<void> {
         const tenantsWithApiKeyStatus = await Promise.all(
           tenants.map(async (tenant) => {
             const widgetConfig = await storage.getWidgetConfig(tenant.id);
+            
+            // Mask the Retell API key (show first 8 chars + dots)
+            let maskedRetellApiKey = null;
+            if (widgetConfig?.retellApiKey) {
+              const keyPrefix = widgetConfig.retellApiKey.substring(0, 8);
+              maskedRetellApiKey = `${keyPrefix}••••••••••••••••`;
+            }
+            
+            // Mask the Agent ID (show first 8 chars + dots)
+            let maskedAgentId = null;
+            if (widgetConfig?.retellAgentId) {
+              const agentPrefix = widgetConfig.retellAgentId.substring(0, 8);
+              maskedAgentId = `${agentPrefix}••••••••••••••••`;
+            }
+            
             return {
               id: tenant.id,
               name: tenant.name,
@@ -667,6 +682,9 @@ export async function registerRoutes(app: Express): Promise<void> {
               plan: tenant.plan,
               status: tenant.status,
               hasRetellApiKey: !!widgetConfig?.retellApiKey,
+              hasRetellAgentId: !!widgetConfig?.retellAgentId,
+              maskedRetellApiKey,
+              maskedAgentId,
               createdAt: tenant.createdAt,
             };
           }),
