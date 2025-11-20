@@ -78,6 +78,7 @@ export interface IStorage {
   // API Key methods
   getApiKey(id: string): Promise<ApiKey | undefined>;
   getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
+  getAllApiKeys(): Promise<ApiKey[]>;
   getApiKeysByTenant(tenantId: string): Promise<ApiKey[]>;
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   updateApiKeyLastUsed(id: string): Promise<void>;
@@ -353,6 +354,10 @@ export class MemStorage implements IStorage {
 
   async getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
     return Array.from(this.apiKeys.values()).find((k) => k.keyHash === keyHash);
+  }
+
+  async getAllApiKeys(): Promise<ApiKey[]> {
+    return Array.from(this.apiKeys.values());
   }
 
   async getApiKeysByTenant(tenantId: string): Promise<ApiKey[]> {
@@ -1189,6 +1194,10 @@ export class DbStorage implements IStorage {
   async getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
     const result = await this.db.select().from(apiKeys).where(eq(apiKeys.keyHash, keyHash));
     return result[0];
+  }
+
+  async getAllApiKeys(): Promise<ApiKey[]> {
+    return await this.db.select().from(apiKeys);
   }
 
   async getApiKeysByTenant(tenantId: string): Promise<ApiKey[]> {

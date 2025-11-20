@@ -559,9 +559,9 @@ export default function PlatformAdminPage() {
                                 size="icon"
                                 onClick={() => {
                                   setEditApiKeyDialog({ open: true, tenant });
-                                  // Pre-fill with masked values if already configured
-                                  setApiKeyInput(tenant.maskedRetellApiKey || '');
-                                  setSelectedAgentId(tenant.maskedAgentId || '');
+                                  // Clear inputs - users should only enter new values
+                                  setApiKeyInput('');
+                                  setSelectedAgentId('');
                                 }}
                                 data-testid={`button-edit-api-key-${tenant.id}`}
                               >
@@ -931,6 +931,20 @@ export default function PlatformAdminPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="retell-api-key">Retell AI API Key</Label>
+              {editApiKeyDialog.tenant?.hasRetellApiKey && (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
+                  <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span className="font-mono text-sm font-medium text-purple-900 dark:text-purple-100">
+                    {editApiKeyDialog.tenant.maskedRetellApiKey || 'Configured (hidden)'}
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                  >
+                    Current
+                  </Badge>
+                </div>
+              )}
               <Input
                 id="retell-api-key"
                 type="text"
@@ -946,13 +960,27 @@ export default function PlatformAdminPage() {
               />
               <p className="text-xs text-muted-foreground">
                 {editApiKeyDialog.tenant?.hasRetellApiKey
-                  ? 'Currently configured. Enter a new key to update, or leave as-is to keep existing.'
+                  ? 'Enter a new key to update, or leave empty to keep existing.'
                   : 'This key will be encrypted and stored securely. It will be used for analytics and chat functionality.'}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="retell-agent-id">Retell Chat Agent ID</Label>
+              {editApiKeyDialog.tenant?.hasRetellAgentId && (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
+                  <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span className="font-mono text-sm font-medium text-purple-900 dark:text-purple-100">
+                    {editApiKeyDialog.tenant.maskedAgentId || 'Configured (hidden)'}
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                  >
+                    Current
+                  </Badge>
+                </div>
+              )}
               <Input
                 id="retell-agent-id"
                 type="text"
@@ -968,7 +996,7 @@ export default function PlatformAdminPage() {
               />
               <p className="text-xs text-muted-foreground">
                 {editApiKeyDialog.tenant?.hasRetellAgentId
-                  ? 'Currently configured. Enter a new agent ID to update, or leave as-is to keep existing.'
+                  ? 'Enter a new agent ID to update, or leave empty to keep existing.'
                   : "The agent ID to use for this tenant's chat widget. This will be used for end-user chat interactions."}
               </p>
             </div>
@@ -988,26 +1016,28 @@ export default function PlatformAdminPage() {
             <Button
               onClick={() => {
                 if (editApiKeyDialog.tenant) {
-                  // Only send values that have been changed (not masked)
-                  const isMaskedApiKey = apiKeyInput.includes('••••••••');
-                  const isMaskedAgentId = selectedAgentId.includes('••••••••');
-                  
                   const payload: any = {
                     tenantId: editApiKeyDialog.tenant.id,
                   };
-                  
-                  if (!isMaskedApiKey && apiKeyInput.trim()) {
+
+                  // If user entered a new API key, send it
+                  if (apiKeyInput.trim()) {
                     payload.retellApiKey = apiKeyInput.trim();
+                  } else if (editApiKeyDialog.tenant.hasRetellApiKey) {
+                    // If API key exists but user didn't enter a new one, send sentinel value
+                    payload.retellApiKey = '__KEEP_EXISTING__';
                   }
-                  
-                  if (!isMaskedAgentId && selectedAgentId.trim()) {
+
+                  // Send agent ID if user entered a value
+                  if (selectedAgentId.trim()) {
                     payload.retellAgentId = selectedAgentId.trim();
                   }
-                  
+
                   updateRetellApiKeyMutation.mutate(payload);
                 }
               }}
               disabled={
+                // Enable if user typed anything in either field, or if saving
                 (!apiKeyInput.trim() && !selectedAgentId.trim()) ||
                 updateRetellApiKeyMutation.isPending
               }
