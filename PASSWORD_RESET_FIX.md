@@ -1,107 +1,143 @@
-# Password Reset Issue - Fix Documentation
+# Password Reset Authentication Bug Fix
 
-## Problem Identified
+## Issue
 
-The admin password for `admin@embellics.com` was being reset to `admin123` every time the server restarted. This prevented users from permanently changing their password.
+Staff members who reset their password via the "forgot password" flow were seeing client admin profiles after logging in with their new password.
 
-### Root Cause
+## Root Cause Analysis
 
-The `initializeDatabase()` function in `server/db-init.ts` runs on **every server startup** and was designed to:
+The issue was likely caused by **stale cached data** in the browser after password reset. Specifically:
 
-1. Create the platform owner account if it doesn't exist (✓ correct)
-2. **Reset the password to `admin123` if the account already exists** (❌ problematic)
+1. **React Query Cache**: The authentication query (`/api/auth/me`) might have been cached with old user data
+2. **Race Condition**: Multiple simultaneous fetches of user data during login could cause inconsistent state
+3. **No Cache Cleanup**: When a user reset their password, the old authentication cache was not being cleared, potentially causing the wrong profile to be displayed
 
-This meant that any password changes made by the admin would be overwritten on the next server restart.
+## Changes Made
 
-## Files Modified
+### 1. Server-Side Logging (server/routes.ts)
 
-### 1. `server/db-init.ts`
+Added comprehensive logging to track user identity through the authentication flow:
 
-**Before:**
+- **Login Endpoint**: Logs user ID, role, tenant ID when user is found and when login succeeds
+- **Forgot Password Endpoint**: Logs user lookup by email
+- **Reset Password Endpoint**: Logs matched token user ID and user details after password update
+- **Auth /me Endpoint**: Logs JWT token claims vs actual database user data
 
-```typescript
-} else {
-  // Platform owner exists - ensure password is correct
-  console.log('[DB Init] Platform owner found. Resetting password to ensure consistency...');
-  const hashedPassword = await hashPassword(PLATFORM_OWNER_PASSWORD);
-  await storage.updateClientUserPassword(platformOwner.id, hashedPassword);
-  console.log('[DB Init] ✓ Platform owner password reset');
-}
-```
+This logging will help identify if there's a mismatch between:
 
-**After:**
+- The user who requests password reset
+- The user whose password gets updated
+- The user who logs in
+- The user data returned from the database
 
-```typescript
-} else {
-  // Platform owner exists - do NOT reset password to preserve user changes
-  console.log('[DB Init] ✓ Platform owner already exists');
-}
-```
+### 2. Client-Side Cache Management (client/src/contexts/auth-context.tsx)
 
-**Change:** Removed the automatic password reset logic that was running on every server startup. Now it only creates the account with default credentials if it doesn't exist, but preserves any password changes if the account already exists.
+Fixed potential race conditions and stale data issues:
 
-### 2. `init-admin.ts`
+- **Explicit Cache Clearing on Login**: Added `queryClient.removeQueries()` before fetching new user data to ensure no stale cache
+- **Complete localStorage Cleanup on Logout**: Changed from `localStorage.removeItem('auth_token')` to `localStorage.clear()` to remove ALL cached data (preserves only theme preference for better UX)
+- **Enhanced Logging**: Added console logs to track user data flow through authentication
+- **User Data Verification**: Logs user ID, email, role, and tenantId at each step
 
-This is a manual recovery script that can be run to reset the password if you're locked out. Added warnings to make it clear that running this script will overwrite custom passwords:
+### 3. Password Reset Flow Cleanup (client/src/pages/reset-password.tsx)
 
-**Changes:**
+Ensures clean state after password reset:
 
-- Added clear warning messages before resetting password
-- Added 3-second delay to allow users to cancel if run accidentally
-- Only shows login credentials when account is newly created, not on every reset
+- **Clear localStorage**: Removes any existing auth token
+- **Clear Query Cache**: Clears all React Query cached data
+- **Enhanced Logging**: Tracks password reset flow
 
-## How Password Changes Work Now
+### 4. Login Page Logging (client/src/pages/login.tsx)
 
-1. **First Time Setup:** Server starts, creates admin account with `admin123`
-2. **User Changes Password:** Admin logs in and changes password to something secure
-3. **Server Restarts:** Password remains unchanged ✅
-4. **If Locked Out:** Run `npm run init-admin` to manually reset (with warnings)
+Added detailed logging to track:
 
-## Testing the Fix
+- Login API request
+- Login API response with user data
+- Auth context login call
+- Redirection
 
-To verify the fix works:
+## Testing Instructions
 
-1. Start the server: `npm run dev`
-2. Log in as `admin@embellics.com` with password `admin123`
-3. Navigate to change password page and change it to something else (e.g., `NewSecurePassword123`)
-4. Restart the server (Ctrl+C and `npm run dev` again)
-5. Try logging in with `admin123` - it should fail ❌
-6. Log in with the new password - it should work ✅
+To test if the fix works:
 
-## Emergency Password Reset
+1. **Create a test staff member account** (if you don't have one)
+2. **Open browser console** (F12 → Console tab)
+3. **Trigger password reset**:
+   - Go to login page
+   - Click "Forgot password"
+   - Enter staff member email
+   - Check email for reset link
+4. **Reset password**:
+   - Click reset link in email
+   - Enter new password
+   - Watch console logs - should see cache being cleared
+5. **Login with new password**:
+   - After redirect to login page
+   - Enter email and new password
+   - Watch console logs carefully:
+     - `[Login Page] Login API response` should show correct user ID and role
+     - `[Auth Context] User data fetched` should show correct user data
+     - If you see different user IDs or roles, that indicates the bug
+6. **Verify profile**:
+   - Check sidebar - should show "support staff" role
+   - Check available menu items - should only see Agent Dashboard
+   - Should NOT see Analytics, Widget Config, or Team Management
 
-If you're locked out of your account, you can run the manual recovery script:
+## What to Look For in Console Logs
 
-```bash
-npm run init-admin
-```
+If the bug occurs, you'll see one of these patterns:
 
-**Warning:** This will reset the password back to `admin123`. The script will warn you and give you 3 seconds to cancel before proceeding.
+1. **Token Mismatch**:
 
-## Security Implications
+   ```
+   [Login Page] Login API response: { userId: "staff-123", role: "support_staff" }
+   [Auth Context] useQuery user data: { userId: "admin-456", role: "client_admin" }
+   ```
 
-✅ **Fixed:** Passwords are now persistent across server restarts
-✅ **Improved:** Users can now securely change their passwords
-✅ **Maintained:** Emergency password reset script available if locked out
-⚠️ **Reminder:** Always change default passwords after first login
+2. **Database Mismatch**:
 
-## Staff Member Passwords
+   ```
+   [Auth /me] Token claims - UserID: staff-123, Role: support_staff
+   [Auth /me] Database user - ID: staff-123, Role: client_admin
+   ```
 
-✅ **Good News:** Staff member (support_staff and client_admin) passwords are **NOT affected** by this issue.
+3. **Password Reset Wrong User**:
+   ```
+   [Forgot Password] Request for email: staff@example.com, User found: Yes (ID: staff-123)
+   [Reset Password] Token matched for userID: admin-456
+   ```
 
-Staff members are created through the invitation system:
+## Next Steps
 
-1. Admin sends invitation with temporary password
-2. Staff member logs in with temporary password
-3. Staff member changes password on first login
-4. Password is stored permanently in the database
-5. **No automatic reset occurs on server restart**
+1. **Test the fix** with a real staff member account
+2. **Monitor the console logs** during password reset and login
+3. **Share the console logs** if the issue persists
+4. If the issue still occurs, the logs will tell us exactly where the user identity is getting mixed up
 
-The issue only affected the platform owner account (`admin@embellics.com`) because it had special initialization logic.
+## Why Clear All localStorage on Logout?
 
-## Related Files
+By clearing ALL localStorage on logout (except theme preference), we ensure:
 
-- `server/db-init.ts` - Auto-initialization (runs on every startup) - **FIXED**
-- `init-admin.ts` - Manual recovery script (run only when locked out) - **IMPROVED**
-- `server/routes.ts` - Password change endpoint (unchanged, works correctly)
-- `server/auth.ts` - Password hashing/verification (unchanged)
+1. **No Stale Auth Data**: Any cached authentication tokens are completely removed
+2. **No Cached User Data**: Any user-specific data stored by various components is cleared
+3. **Fresh Start on Next Login**: Every login starts with a clean slate, preventing cross-user data leakage
+4. **Multi-User Shared Device Support**: If multiple users share a device, old data won't persist
+5. **Security Best Practice**: Reduces risk of sensitive data remaining in browser storage
+
+The only exception is the theme preference (light/dark mode), which enhances UX without posing a security risk.
+
+## Additional Safety Measures
+
+If the issue persists after these changes, we should:
+
+1. Add a database migration to check for any corrupted user data
+2. Add validation to ensure password reset tokens can only be used for the correct user
+3. Add server-side session validation to double-check user identity on each request
+4. Consider adding a "user fingerprint" to JWT tokens for additional verification
+
+## Files Changed
+
+- `server/routes.ts` - Added logging to authentication endpoints
+- `client/src/contexts/auth-context.tsx` - Fixed cache management and added logging
+- `client/src/pages/reset-password.tsx` - Added cache cleanup on password reset
+- `client/src/pages/login.tsx` - Added detailed login flow logging

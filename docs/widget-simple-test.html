@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Embellics Chat Widget - Test</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1 {
+        color: #333;
+      }
+      .status {
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        background: #f0f9ff;
+        border: 1px solid #0284c7;
+        color: #0c4a6e;
+      }
+      .warning {
+        background: #fef3c7;
+        border-color: #f59e0b;
+        color: #78350f;
+      }
+      .success {
+        background: #dcfce7;
+        border-color: #22c55e;
+        color: #14532d;
+      }
+      .info-box {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      .info-box h3 {
+        margin-top: 0;
+        color: #374151;
+      }
+      .info-box ul {
+        margin: 10px 0;
+        padding-left: 20px;
+      }
+      .info-box li {
+        margin: 8px 0;
+      }
+      code {
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+      }
+      pre {
+        background: #f8fafc;
+        color: #1e293b;
+        padding: 15px;
+        border-radius: 8px;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+      }
+      pre code {
+        background: transparent;
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>💬 Embellics Chat Widget - Test Page</h1>
+    <p>
+      This page tests the Embellics <strong>Chat Widget</strong> powered by Retell AI. The widget
+      enables text-based conversations with an AI agent directly from your website.
+    </p>
+
+    <div class="status"><strong>Status:</strong> Initializing chat widget...</div>
+
+    <div id="widget-info" style="display: none">
+      <div class="info-box">
+        <h3>✅ Widget Loaded Successfully</h3>
+        <p>You should see a chat button in the bottom-right corner.</p>
+
+        <h4>How to use:</h4>
+        <ul>
+          <li><strong>Click the chat button</strong> to open the chat window</li>
+          <li><strong>Type your message</strong> in the input field at the bottom</li>
+          <li><strong>Press Enter</strong> or click the send button to send</li>
+          <li><strong>Chat naturally</strong> - the AI agent will respond to your messages</li>
+          <li><strong>Click the × button</strong> to close the chat</li>
+        </ul>
+
+        <h4>What to expect:</h4>
+        <ul>
+          <li>Your messages appear on the right in purple bubbles</li>
+          <li>AI responses appear on the left in white bubbles</li>
+          <li>"Agent is typing..." indicator shows when waiting for response</li>
+          <li>Chat history persists throughout the session</li>
+          <li>Text conversations are processed through Retell AI's conversational AI</li>
+        </ul>
+      </div>
+
+      <div class="info-box">
+        <h3>🔧 Configuration</h3>
+        <ul>
+          <li>
+            <strong>API Key:</strong>
+            <code
+              >embellics_4c742a************************************************************</code
+            >
+          </li>
+          <li><strong>Server:</strong> <code>http://localhost:3000</code></li>
+          <li><strong>Agent Type:</strong> Text Chat (Retell AI)</li>
+        </ul>
+      </div>
+
+      <div class="info-box">
+        <h3>📦 Embed Code</h3>
+        <p>
+          To embed this widget on your website, add this code before the closing
+          <code>&lt;/body&gt;</code> tag:
+        </p>
+        <pre><code>&lt;script&gt;
+  (function() {
+    var script = document.createElement('script');
+    script.src = 'http://localhost:3000/widget.js';
+    script.setAttribute('data-api-key', 'embellics_4c742a****...');
+    document.head.appendChild(script);
+  })();
+&lt;/script&gt;</code></pre>
+      </div>
+    </div>
+
+    <script>
+      // Wait for widget to load
+      setTimeout(() => {
+        const widgetButton = document.getElementById('embellics-widget-button');
+        if (widgetButton) {
+          document.querySelector('.status').className = 'status success';
+          document.querySelector('.status').innerHTML =
+            '<strong>✅ Success!</strong> Chat widget loaded and ready to use. Click the chat button in the bottom-right corner.';
+          document.getElementById('widget-info').style.display = 'block';
+        } else {
+          document.querySelector('.status').className = 'status warning';
+          document.querySelector('.status').innerHTML =
+            '<strong>⚠️ Widget not found.</strong> Make sure the server is running on port 3000.';
+        }
+      }, 1000);
+    </script>
+
+    <!-- Load the Embellics Chat Widget -->
+
+    <script>
+      (function () {
+        var script = document.createElement('script');
+        script.src = 'http://localhost:3000/widget.js';
+        script.setAttribute(
+          'data-api-key',
+          'embellics_aa1ff891b3b0fc6cce1aa42464a303fd9a2a81107cc7caa90540e915b5c32d2a',
+        );
+        document.head.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,204 +1,153 @@
-# Production Deployment Guide# Railway Deployment Guide
-
-## 🚀 Recommended: Render.com (Free Tier)## Why Railway Instead of Vercel?
-
-### Why Render?Your application uses:
-
-This application requires:- **Express.js server** with persistent connections
-
-- **Express.js server** with persistent connections- **WebSockets** for real-time chat
-
-- **WebSockets** for real-time chat- **Long-running processes** for database initialization
-
-- **Long-running Node.js process**
-
-- **Database initialization** on startup**Vercel only supports serverless functions**, which don't work for this architecture. Railway is perfect for full-stack Express apps.
-
-**Render.com provides:**## Deploy to Railway (5 minutes)
-
-- ✅ Free tier for web services
-
-- ✅ Automatic deployments from GitHub### Step 1: Create Railway Account
-
-- ✅ WebSocket support
-
-- ✅ Zero configuration1. Go to https://railway.app
-
-- ✅ 750 hours/month free runtime2. Sign up with GitHub
-
-3. Connect your `embellics-ai/app` repository
-
 # Production Deployment Guide
 
-This guide explains how to deploy the Embellics application to a standard hosting provider that supports long-running Node.js services and WebSockets (for real-time chat). The instructions below are provider-agnostic; replace any example URLs with your actual deployment URL.
+## 🚀 Deployed on Render.com
 
-## Recommended: Render.com (Free Tier)
+**Production URL:** https://app.embellics.com
+
+## Why Render?
 
 This application requires:
 
 - An Express.js server capable of persistent connections
 - WebSocket support for real-time chat
 - Long-running Node.js processes (for database initialization and background work)
+- PostgreSQL database (using Neon)
 
 Render.com provides a straightforward option for hosting web services and automatic GitHub deployments. If you prefer another provider, ensure it supports persistent connections and WebSockets.
 
-## Quick Start (example using Render.com)
+**Render.com provides:**
 
-### Step 1: Prepare environment variables
+- ✅ Free tier for web services
+- ✅ Automatic deployments from GitHub
+- ✅ WebSocket support
+- ✅ Simple configuration
+- ✅ Custom domains (app.embellics.com)
+- ✅ Automatic SSL/TLS certificates
 
-Create the environment variables required by the app (set them in your host's dashboard or CI/CD settings):
+## Environment Variables
+
+The following environment variables are configured in Render dashboard:
 
 ```
 NODE_ENV=production
 DATABASE_URL=postgresql://<user>:<password>@<host>/<db>?sslmode=require
-SESSION_SECRET=your-session-secret-here
-ENCRYPTION_KEY=your-encryption-key-here
-RETELL_API_KEY=your-retell-api-key
+SESSION_SECRET=<your-session-secret>
+ENCRYPTION_KEY=<your-encryption-key>
+RETELL_API_KEY=<your-retell-api-key>
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+SMTP_USER=<your-email@gmail.com>
+SMTP_PASS=<your-app-password>
 SMTP_FROM=noreply@embellics.com
-APP_URL=https://your-app.example.com
+APP_URL=https://app.embellics.com
 SALT_ROUNDS=10
 ```
 
-### Step 2: Create a Web Service
+## Deployment Configuration
 
-1. Create a new Web Service (or equivalent) in your hosting dashboard.
-2. Connect the service to the `embellics-ai/app` GitHub repository.
-3. Set the build command and start command:
+### Build Command
 
-- Build command: `npm install && npm run build`
-- Start command: `npm start`
-
-Your host should detect the Node environment. After deployment, update `APP_URL` with your deployment URL.
-
-## Alternative: Heroku
-
-If you prefer Heroku, you can deploy similarly:
-
-1. Install Heroku CLI: `npm install -g heroku`
-2. `heroku login`
-3. `heroku create <your-app-name>`
-4. Set environment variables with `heroku config:set KEY=value`
-5. Deploy: `git push heroku main`
-
-## Database: Neon PostgreSQL (example)
-
-This app works well with Neon (PostgreSQL). Steps:
-
-1. Create a Neon project and copy the connection string.
-2. Set the connection string as `DATABASE_URL` in your host's environment variables.
-
-## Step — Test your deployment
-
-1. Visit your deployment URL (e.g., `https://your-app.example.com`).
-2. Login with admin credentials (change the default password immediately).
-3. Verify WebSocket connections and database initialization.
-
-## Next steps after deployment
-
-1. Enable 2FA on accounts used for deployment and email
-2. Rotate API keys and secrets
-3. Update any webhooks or integrations to use your deployed URL
-4. Configure a custom domain and TLS if desired
-
-## Security checklist
-
-- [ ] Change default admin password
-- [ ] Rotate security keys regularly
-- [ ] Use HTTPS
-- [ ] Never commit `.env` to git
-
-## Continuous deployment
-
-Push to GitHub to trigger automatic deploys if your host supports GitHub integration:
-
+```bash
+npm install && npm run build
 ```
+
+### Start Command
+
+```bash
+npm start
+```
+
+## Database: Neon PostgreSQL
+
+The application uses Neon PostgreSQL (serverless PostgreSQL):
+
+1. Database is hosted on Neon
+2. Connection string is set in `DATABASE_URL` environment variable
+3. Database initialization runs automatically on startup
+
+## Continuous Deployment
+
+Automatic deployments are triggered when pushing to GitHub:
+
+```bash
 git push origin main
 ```
 
-## Troubleshooting
+Render automatically:
 
-- Build fails: check your host's build logs
-- 502 / 5xx errors: service may be starting — wait 1–2 minutes
-- DB connection failed: verify `DATABASE_URL` and network access
+1. Detects the push
+2. Runs the build command
+3. Restarts the service with the new code
 
----
+## Testing the Deployment
 
-Your app should now be ready for production deployment. Replace example values above with your real configuration and URLs.
+1. Visit https://app.embellics.com
+2. Login with admin credentials
+3. Verify:
+   - Dashboard loads correctly
+   - WebSocket connections work
+   - Widget initialization works
+   - Database queries execute successfully
 
-APP_URL=https://your-app.example.com
-SALT_ROUNDS=10
+## Widget Embedding
 
+For external websites to use the widget, use the production URL:
+
+```html
+<script>
+  (function() {
+    var script = document.createElement('script');
+    script.src = 'https://app.embellics.com/widget.js';
+    script.setAttribute('data-api-key', 'your-api-key-here');
+    document.head.appendChild(script);
+  })();
+</script>
 ```
 
-### Step 2: Create a Web Service
+## Security Checklist
 
-1. Create a new Web Service (or equivalent) in your hosting dashboard.
-2. Connect the service to the `embellics-ai/app` GitHub repository.
-3. Set the build command and start command:
-
-- Build command: `npm install && npm run build`
-- Start command: `npm start`
-
-Your host should detect the Node environment. After deployment, update `APP_URL` with your deployment URL.
-
-## Alternative: Heroku
-
-If you prefer Heroku, you can deploy similarly:
-
-1. Install Heroku CLI: `npm install -g heroku`
-2. `heroku login`
-3. `heroku create <your-app-name>`
-4. Set environment variables with `heroku config:set KEY=value`
-5. Deploy: `git push heroku main`
-
-## Database: Neon PostgreSQL (example)
-
-This app works well with Neon (PostgreSQL). Steps:
-
-1. Create a Neon project and copy the connection string.
-2. Set the connection string as `DATABASE_URL` in your host's environment variables.
-
-## Step — Test your deployment
-
-1. Visit your deployment URL (e.g., `https://your-app.example.com`).
-2. Login with admin credentials (change the default password immediately).
-3. Verify WebSocket connections and database initialization.
-
-## Next steps after deployment
-
-1. Enable 2FA on accounts used for deployment and email
-2. Rotate API keys and secrets
-3. Update any webhooks or integrations to use your deployed URL
-4. Configure a custom domain and TLS if desired
-
-## Security checklist
-
-- [ ] Change default admin password
-- [ ] Rotate security keys regularly
-- [ ] Use HTTPS
-- [ ] Never commit `.env` to git
-
-## Continuous deployment
-
-Push to GitHub to trigger automatic deploys if your host supports GitHub integration:
-
-```
-
-git push origin main
-
-```
+- [x] HTTPS enabled (automatic with Render)
+- [x] Environment variables secured
+- [x] Custom domain configured (app.embellics.com)
+- [ ] Rotate API keys regularly
+- [ ] Monitor error logs
+- [ ] Set up uptime monitoring
 
 ## Troubleshooting
 
-- Build fails: check your host's build logs
-- 502 / 5xx errors: service may be starting — wait 1–2 minutes
-- DB connection failed: verify `DATABASE_URL` and network access
+### Build Failures
+
+- Check Render build logs
+- Verify `package.json` scripts are correct
+- Ensure all dependencies are listed
+
+### 502/503 Errors
+
+- Service may be starting (wait 1-2 minutes)
+- Check Render service logs
+- Verify environment variables are set
+
+### Database Connection Issues
+
+- Verify `DATABASE_URL` is correct
+- Check Neon database status
+- Ensure SSL mode is enabled
+
+### Widget Not Loading
+
+- Clear browser cache
+- Check CORS configuration
+- Verify API key is valid
+- Check network tab for errors
+
+## Monitoring
+
+Monitor the application using:
+
+- Render dashboard (service logs, metrics)
+- Browser console (client-side errors)
+- Database dashboard (Neon console)
 
 ---
 
-Your app should now be ready for production deployment. Replace example values above with your real configuration and URLs.
-```
+**Current Status:** ✅ Live at https://app.embellics.com

@@ -27,7 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { Key, Plus, Trash2, Copy, Eye, EyeOff } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Eye, EyeOff, Code } from 'lucide-react';
 import { format } from 'date-fns';
 import type { ApiKey } from '@shared/schema';
 
@@ -36,7 +36,7 @@ export default function ApiKeysPage() {
   const [newKeyName, setNewKeyName] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
-  const [showNewKey, setShowNewKey] = useState(true); // Auto-show new keys by default
+  const [showNewKey, setShowNewKey] = useState(false); // Hide key by default for security
 
   // Query for API keys
   const { data: apiKeys = [], isLoading } = useQuery<ApiKey[]>({
@@ -52,11 +52,12 @@ export default function ApiKeysPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/api-keys'] });
       setNewlyCreatedKey(data.apiKey);
+      setShowNewKey(false); // Hide by default, user must click eye icon to see
       setNewKeyName('');
       setIsCreateDialogOpen(false);
       toast({
         title: 'API key created',
-        description: 'Your new API key has been generated. Make sure to copy it now!',
+        description: 'Your new API key has been generated. Click the eye icon to view it!',
       });
     },
     onError: () => {
@@ -76,6 +77,8 @@ export default function ApiKeysPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/api-keys'] });
+      // Clear the newly created key banner when deleting
+      setNewlyCreatedKey(null);
       toast({
         title: 'API key deleted',
         description: 'The API key has been permanently deleted.',
@@ -219,13 +222,9 @@ export default function ApiKeysPage() {
             <CardContent className="py-12 text-center">
               <Key className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No API keys yet</h3>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-muted-foreground">
                 Create your first API key to start embedding the chat widget on your website
               </p>
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create API Key
-              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -291,33 +290,127 @@ export default function ApiKeysPage() {
         )}
       </div>
 
-      {/* Usage Instructions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Embedding the Widget</CardTitle>
-          <CardDescription>
-            Add this code snippet to your website to embed the chat widget
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-muted p-4 rounded-md font-mono text-sm overflow-x-auto">
-            <code>
-              {`<script>
+      {/* Installation Instructions */}
+      {apiKeys.length > 0 && (
+        <Card className="border-2 border-primary/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Code className="h-5 w-5" />
+                  Installation Instructions
+                </CardTitle>
+                <CardDescription className="mt-2">
+                  Copy and paste this code snippet into your website
+                  <br />
+                  <span className="text-xs text-muted-foreground mt-1 inline-block">
+                    Production URL:{' '}
+                    <code className="text-primary">https://app.embellics.com/widget.js</code>
+                  </span>
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const firstKey = apiKeys[0];
+                  const embedCode = `<script>
   (function() {
     var script = document.createElement('script');
-    script.src = 'https://embellics.com/widget.js';
-    script.setAttribute('data-api-key', 'YOUR_API_KEY');
+    script.src = '${window.location.origin}/widget.js';
+    script.setAttribute('data-api-key', '${firstKey.keyPrefix}...');
     document.head.appendChild(script);
   })();
-</script>`}
-            </code>
-          </div>
-          <p className="text-sm text-muted-foreground mt-3">
-            Replace <code className="bg-muted px-1 py-0.5 rounded">YOUR_API_KEY</code> with your
-            actual API key
-          </p>
-        </CardContent>
-      </Card>
+</script>`;
+                  copyToClipboard(embedCode);
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy Code
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="relative">
+              <div className="bg-slate-950 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                <code className="text-slate-50">
+                  <span className="text-slate-500">&lt;</span>
+                  <span className="text-pink-400">script</span>
+                  <span className="text-slate-500">&gt;</span>
+                  {'\n  '}
+                  <span className="text-slate-500">(</span>
+                  <span className="text-purple-400">function</span>
+                  <span className="text-slate-500">() {'{'}</span>
+                  {'\n    '}
+                  <span className="text-purple-400">var</span>{' '}
+                  <span className="text-blue-400">script</span> ={' '}
+                  <span className="text-blue-400">document</span>.
+                  <span className="text-yellow-400">createElement</span>
+                  <span className="text-slate-500">(</span>
+                  <span className="text-green-400">'script'</span>
+                  <span className="text-slate-500">);</span>
+                  {'\n    '}
+                  <span className="text-blue-400">script</span>.
+                  <span className="text-blue-400">src</span> ={' '}
+                  <span className="text-green-400">'{`${window.location.origin}/widget.js`}'</span>;
+                  {'\n    '}
+                  <span className="text-blue-400">script</span>.
+                  <span className="text-yellow-400">setAttribute</span>
+                  <span className="text-slate-500">(</span>
+                  <span className="text-green-400">'data-api-key'</span>,{' '}
+                  <span className="text-green-400">
+                    '
+                    {newlyCreatedKey ||
+                      (apiKeys[0] ? `${apiKeys[0].keyPrefix}...` : 'YOUR_API_KEY')}
+                    '
+                  </span>
+                  <span className="text-slate-500">);</span>
+                  {'\n    '}
+                  <span className="text-blue-400">document</span>.
+                  <span className="text-blue-400">head</span>.
+                  <span className="text-yellow-400">appendChild</span>
+                  <span className="text-slate-500">(</span>
+                  <span className="text-blue-400">script</span>
+                  <span className="text-slate-500">);</span>
+                  {'\n  '}
+                  <span className="text-slate-500">{'}'})();</span>
+                  {'\n'}
+                  <span className="text-slate-500">&lt;/</span>
+                  <span className="text-pink-400">script</span>
+                  <span className="text-slate-500">&gt;</span>
+                </code>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                � Installation Steps:
+              </h4>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-blue-900 dark:text-blue-100">
+                <li>Copy the code snippet above (or click the "Copy Code" button)</li>
+                <li>Open your website's HTML file</li>
+                <li>
+                  Paste the code just before the closing{' '}
+                  <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded font-mono">
+                    {'</body>'}
+                  </code>{' '}
+                  tag
+                </li>
+                <li>Save and reload your website</li>
+                <li>The chat widget will appear in the bottom-right corner</li>
+              </ol>
+            </div>
+
+            {!newlyCreatedKey && apiKeys.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  <strong>⚠️ Note:</strong> The code above shows your key prefix. Replace it with
+                  your full API key shown when you created it.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -62,6 +62,7 @@ export default function ResetPassword() {
       if (!token) {
         throw new Error('No reset token found');
       }
+      console.log('[Reset Password] Submitting password reset');
       const response = await apiRequest('POST', '/api/auth/reset-password', {
         token,
         newPassword: data.newPassword,
@@ -69,16 +70,29 @@ export default function ResetPassword() {
       return await response.json();
     },
     onSuccess: (data) => {
+      console.log('[Reset Password] Password reset successful');
       setSuccessMessage(data.message);
       setErrorMessage(null);
       form.reset();
 
+      // Clear any cached auth data to ensure fresh login
+      console.log('[Reset Password] Clearing auth token and cache');
+      localStorage.removeItem('auth_token');
+
+      // Import queryClient if needed
+      import('@/lib/queryClient').then(({ queryClient }) => {
+        queryClient.clear();
+        console.log('[Reset Password] Cache cleared');
+      });
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
+        console.log('[Reset Password] Redirecting to login');
         setLocation('/login');
       }, 3000);
     },
     onError: (error: any) => {
+      console.error('[Reset Password] Error:', error);
       const errorText =
         error?.message || 'Failed to reset password. The link may be expired or invalid.';
       setErrorMessage(errorText);

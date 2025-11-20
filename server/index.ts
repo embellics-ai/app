@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction, type Express } from 'express';
 import expressWs from 'express-ws';
 import { createServer } from 'http';
+import rateLimit from 'express-rate-limit';
 import { registerRoutes } from './routes';
 import { setupVite, serveStatic, log } from './vite';
 import { initializeDatabase } from './db-init';
@@ -60,6 +61,37 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Serve widget test HTML file BEFORE registerRoutes and Vite middleware
+  // This ensures this specific route is not intercepted by the SPA
+  const fs = await import('fs');
+  const path = await import('path');
+
+  // Rate limiter for test HTML file to prevent abuse
+  const testHtmlLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  });
+
+  app.get('/widget-simple-test.html', testHtmlLimiter, async (req, res) => {
+    try {
+      const filePath = path.resolve(process.cwd(), 'docs', 'widget-simple-test.html');
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).send('Test file not found');
+      }
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      const content = fs.readFileSync(filePath, 'utf-8');
+      res.send(content);
+    } catch (error) {
+      console.error('Error serving test HTML:', error);
+      res.status(500).send('Failed to load test file');
+    }
+  });
+
   await registerRoutes(wsApp as any as Express);
 
   // Initialize database with platform owner if needed

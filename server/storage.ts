@@ -23,6 +23,12 @@ import {
   type InsertUserInvitation,
   type PasswordResetToken,
   type InsertPasswordResetToken,
+  type WidgetHandoff,
+  type InsertWidgetHandoff,
+  type WidgetHandoffMessage,
+  type InsertWidgetHandoffMessage,
+  type WidgetChatMessage,
+  type InsertWidgetChatMessage,
   users,
   messages,
   conversations,
@@ -35,6 +41,9 @@ import {
   humanAgents,
   userInvitations,
   passwordResetTokens,
+  widgetHandoffs,
+  widgetHandoffMessages,
+  widgetChatMessages,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import { neon } from '@neondatabase/serverless';
@@ -155,6 +164,35 @@ export interface IStorage {
   markTokenAsUsed(token: string): Promise<void>;
   markTokenAsUsedById(id: string): Promise<void>;
   cleanupExpiredResetTokens(): Promise<number>; // Clean up expired/used tokens
+
+  // Widget Handoff methods
+  createWidgetHandoff(handoff: InsertWidgetHandoff): Promise<WidgetHandoff>;
+  getWidgetHandoff(id: string): Promise<WidgetHandoff | undefined>;
+  getWidgetHandoffsByTenant(tenantId: string): Promise<WidgetHandoff[]>;
+  getPendingWidgetHandoffs(tenantId: string): Promise<WidgetHandoff[]>;
+  getActiveWidgetHandoffs(tenantId: string): Promise<WidgetHandoff[]>;
+  updateWidgetHandoffStatus(
+    id: string,
+    status: string,
+    updates?: Partial<InsertWidgetHandoff>,
+  ): Promise<WidgetHandoff | undefined>;
+  assignHandoffToAgent(
+    handoffId: string,
+    agentId: string,
+    tenantId: string,
+  ): Promise<WidgetHandoff | undefined>;
+
+  // Widget Handoff Message methods
+  createWidgetHandoffMessage(message: InsertWidgetHandoffMessage): Promise<WidgetHandoffMessage>;
+  getWidgetHandoffMessages(handoffId: string): Promise<WidgetHandoffMessage[]>;
+  getWidgetHandoffMessagesSince(
+    handoffId: string,
+    sinceTimestamp: Date,
+  ): Promise<WidgetHandoffMessage[]>;
+
+  // Widget Chat Message methods (for history persistence)
+  createWidgetChatMessage(message: InsertWidgetChatMessage): Promise<WidgetChatMessage>;
+  getWidgetChatMessages(chatId: string): Promise<WidgetChatMessage[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -387,12 +425,8 @@ export class MemStorage implements IStorage {
       tenantId: encryptedConfig.tenantId,
       retellAgentId: encryptedConfig.retellAgentId ?? null,
       retellApiKey: encryptedConfig.retellApiKey ?? null,
-      primaryColor: encryptedConfig.primaryColor ?? null,
-      position: encryptedConfig.position ?? null,
       greeting: encryptedConfig.greeting ?? null,
-      placeholder: encryptedConfig.placeholder ?? null,
       allowedDomains: encryptedConfig.allowedDomains ?? null,
-      customCss: encryptedConfig.customCss ?? null,
       updatedAt: new Date(),
     };
     this.widgetConfigs.set(id, config);
@@ -936,6 +970,101 @@ export class MemStorage implements IStorage {
     this.clientUsers.set(userId, updated);
     return updated;
   }
+
+  // Widget Handoff methods (stubs for testing)
+  async createWidgetHandoff(handoff: InsertWidgetHandoff): Promise<WidgetHandoff> {
+    const id = randomUUID();
+    const newHandoff: WidgetHandoff = {
+      id,
+      tenantId: handoff.tenantId,
+      chatId: handoff.chatId,
+      status: handoff.status || 'pending',
+      requestedAt: new Date(),
+      pickedUpAt: handoff.pickedUpAt || null,
+      resolvedAt: handoff.resolvedAt || null,
+      assignedAgentId: handoff.assignedAgentId || null,
+      userEmail: handoff.userEmail || null,
+      userMessage: handoff.userMessage || null,
+      conversationHistory: handoff.conversationHistory || null,
+      lastUserMessage: handoff.lastUserMessage || null,
+      metadata: handoff.metadata || null,
+    };
+    // Note: No Map storage for handoffs in MemStorage - just return for testing
+    return newHandoff;
+  }
+
+  async getWidgetHandoff(id: string): Promise<WidgetHandoff | undefined> {
+    return undefined; // Stub
+  }
+
+  async getWidgetHandoffsByTenant(tenantId: string): Promise<WidgetHandoff[]> {
+    return []; // Stub
+  }
+
+  async getPendingWidgetHandoffs(tenantId: string): Promise<WidgetHandoff[]> {
+    return []; // Stub
+  }
+
+  async getActiveWidgetHandoffs(tenantId: string): Promise<WidgetHandoff[]> {
+    return []; // Stub
+  }
+
+  async updateWidgetHandoffStatus(
+    id: string,
+    status: string,
+    updates?: Partial<InsertWidgetHandoff>,
+  ): Promise<WidgetHandoff | undefined> {
+    return undefined; // Stub
+  }
+
+  async assignHandoffToAgent(
+    handoffId: string,
+    agentId: string,
+    tenantId: string,
+  ): Promise<WidgetHandoff | undefined> {
+    return undefined; // Stub
+  }
+
+  async createWidgetHandoffMessage(
+    message: InsertWidgetHandoffMessage,
+  ): Promise<WidgetHandoffMessage> {
+    const id = randomUUID();
+    return {
+      id,
+      handoffId: message.handoffId,
+      senderType: message.senderType,
+      senderId: message.senderId || null,
+      content: message.content,
+      timestamp: new Date(),
+    };
+  }
+
+  async getWidgetHandoffMessages(handoffId: string): Promise<WidgetHandoffMessage[]> {
+    return []; // Stub
+  }
+
+  async getWidgetHandoffMessagesSince(
+    handoffId: string,
+    sinceTimestamp: Date,
+  ): Promise<WidgetHandoffMessage[]> {
+    return []; // Stub
+  }
+
+  async createWidgetChatMessage(message: InsertWidgetChatMessage): Promise<WidgetChatMessage> {
+    const id = randomUUID();
+    return {
+      id,
+      tenantId: message.tenantId,
+      chatId: message.chatId,
+      role: message.role,
+      content: message.content,
+      timestamp: new Date(),
+    };
+  }
+
+  async getWidgetChatMessages(chatId: string): Promise<WidgetChatMessage[]> {
+    return []; // Stub
+  }
 }
 
 // Database storage implementation using PostgreSQL
@@ -1142,6 +1271,10 @@ export class DbStorage implements IStorage {
       updatesToApply.retellApiKey = encryptApiKey(updates.retellApiKey);
     }
 
+    console.log(
+      `[Storage] updateWidgetConfig - tenantId: ${tenantId}, retellAgentId: ${updatesToApply.retellAgentId || 'not in updates'}`,
+    );
+
     const result = await this.db
       .update(widgetConfigs)
       .set({ ...updatesToApply, updatedAt: new Date() })
@@ -1150,6 +1283,10 @@ export class DbStorage implements IStorage {
 
     const config = result[0];
     if (!config) return undefined;
+
+    console.log(
+      `[Storage] updateWidgetConfig - Saved to DB, retellAgentId: ${config.retellAgentId || 'null'}`,
+    );
 
     // Decrypt the API key for immediate use
     if (config.retellApiKey) {
@@ -1666,6 +1803,129 @@ export class DbStorage implements IStorage {
         or(eq(passwordResetTokens.used, true), sql`${passwordResetTokens.expiresAt} < ${now}`),
       );
     return result.rowCount || 0;
+  }
+
+  // ============================================
+  // WIDGET HANDOFF METHODS
+  // ============================================
+
+  async createWidgetHandoff(handoff: InsertWidgetHandoff): Promise<WidgetHandoff> {
+    const result = await this.db.insert(widgetHandoffs).values(handoff).returning();
+    return result[0];
+  }
+
+  async getWidgetHandoff(id: string): Promise<WidgetHandoff | undefined> {
+    const result = await this.db.select().from(widgetHandoffs).where(eq(widgetHandoffs.id, id));
+    return result[0];
+  }
+
+  async getWidgetHandoffsByTenant(tenantId: string): Promise<WidgetHandoff[]> {
+    return await this.db
+      .select()
+      .from(widgetHandoffs)
+      .where(eq(widgetHandoffs.tenantId, tenantId))
+      .orderBy(desc(widgetHandoffs.requestedAt));
+  }
+
+  async getPendingWidgetHandoffs(tenantId: string): Promise<WidgetHandoff[]> {
+    return await this.db
+      .select()
+      .from(widgetHandoffs)
+      .where(and(eq(widgetHandoffs.tenantId, tenantId), eq(widgetHandoffs.status, 'pending')))
+      .orderBy(widgetHandoffs.requestedAt);
+  }
+
+  async getActiveWidgetHandoffs(tenantId: string): Promise<WidgetHandoff[]> {
+    return await this.db
+      .select()
+      .from(widgetHandoffs)
+      .where(and(eq(widgetHandoffs.tenantId, tenantId), eq(widgetHandoffs.status, 'active')))
+      .orderBy(widgetHandoffs.pickedUpAt);
+  }
+
+  async updateWidgetHandoffStatus(
+    id: string,
+    status: string,
+    updates?: Partial<InsertWidgetHandoff>,
+  ): Promise<WidgetHandoff | undefined> {
+    const updateData: any = { status, ...updates };
+
+    if (status === 'active' && !updates?.pickedUpAt) {
+      updateData.pickedUpAt = new Date();
+    } else if (status === 'resolved' && !updates?.resolvedAt) {
+      updateData.resolvedAt = new Date();
+    }
+
+    const result = await this.db
+      .update(widgetHandoffs)
+      .set(updateData)
+      .where(eq(widgetHandoffs.id, id))
+      .returning();
+
+    return result[0];
+  }
+
+  async assignHandoffToAgent(
+    handoffId: string,
+    agentId: string,
+    tenantId: string,
+  ): Promise<WidgetHandoff | undefined> {
+    const result = await this.db
+      .update(widgetHandoffs)
+      .set({
+        assignedAgentId: agentId,
+        status: 'active',
+        pickedUpAt: new Date(),
+      })
+      .where(and(eq(widgetHandoffs.id, handoffId), eq(widgetHandoffs.tenantId, tenantId)))
+      .returning();
+
+    return result[0];
+  }
+
+  async createWidgetHandoffMessage(
+    message: InsertWidgetHandoffMessage,
+  ): Promise<WidgetHandoffMessage> {
+    const result = await this.db.insert(widgetHandoffMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getWidgetHandoffMessages(handoffId: string): Promise<WidgetHandoffMessage[]> {
+    return await this.db
+      .select()
+      .from(widgetHandoffMessages)
+      .where(eq(widgetHandoffMessages.handoffId, handoffId))
+      .orderBy(widgetHandoffMessages.timestamp);
+  }
+
+  async getWidgetHandoffMessagesSince(
+    handoffId: string,
+    sinceTimestamp: Date,
+  ): Promise<WidgetHandoffMessage[]> {
+    return await this.db
+      .select()
+      .from(widgetHandoffMessages)
+      .where(
+        and(
+          eq(widgetHandoffMessages.handoffId, handoffId),
+          gt(widgetHandoffMessages.timestamp, sinceTimestamp),
+        ),
+      )
+      .orderBy(widgetHandoffMessages.timestamp);
+  }
+
+  // Widget Chat Messages (for history persistence)
+  async createWidgetChatMessage(message: InsertWidgetChatMessage): Promise<WidgetChatMessage> {
+    const result = await this.db.insert(widgetChatMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getWidgetChatMessages(chatId: string): Promise<WidgetChatMessage[]> {
+    return await this.db
+      .select()
+      .from(widgetChatMessages)
+      .where(eq(widgetChatMessages.chatId, chatId))
+      .orderBy(widgetChatMessages.timestamp);
   }
 }
 

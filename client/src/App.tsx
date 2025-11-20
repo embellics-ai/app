@@ -17,6 +17,8 @@ import PlatformAnalytics from '@/pages/platform-analytics';
 import WidgetConfigPage from '@/pages/widget-config';
 import ApiKeysPage from '@/pages/api-keys';
 import AgentDashboard from '@/pages/agent-dashboard';
+import AgentQueue from '@/pages/agent-queue';
+import AgentChat from '@/pages/agent-chat';
 import PlatformAdminPage from '@/pages/platform-admin';
 import TeamManagementPage from '@/pages/team-management';
 import ChangePasswordPage from '@/pages/change-password';
@@ -69,6 +71,16 @@ function Router() {
       <Route path="/agent-dashboard">
         <ProtectedRoute path="/agent-dashboard">
           <AgentDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/agent-queue">
+        <ProtectedRoute path="/agent-queue">
+          <AgentQueue />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/agent-chat/:id">
+        <ProtectedRoute path="/agent-chat/:id">
+          <AgentChat />
         </ProtectedRoute>
       </Route>
       <Route path="/platform-admin">
