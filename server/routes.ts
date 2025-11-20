@@ -123,10 +123,7 @@ export async function registerRoutes(app: Express): Promise<void> {
               const companyName = pendingInvitation.companyName || 'Your Company';
               await storage.createWidgetConfig({
                 tenantId: tenantId,
-                primaryColor: '#667eea',
-                position: 'bottom-right',
                 greeting: 'Hi! How can I help you today?',
-                placeholder: 'Type your message...',
                 retellApiKey: null, // Platform admin will set this later
                 retellAgentId: null, // Platform admin will set this later
               });
@@ -3103,6 +3100,277 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ============================================
+  // WIDGET HANDOFF MANAGEMENT ENDPOINTS (PROTECTED)
+  // ============================================
+
+  // Get all widget handoffs for tenant
+  app.get('/api/widget-handoffs', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const tenantId = assertTenant(req, res);
+      if (!tenantId) return;
+      const handoffs = await storage.getWidgetHandoffsByTenant(tenantId);
+      res.json(handoffs);
+    } catch (error) {
+      console.error('Error fetching widget handoffs:', error);
+      res.status(500).json({ error: 'Failed to fetch handoffs' });
+    }
+  });
+
+  // Get pending widget handoffs
+  app.get('/api/widget-handoffs/pending', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const tenantId = assertTenant(req, res);
+      if (!tenantId) return;
+      const handoffs = await storage.getPendingWidgetHandoffs(tenantId);
+      res.json(handoffs);
+    } catch (error) {
+      console.error('Error fetching pending handoffs:', error);
+      res.status(500).json({ error: 'Failed to fetch pending handoffs' });
+    }
+  });
+
+  // Get active widget handoffs
+  app.get('/api/widget-handoffs/active', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const tenantId = assertTenant(req, res);
+      if (!tenantId) return;
+      const handoffs = await storage.getActiveWidgetHandoffs(tenantId);
+      res.json(handoffs);
+    } catch (error) {
+      console.error('Error fetching active handoffs:', error);
+      res.status(500).json({ error: 'Failed to fetch active handoffs' });
+    }
+  });
+
+  // Get specific widget handoff
+  app.get('/api/widget-handoffs/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const tenantId = assertTenant(req, res);
+      if (!tenantId) return;
+      const { id } = req.params;
+      const handoff = await storage.getWidgetHandoff(id);
+
+      if (!handoff || handoff.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Handoff not found' });
+      }
+
+      res.json(handoff);
+    } catch (error) {
+      console.error('Error fetching handoff:', error);
+      res.status(500).json({ error: 'Failed to fetch handoff' });
+    }
+  });
+
+  // Pick up a widget handoff (agent claims it)
+  app.post(
+    '/api/widget-handoffs/:id/pickup',
+    requireAuth,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenantId = assertTenant(req, res);
+        if (!tenantId) return;
+        const { id } = req.params;
+
+        if (!req.user?.email) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const handoff = await storage.getWidgetHandoff(id);
+
+        if (!handoff || handoff.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Handoff not found' });
+        }
+
+        if (handoff.status !== 'pending') {
+          return res.status(400).json({ error: 'Handoff is not available' });
+        }
+
+        // Find agent record for this user
+        const agents = await storage.getHumanAgentsByTenant(tenantId);
+        const agent = agents.find((a) => a.email === req.user?.email);
+
+        if (!agent) {
+          return res.status(404).json({ error: 'Agent record not found' });
+        }
+
+        // Assign handoff to agent
+        const updatedHandoff = await storage.assignHandoffToAgent(id, agent.id, tenantId);
+
+        // Increment agent's active chats
+        await storage.incrementActiveChats(agent.id, tenantId);
+
+        // Broadcast via WebSocket
+        const wss = (req as any).ws;
+        if (wss) {
+          wss.clients.forEach((client: any) => {
+            if (client.tenantId === tenantId && client.readyState === 1) {
+              client.send(
+                JSON.stringify({
+                  type: 'handoff_picked_up',
+                  handoffId: id,
+                  agentId: agent.id,
+                  agentName: agent.name,
+                }),
+              );
+            }
+          });
+        }
+
+        res.json(updatedHandoff);
+      } catch (error) {
+        console.error('Error picking up handoff:', error);
+        res.status(500).json({ error: 'Failed to pick up handoff' });
+      }
+    },
+  );
+
+  // Resolve a widget handoff
+  app.post(
+    '/api/widget-handoffs/:id/resolve',
+    requireAuth,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenantId = assertTenant(req, res);
+        if (!tenantId) return;
+        const { id } = req.params;
+
+        const handoff = await storage.getWidgetHandoff(id);
+
+        if (!handoff || handoff.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Handoff not found' });
+        }
+
+        if (handoff.status !== 'active') {
+          return res.status(400).json({ error: 'Handoff is not active' });
+        }
+
+        // Update handoff status
+        const updatedHandoff = await storage.updateWidgetHandoffStatus(id, 'resolved');
+
+        // Decrement agent's active chats
+        if (handoff.assignedAgentId) {
+          await storage.decrementActiveChats(handoff.assignedAgentId, tenantId);
+        }
+
+        // Broadcast via WebSocket
+        const wss = (req as any).ws;
+        if (wss) {
+          wss.clients.forEach((client: any) => {
+            if (client.tenantId === tenantId && client.readyState === 1) {
+              client.send(
+                JSON.stringify({
+                  type: 'handoff_resolved',
+                  handoffId: id,
+                }),
+              );
+            }
+          });
+        }
+
+        res.json(updatedHandoff);
+      } catch (error) {
+        console.error('Error resolving handoff:', error);
+        res.status(500).json({ error: 'Failed to resolve handoff' });
+      }
+    },
+  );
+
+  // Send message from agent to user (during active handoff)
+  app.post(
+    '/api/widget-handoffs/:id/send-message',
+    requireAuth,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenantId = assertTenant(req, res);
+        if (!tenantId) return;
+        const { id } = req.params;
+        const { message } = z.object({ message: z.string().min(1) }).parse(req.body);
+
+        const handoff = await storage.getWidgetHandoff(id);
+
+        if (!handoff || handoff.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Handoff not found' });
+        }
+
+        if (handoff.status !== 'active') {
+          return res.status(400).json({ error: 'Handoff is not active' });
+        }
+
+        // Find agent record
+        const agents = await storage.getHumanAgentsByTenant(tenantId);
+        const agent = agents.find((a) => a.email === req.user?.email);
+
+        if (!agent) {
+          return res.status(404).json({ error: 'Agent record not found' });
+        }
+
+        // Save message
+        const savedMessage = await storage.createWidgetHandoffMessage({
+          handoffId: id,
+          senderType: 'agent',
+          senderId: agent.id,
+          content: message,
+        });
+
+        // Broadcast to widget via WebSocket (if connected)
+        const wss = (req as any).ws;
+        if (wss) {
+          wss.clients.forEach((client: any) => {
+            // Widget clients don't have userId, only chatId or handoffId
+            if (client.readyState === 1) {
+              client.send(
+                JSON.stringify({
+                  type: 'agent_message',
+                  handoffId: id,
+                  message: {
+                    id: savedMessage.id,
+                    content: savedMessage.content,
+                    senderType: 'agent',
+                    timestamp: savedMessage.timestamp,
+                  },
+                }),
+              );
+            }
+          });
+        }
+
+        res.json(savedMessage);
+      } catch (error) {
+        console.error('Error sending message:', error);
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ error: 'Invalid request', details: error.errors });
+        }
+        res.status(500).json({ error: 'Failed to send message' });
+      }
+    },
+  );
+
+  // Get messages for a handoff
+  app.get(
+    '/api/widget-handoffs/:id/messages',
+    requireAuth,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const tenantId = assertTenant(req, res);
+        if (!tenantId) return;
+        const { id } = req.params;
+
+        const handoff = await storage.getWidgetHandoff(id);
+
+        if (!handoff || handoff.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Handoff not found' });
+        }
+
+        const messages = await storage.getWidgetHandoffMessages(id);
+        res.json(messages);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        res.status(500).json({ error: 'Failed to fetch messages' });
+      }
+    },
+  );
+
   // ===== Handoff Management Endpoints =====
   // Note: Handoff lifecycle events (trigger/assign/complete) are broadcast-only via WebSocket.
   // They update conversation metadata but do not persist messages. Only actual chat messages
@@ -3332,14 +3600,23 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Content-Type', 'application/javascript');
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET');
-      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+
+      // In development, disable caching for easier iteration
+      // In production, cache for 1 hour
+      const isDev = process.env.NODE_ENV !== 'production';
+      if (isDev) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      }
 
       // In production, serve from dist/public
       // In development, serve from client/public
       const fs = await import('fs');
       const path = await import('path');
 
-      const isDev = process.env.NODE_ENV !== 'production';
       const widgetPath = isDev
         ? path.resolve(process.cwd(), 'client/public/widget.js')
         : path.resolve(import.meta.dirname, 'public/widget.js');
@@ -3409,13 +3686,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       // Return safe configuration (exclude sensitive data)
+      // Widget styling is now fixed in CSS - no customization options
       res.json({
         tenantId: apiKeyRecord.tenantId,
-        primaryColor: widgetConfig.primaryColor,
         greeting: widgetConfig.greeting,
-        placeholder: widgetConfig.placeholder,
-        customCss: widgetConfig.customCss,
-        position: widgetConfig.position || 'bottom-right',
       });
     } catch (error) {
       console.error('Error initializing widget:', error);
@@ -3509,6 +3783,30 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       console.log('[Widget Chat] Response:', response.slice(0, 100));
 
+      // Save messages to database for history persistence
+      try {
+        // Save user message
+        await storage.createWidgetChatMessage({
+          tenantId: apiKeyRecord.tenantId,
+          chatId: retellChatId,
+          role: 'user',
+          content: message,
+        });
+
+        // Save assistant response
+        await storage.createWidgetChatMessage({
+          tenantId: apiKeyRecord.tenantId,
+          chatId: retellChatId,
+          role: 'assistant',
+          content: response,
+        });
+
+        console.log('[Widget Chat] Messages saved to database');
+      } catch (dbError) {
+        console.error('[Widget Chat] Failed to save messages to database:', dbError);
+        // Don't fail the request if database save fails
+      }
+
       // Return response and chatId for continuation
       res.json({
         response,
@@ -3525,6 +3823,461 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Handle CORS preflight for chat endpoint
   app.options('/api/widget/chat', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+  });
+
+  // Get complete session history (chat + handoff messages)
+  app.get('/api/widget/session/:chatId/history', async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const { apiKey, handoffId } = z
+        .object({
+          apiKey: z.string(),
+          handoffId: z.string().optional(),
+        })
+        .parse(req.query);
+
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Get chat messages from database
+      const chatMessages = await storage.getWidgetChatMessages(chatId);
+
+      // Get handoff messages if handoffId provided
+      let handoffMessages: any[] = [];
+      let handoffStatus = 'none';
+
+      if (handoffId) {
+        handoffMessages = await storage.getWidgetHandoffMessages(handoffId);
+
+        // Get handoff status
+        const handoff = await storage.getWidgetHandoff(handoffId);
+        if (handoff) {
+          handoffStatus = handoff.status;
+        }
+      }
+
+      // Merge and sort all messages by timestamp
+      const allMessages = [
+        ...chatMessages.map((msg) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        })),
+        ...handoffMessages.map((msg) => ({
+          id: msg.id,
+          role: msg.senderType === 'agent' ? 'agent' : msg.senderType,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        })),
+      ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      console.log(`[Widget History] Returning ${allMessages.length} messages for chat ${chatId}`);
+
+      // Return complete history
+      res.json({
+        chatId,
+        handoffId: handoffId || null,
+        handoffStatus,
+        messages: allMessages,
+      });
+    } catch (error) {
+      console.error('[Widget History] Error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid request', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to fetch session history' });
+    }
+  }); // Handle CORS preflight for session history endpoint
+  app.options('/api/widget/session/:chatId/history', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+  });
+
+  // ============================================
+  // WIDGET HANDOFF ENDPOINTS
+  // ============================================
+
+  // Request human agent handoff
+  app.post('/api/widget/handoff', async (req, res) => {
+    try {
+      const { apiKey, chatId, conversationHistory, lastUserMessage, userEmail, userMessage } = z
+        .object({
+          apiKey: z.string(),
+          chatId: z.string(),
+          conversationHistory: z.array(z.any()).optional(),
+          lastUserMessage: z.string().optional(),
+          userEmail: z.string().email().optional(),
+          userMessage: z.string().optional(),
+        })
+        .parse(req.body);
+
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Check if agents are available
+      const availableAgents = await storage.getAvailableHumanAgents(apiKeyRecord.tenantId);
+      const hasAvailableAgents = availableAgents.some(
+        (agent) => agent.status === 'available' && agent.activeChats < agent.maxChats,
+      );
+
+      // Create handoff request
+      const handoff = await storage.createWidgetHandoff({
+        tenantId: apiKeyRecord.tenantId,
+        chatId,
+        status: hasAvailableAgents ? 'pending' : 'pending', // Will be 'pending' either way
+        conversationHistory: conversationHistory || null,
+        lastUserMessage: lastUserMessage || null,
+        userEmail: userEmail || null,
+        userMessage: userMessage || null,
+        metadata: null,
+        assignedAgentId: null,
+        pickedUpAt: null,
+        resolvedAt: null,
+      });
+
+      // Broadcast to agents via WebSocket (if available)
+      const wss = (req as any).ws;
+      if (wss) {
+        wss.clients.forEach((client: any) => {
+          if (
+            client.tenantId === apiKeyRecord.tenantId &&
+            client.readyState === 1 // OPEN
+          ) {
+            client.send(
+              JSON.stringify({
+                type: 'new_handoff',
+                handoff: {
+                  id: handoff.id,
+                  chatId: handoff.chatId,
+                  lastUserMessage: handoff.lastUserMessage,
+                  requestedAt: handoff.requestedAt,
+                },
+              }),
+            );
+          }
+        });
+      }
+
+      res.json({
+        handoffId: handoff.id,
+        status: hasAvailableAgents ? 'pending' : 'after-hours',
+        message: hasAvailableAgents
+          ? 'Handoff request created. An agent will be with you shortly.'
+          : 'No agents available. Please leave your contact information.',
+      });
+    } catch (error) {
+      console.error('[Widget Handoff] Error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid request', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to create handoff request' });
+    }
+  });
+
+  // Get handoff status
+  app.get('/api/widget/handoff/:handoffId/status', async (req, res) => {
+    try {
+      const { handoffId } = req.params;
+      const { apiKey } = z
+        .object({
+          apiKey: z.string(),
+        })
+        .parse(req.query);
+
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      const handoff = await storage.getWidgetHandoff(handoffId);
+
+      if (!handoff || handoff.tenantId !== apiKeyRecord.tenantId) {
+        return res.status(404).json({ error: 'Handoff not found' });
+      }
+
+      let agentName = null;
+      if (handoff.assignedAgentId) {
+        const agent = await storage.getHumanAgent(handoff.assignedAgentId);
+        agentName = agent?.name || null;
+      }
+
+      res.json({
+        status: handoff.status,
+        agentName,
+        pickedUpAt: handoff.pickedUpAt,
+        resolvedAt: handoff.resolvedAt,
+      });
+    } catch (error) {
+      console.error('[Widget Handoff Status] Error:', error);
+      res.status(500).json({ error: 'Failed to get handoff status' });
+    }
+  });
+
+  // Send message during handoff
+  app.post('/api/widget/handoff/:handoffId/message', async (req, res) => {
+    try {
+      const { handoffId } = req.params;
+      const { apiKey, message } = z
+        .object({
+          apiKey: z.string(),
+          message: z.string().min(1),
+        })
+        .parse(req.body);
+
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      const handoff = await storage.getWidgetHandoff(handoffId);
+
+      if (!handoff || handoff.tenantId !== apiKeyRecord.tenantId) {
+        return res.status(404).json({ error: 'Handoff not found' });
+      }
+
+      if (handoff.status !== 'active') {
+        return res.status(400).json({ error: 'Handoff is not active' });
+      }
+
+      // Save user message
+      const savedMessage = await storage.createWidgetHandoffMessage({
+        handoffId,
+        senderType: 'user',
+        senderId: null,
+        content: message,
+      });
+
+      // Send to agent via WebSocket
+      const wss = (req as any).ws;
+      if (wss && handoff.assignedAgentId) {
+        wss.clients.forEach((client: any) => {
+          if (
+            client.userId === handoff.assignedAgentId &&
+            client.readyState === 1 // OPEN
+          ) {
+            client.send(
+              JSON.stringify({
+                type: 'handoff_message',
+                handoffId,
+                message: {
+                  id: savedMessage.id,
+                  content: savedMessage.content,
+                  senderType: 'user',
+                  timestamp: savedMessage.timestamp,
+                },
+              }),
+            );
+          }
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Widget Handoff Message] Error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid request', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to send message' });
+    }
+  });
+
+  // Get handoff messages (for polling)
+  app.get('/api/widget/handoff/:handoffId/messages', async (req, res) => {
+    try {
+      const { handoffId } = req.params;
+      const { apiKey, since } = z
+        .object({
+          apiKey: z.string(),
+          since: z.string().optional(),
+        })
+        .parse(req.query);
+
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      const handoff = await storage.getWidgetHandoff(handoffId);
+
+      if (!handoff || handoff.tenantId !== apiKeyRecord.tenantId) {
+        return res.status(404).json({ error: 'Handoff not found' });
+      }
+
+      let messages;
+      if (since) {
+        const sinceDate = new Date(since);
+        messages = await storage.getWidgetHandoffMessagesSince(handoffId, sinceDate);
+      } else {
+        messages = await storage.getWidgetHandoffMessages(handoffId);
+      }
+
+      res.json({ messages });
+    } catch (error) {
+      console.error('[Widget Handoff Messages] Error:', error);
+      res.status(500).json({ error: 'Failed to get messages' });
+    }
+  });
+
+  // CORS preflight handlers
+  app.options('/api/widget/handoff', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+  });
+
+  app.options('/api/widget/handoff/:handoffId/status', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+  });
+
+  app.options('/api/widget/handoff/:handoffId/message', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+  });
+
+  app.options('/api/widget/handoff/:handoffId/messages', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+  });
+
+  // End chat (user-initiated) - Resolves active handoff if exists
+  app.post('/api/widget/end-chat', async (req, res) => {
+    try {
+      const { apiKey, chatId, handoffId } = z
+        .object({
+          apiKey: z.string(),
+          chatId: z.string(),
+          handoffId: z.string().optional(),
+        })
+        .parse(req.body);
+
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      const tenantId = apiKeyRecord.tenantId;
+
+      // If there's an active handoff, resolve it
+      if (handoffId) {
+        const handoff = await storage.getWidgetHandoff(handoffId);
+
+        if (handoff && handoff.tenantId === tenantId && handoff.status === 'active') {
+          // Update handoff status to resolved
+          await storage.updateWidgetHandoffStatus(handoffId, 'resolved');
+
+          // Decrement agent's active chats
+          if (handoff.assignedAgentId) {
+            await storage.decrementActiveChats(handoff.assignedAgentId, tenantId);
+          }
+
+          // Add system message that user ended the chat
+          await storage.createWidgetHandoffMessage({
+            handoffId,
+            senderType: 'system',
+            senderId: null,
+            content: 'User ended the chat',
+          });
+
+          // Broadcast via WebSocket to agent
+          const wss = (req as any).ws;
+          if (wss) {
+            wss.clients.forEach((client: any) => {
+              if (client.tenantId === tenantId && client.readyState === 1) {
+                client.send(
+                  JSON.stringify({
+                    type: 'handoff_resolved',
+                    handoffId: handoffId,
+                    resolvedBy: 'user',
+                  }),
+                );
+              }
+            });
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Chat ended successfully',
+      });
+    } catch (error) {
+      console.error('[Widget End Chat] Error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid request', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to end chat' });
+    }
+  });
+
+  // CORS preflight for end chat
+  app.options('/api/widget/end-chat', (_req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

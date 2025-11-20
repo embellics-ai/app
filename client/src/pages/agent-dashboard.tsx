@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Users, Clock, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { AgentChatInterface } from '@/components/agent-chat-interface';
 
@@ -22,19 +22,27 @@ type HumanAgent = {
   maxChats: number;
 };
 
-type Conversation = {
+type WidgetHandoff = {
   id: string;
-  handoffStatus: string;
-  handoffReason?: string;
-  conversationSummary?: string;
-  handoffTimestamp?: Date;
-  humanAgentId?: string;
+  chatId: string;
+  tenantId: string;
+  status: string;
+  requestedAt: string;
+  pickedUpAt?: string | null;
+  resolvedAt?: string | null;
+  assignedAgentId?: string | null;
+  userEmail?: string | null;
+  userMessage?: string | null;
+  conversationHistory?: any[];
+  lastUserMessage?: string | null;
+  metadata?: any;
 };
 
 export default function AgentDashboard() {
   const { toast } = useToast();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [chatDialogOpen, setChatDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('pending');
 
   // Fetch all human agents with auto-refresh
   const { data: agents = [], isLoading: agentsLoading } = useQuery<HumanAgent[]>({
@@ -43,16 +51,29 @@ export default function AgentDashboard() {
   });
 
   // Fetch pending handoffs with auto-refresh every 3 seconds
-  const { data: pendingHandoffs = [], isLoading: pendingLoading } = useQuery<Conversation[]>({
-    queryKey: ['/api/handoff/pending'],
+  const { data: pendingHandoffs = [], isLoading: pendingLoading } = useQuery<WidgetHandoff[]>({
+    queryKey: ['/api/widget-handoffs/pending'],
     refetchInterval: 3000, // Refresh every 3 seconds for new handoffs
   });
 
   // Fetch ALL active handoffs for tenant (all agents) with auto-refresh
-  const { data: activeChats = [], isLoading: activeChatsLoading } = useQuery<Conversation[]>({
-    queryKey: ['/api/handoff/active'],
+  const { data: activeChats = [], isLoading: activeChatsLoading } = useQuery<WidgetHandoff[]>({
+    queryKey: ['/api/widget-handoffs/active'],
     refetchInterval: 3000, // Refresh every 3 seconds for status updates
   });
+
+  // Fetch all handoffs for history (resolved conversations)
+  const { data: allHandoffs = [], isLoading: allHandoffsLoading } = useQuery<WidgetHandoff[]>({
+    queryKey: ['/api/widget-handoffs'],
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
+  // Refetch history when switching to history tab
+  useEffect(() => {
+    if (activeTab === 'history') {
+      queryClient.invalidateQueries({ queryKey: ['/api/widget-handoffs'] });
+    }
+  }, [activeTab]);
 
   // Assign handoff mutation
   const assignMutation = useMutation({
@@ -110,17 +131,6 @@ export default function AgentDashboard() {
     }
   };
 
-  const getHandoffReasonLabel = (reason?: string) => {
-    switch (reason) {
-      case 'user_request':
-        return 'User requested';
-      case 'ai_limitation':
-        return 'AI limitation';
-      default:
-        return reason || 'Unknown';
-    }
-  };
-
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="space-y-6">
@@ -174,7 +184,12 @@ export default function AgentDashboard() {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="pending" className="space-y-4">
+        <Tabs
+          defaultValue="pending"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-4"
+        >
           <TabsList data-testid="tabs-handoff">
             <TabsTrigger value="pending" data-testid="tab-pending">
               Pending Handoffs
@@ -191,6 +206,9 @@ export default function AgentDashboard() {
                   {activeChats.length}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-history">
+              History
             </TabsTrigger>
             <TabsTrigger value="agents" data-testid="tab-agents">
               Agents
@@ -230,28 +248,28 @@ export default function AgentDashboard() {
                           </CardTitle>
                           <CardDescription className="flex items-center gap-2">
                             <Clock className="h-3 w-3" />
-                            {conversation.handoffTimestamp
-                              ? formatDistanceToNow(new Date(conversation.handoffTimestamp), {
+                            {conversation.requestedAt
+                              ? formatDistanceToNow(new Date(conversation.requestedAt), {
                                   addSuffix: true,
                                 })
                               : 'Just now'}
                           </CardDescription>
                         </div>
                         <Badge variant="secondary" data-testid={`badge-reason-${conversation.id}`}>
-                          {getHandoffReasonLabel(conversation.handoffReason)}
+                          {conversation.userMessage ? 'User Message' : 'Handoff Requested'}
                         </Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {/* Conversation Summary */}
-                      {conversation.conversationSummary && (
+                      {/* Last User Message */}
+                      {conversation.lastUserMessage && (
                         <div>
-                          <h4 className="text-sm font-medium mb-2">Summary</h4>
+                          <h4 className="text-sm font-medium mb-2">Last Message</h4>
                           <div
                             className="text-sm text-muted-foreground bg-muted p-3 rounded-md"
                             data-testid={`text-summary-${conversation.id}`}
                           >
-                            {conversation.conversationSummary}
+                            {conversation.lastUserMessage}
                           </div>
                         </div>
                       )}
@@ -327,8 +345,8 @@ export default function AgentDashboard() {
                           <CardDescription className="flex items-center gap-2">
                             <Clock className="h-3 w-3" />
                             Active since{' '}
-                            {conversation.handoffTimestamp
-                              ? formatDistanceToNow(new Date(conversation.handoffTimestamp), {
+                            {conversation.pickedUpAt
+                              ? formatDistanceToNow(new Date(conversation.pickedUpAt), {
                                   addSuffix: true,
                                 })
                               : 'recently'}
@@ -343,15 +361,15 @@ export default function AgentDashboard() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {/* Conversation Summary */}
-                      {conversation.conversationSummary && (
+                      {/* Last User Message */}
+                      {conversation.lastUserMessage && (
                         <div>
                           <h4 className="text-sm font-medium mb-2">Context</h4>
                           <div
                             className="text-sm text-muted-foreground bg-muted p-3 rounded-md"
                             data-testid={`text-active-summary-${conversation.id}`}
                           >
-                            {conversation.conversationSummary}
+                            {conversation.lastUserMessage}
                           </div>
                         </div>
                       )}
@@ -359,14 +377,14 @@ export default function AgentDashboard() {
                       <Separator />
 
                       {/* Agent Assignment Info */}
-                      {conversation.humanAgentId && (
+                      {conversation.assignedAgentId && (
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-muted-foreground">Assigned to:</span>
                           <span
                             className="font-medium"
                             data-testid={`text-assigned-agent-${conversation.id}`}
                           >
-                            {agents.find((a) => a.id === conversation.humanAgentId)?.name ||
+                            {agents.find((a) => a.id === conversation.assignedAgentId)?.name ||
                               'Unknown Agent'}
                           </span>
                         </div>
@@ -390,6 +408,120 @@ export default function AgentDashboard() {
                   </Card>
                 ))}
               </div>
+            )}
+          </TabsContent>
+
+          {/* History Tab */}
+          <TabsContent value="history" className="space-y-4">
+            {allHandoffsLoading ? (
+              <div className="text-center py-8 text-muted-foreground" data-testid="loading-history">
+                Loading history...
+              </div>
+            ) : allHandoffs.filter((h) => h.status === 'resolved').length === 0 ? (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="text-center text-muted-foreground" data-testid="text-no-history">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No resolved conversations</p>
+                    <p className="text-sm">Completed conversations will appear here</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <ScrollArea className="h-[600px]">
+                <div className="grid gap-4 pr-4">
+                  {allHandoffs
+                    .filter((h) => h.status === 'resolved')
+                    .slice(0, 50)
+                    .map((conversation) => (
+                      <Card key={conversation.id} data-testid={`card-history-${conversation.id}`}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-1">
+                              <CardTitle
+                                className="text-base"
+                                data-testid={`text-history-conversation-${conversation.id}`}
+                              >
+                                Conversation {conversation.id.slice(0, 8)}
+                              </CardTitle>
+                              <CardDescription className="flex items-center gap-2">
+                                <Clock className="h-3 w-3" />
+                                Resolved{' '}
+                                {conversation.resolvedAt
+                                  ? formatDistanceToNow(new Date(conversation.resolvedAt), {
+                                      addSuffix: true,
+                                    })
+                                  : conversation.requestedAt
+                                    ? formatDistanceToNow(new Date(conversation.requestedAt), {
+                                        addSuffix: true,
+                                      })
+                                    : 'recently'}
+                              </CardDescription>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border-green-200"
+                              data-testid={`badge-history-status-${conversation.id}`}
+                            >
+                              Resolved
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Last User Message */}
+                          {conversation.lastUserMessage && (
+                            <div>
+                              <h4 className="text-sm font-medium mb-2">Last Message</h4>
+                              <div
+                                className="text-sm text-muted-foreground bg-muted p-3 rounded-md"
+                                data-testid={`text-history-summary-${conversation.id}`}
+                              >
+                                {conversation.lastUserMessage}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Agent Assignment Info */}
+                          {conversation.assignedAgentId && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-muted-foreground">Handled by:</span>
+                              <span
+                                className="font-medium"
+                                data-testid={`text-history-agent-${conversation.id}`}
+                              >
+                                {agents.find((a) => a.id === conversation.assignedAgentId)?.name ||
+                                  'Unknown Agent'}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* User Email */}
+                          {conversation.userEmail && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-muted-foreground">Customer:</span>
+                              <span className="font-medium">{conversation.userEmail}</span>
+                            </div>
+                          )}
+
+                          <Separator />
+
+                          {/* View Chat Button */}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenChat(conversation.id)}
+                              data-testid={`button-view-history-${conversation.id}`}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              View Chat
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+              </ScrollArea>
             )}
           </TabsContent>
 
@@ -449,11 +581,15 @@ export default function AgentDashboard() {
           </TabsContent>
         </Tabs>
 
-        {/* Chat Dialog */}
+        {/* Chat Dialog - Read-only for Client Admin (no send/complete actions) */}
         <Dialog open={chatDialogOpen} onOpenChange={setChatDialogOpen}>
           <DialogContent className="max-w-4xl p-0" data-testid="dialog-chat">
             {selectedConversation && (
-              <AgentChatInterface conversationId={selectedConversation} onClose={handleCloseChat} />
+              <AgentChatInterface
+                conversationId={selectedConversation}
+                onClose={handleCloseChat}
+                readOnly={true}
+              />
             )}
           </DialogContent>
         </Dialog>

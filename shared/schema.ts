@@ -168,14 +168,34 @@ export const widgetConfigs = pgTable('widget_configs', {
     .unique(),
   retellAgentId: text('retell_agent_id'), // Tenant-specific Retell AI agent ID for chat widget
   retellApiKey: text('retell_api_key'), // Tenant's own Retell AI API key for account-wide analytics
-  primaryColor: text('primary_color').default('#3b82f6'), // Button color
-  position: text('position').default('bottom-right'), // bottom-right, bottom-left, etc.
   greeting: text('greeting').default('Hi! How can I help you today?'),
-  placeholder: text('placeholder').default('Type your message...'),
   allowedDomains: text('allowed_domains').array(), // Array of allowed domains
-  customCss: text('custom_css'), // Custom CSS overrides
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // Note: Widget styling is now fixed in CSS following application design system
+  // Removed: primaryColor, position, placeholder, customCss (no longer customizable)
 });
+
+// Widget Chat Messages (Store all chat messages for history persistence)
+export const widgetChatMessages = pgTable('widget_chat_messages', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  chatId: text('chat_id').notNull(), // Retell chat ID
+  role: text('role').notNull(), // user, assistant, system
+  content: text('content').notNull(),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+});
+
+export const insertWidgetChatMessageSchema = createInsertSchema(widgetChatMessages).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertWidgetChatMessage = z.infer<typeof insertWidgetChatMessageSchema>;
+export type WidgetChatMessage = typeof widgetChatMessages.$inferSelect;
 
 export const insertWidgetConfigSchema = createInsertSchema(widgetConfigs).omit({
   id: true,
@@ -367,6 +387,65 @@ export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTo
 
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+// ============================================
+// WIDGET HANDOFFS
+// ============================================
+
+// Widget Handoffs (Track handoff requests from widget conversations)
+export const widgetHandoffs = pgTable('widget_handoffs', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  chatId: text('chat_id').notNull(), // Retell chat ID from widget - required (handoff happens after chat starts)
+  status: text('status').notNull().default('pending'), // pending, active, resolved, expired
+  requestedAt: timestamp('requested_at').defaultNow().notNull(),
+  pickedUpAt: timestamp('picked_up_at'), // When agent picked up the chat
+  resolvedAt: timestamp('resolved_at'), // When chat was resolved
+  assignedAgentId: varchar('assigned_agent_id').references(() => humanAgents.id, {
+    onDelete: 'set null',
+  }),
+  // After-hours support
+  userEmail: text('user_email'), // Email collected when no agents available
+  userMessage: text('user_message'), // Optional message from user explaining their issue
+  // Conversation context
+  conversationHistory: jsonb('conversation_history'), // Array of AI messages for agent context
+  lastUserMessage: text('last_user_message'), // Most recent message before handoff
+  metadata: jsonb('metadata'), // Additional context (user browser, location, etc.)
+});
+
+export const insertWidgetHandoffSchema = createInsertSchema(widgetHandoffs).omit({
+  id: true,
+  requestedAt: true,
+});
+
+export type InsertWidgetHandoff = z.infer<typeof insertWidgetHandoffSchema>;
+export type WidgetHandoff = typeof widgetHandoffs.$inferSelect;
+
+// Widget Handoff Messages (Messages exchanged during handoff)
+export const widgetHandoffMessages = pgTable('widget_handoff_messages', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  handoffId: varchar('handoff_id')
+    .notNull()
+    .references(() => widgetHandoffs.id, { onDelete: 'cascade' }),
+  senderType: text('sender_type').notNull(), // user, agent, system
+  senderId: varchar('sender_id'), // humanAgents.id for agent messages
+  content: text('content').notNull(),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+});
+
+export const insertWidgetHandoffMessageSchema = createInsertSchema(widgetHandoffMessages).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertWidgetHandoffMessage = z.infer<typeof insertWidgetHandoffMessageSchema>;
+export type WidgetHandoffMessage = typeof widgetHandoffMessages.$inferSelect;
 
 // Settings Schema (keeping for backward compatibility)
 export const settingsSchema = z.object({

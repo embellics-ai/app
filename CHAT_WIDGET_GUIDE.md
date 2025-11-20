@@ -233,13 +233,259 @@ http://localhost:3000/widget-simple-test.html
 2. **POST /api/widget/retell-token** - Voice call endpoint (no longer needed)
 3. **OPTIONS /api/widget/retell-token** - CORS preflight for voice endpoint
 
+## Live Handoff to Human Agents
+
+### Overview
+
+The chat widget now supports seamless handoff from AI to human agents. Customers can request to speak with a human agent at any time, and agents can pick up conversations through the Agent Queue dashboard.
+
+### Features
+
+- ✅ **User-initiated handoff**: "Talk to a Human" button appears after 3 seconds
+- ✅ **Seamless transition**: Widget stays open, just switches from AI to human responses
+- ✅ **AI conversation history**: Agents see the full previous conversation
+- ✅ **Real-time messaging**: Bidirectional communication between customer and agent
+- ✅ **After-hours support**: Email collection when no agents are available
+- ✅ **Status updates**: Real-time notifications for pickup and resolution
+
+### Customer Experience
+
+1. **Requesting Handoff**:
+   - Customer clicks "Talk to a Human" button in widget
+   - Widget shows "Requesting connection to a human agent..."
+   - If agents available: "An agent will be with you shortly..."
+   - If no agents: Email collection form appears
+
+2. **During Active Chat**:
+   - Widget switches to human agent mode
+   - Customer sees "Agent Name has joined the chat"
+   - Messages route to human agent instead of AI
+   - Real-time message delivery (polling every 1 second)
+
+3. **Chat Resolution**:
+   - Agent closes the conversation
+   - Widget shows "The agent has ended this conversation. Thank you!"
+   - Handoff button becomes unavailable
+
+### Agent Experience
+
+#### 1. Agent Queue Dashboard (`/agent-queue`)
+
+**Access**: Navigate to "Agent Queue" in sidebar (client_admin and support_staff roles)
+
+**Features**:
+
+- **Three tabs**:
+  - **Pending**: Handoffs waiting to be picked up
+  - **Active**: Your current conversations
+  - **History**: Past resolved handoffs
+- **Quick stats**: Waiting customers, active chats, available agents
+- **Auto-refresh**: 2-10 seconds depending on tab
+
+**Handoff Card Information**:
+
+- Chat ID and status badge
+- Time since request
+- Last user message preview
+- Number of AI messages in history
+- Contact email (if provided for after-hours)
+- Assigned agent (for active chats)
+
+**Actions**:
+
+- **Pick Up** button: Claim a pending handoff
+- **Open Chat** button: Navigate to active conversation
+
+#### 2. Agent Chat Interface (`/agent-chat/:handoffId`)
+
+**Layout**:
+
+- **Left side**: Conversation area with message history
+- **Right side**: Chat details sidebar
+
+**Conversation Area**:
+
+- **AI History Section**: Previous AI conversation (dimmed, with Bot icon)
+- **Separator**: "LIVE CHAT WITH AGENT" divider
+- **Live Messages**: Real-time customer ↔ agent messages
+- **Message Input**: Text area with Send button (Enter to send, Shift+Enter for new line)
+
+**Details Sidebar**:
+
+- Status badge
+- Chat ID
+- Customer email (if provided)
+- Initial request message
+- Last user message
+- Timestamps (requested, picked up, resolved)
+- AI conversation message count
+
+**Actions**:
+
+- **Send message**: Type and press Enter or click Send
+- **Resolve Chat**: Red button to end conversation
+- **Back to Queue**: Return to dashboard
+
+### After-Hours Support
+
+When no agents are available (all offline or busy):
+
+1. Widget detects no available agents
+2. Shows email collection form:
+
+   ```
+   No agents are currently available
+   Please leave your email and a message,
+   and we'll get back to you soon.
+
+   [Email input]
+   [Message textarea]
+   [Submit Request button]
+   ```
+
+3. Request stored in database with status "pending"
+4. Admin can review after-hours requests in Agent Queue history
+
+### API Endpoints
+
+#### Widget Public Endpoints (CORS-enabled)
+
+```
+POST   /api/widget/handoff                    - Request handoff
+GET    /api/widget/handoff/:id/status         - Check handoff status
+POST   /api/widget/handoff/:id/message        - Send user message
+GET    /api/widget/handoff/:id/messages       - Get agent messages
+```
+
+#### Agent Protected Endpoints (Auth required)
+
+```
+GET    /api/widget-handoffs                   - All handoffs for tenant
+GET    /api/widget-handoffs/pending           - Pending handoffs
+GET    /api/widget-handoffs/active            - Active handoffs
+GET    /api/widget-handoffs/:id               - Specific handoff
+POST   /api/widget-handoffs/:id/pickup        - Pick up handoff
+POST   /api/widget-handoffs/:id/resolve       - Resolve handoff
+POST   /api/widget-handoffs/:id/send-message  - Agent sends message
+GET    /api/widget-handoffs/:id/messages      - Get all messages
+```
+
+### Database Schema
+
+**widget_handoffs table**:
+
+- `id`: UUID primary key
+- `chatId`: Retell chat session ID
+- `tenantId`: Client identifier
+- `status`: 'pending', 'active', 'resolved'
+- `requestedAt`, `pickedUpAt`, `resolvedAt`: Timestamps
+- `assignedAgentId`: Reference to human_agents
+- `userEmail`, `userMessage`: After-hours contact info
+- `conversationHistory`: AI conversation JSON
+- `lastUserMessage`: Most recent message
+
+**widget_handoff_messages table**:
+
+- `id`: UUID primary key
+- `handoffId`: Reference to widget_handoffs
+- `senderType`: 'user', 'agent', 'system'
+- `senderId`: Agent ID for agent messages
+- `content`: Message text
+- `timestamp`: Message time
+
+### Setup Requirements
+
+#### 1. Human Agents Configuration
+
+Navigate to **Team Management** and configure human agents:
+
+```
+Name: Agent Name
+Email: agent@example.com
+Status: available (or offline/busy)
+Max Chats: 5
+```
+
+**Important**: Agents must exist in `human_agents` table to appear in queue
+
+#### 2. Agent Permissions
+
+- **client_admin**: Full access to Agent Queue and Agent Chat
+- **support_staff**: Full access to Agent Queue and Agent Chat
+- **Platform admins**: No access (tenant-specific feature)
+
+### WebSocket Events
+
+Real-time updates use WebSocket for instant notifications:
+
+**Events**:
+
+- `new_handoff`: Alert agents to new pending handoff
+- `handoff_picked_up`: Update queue when agent claims chat
+- `handoff_message`: Real-time message delivery
+- `handoff_resolved`: Notify of conversation closure
+- `agent_message`: Send agent replies to widget
+
+**Connection**: Automatic via `useWebSocket()` hook, authenticates with JWT token
+
+### Performance Considerations
+
+**Polling Intervals** (fallback when WebSocket not connected):
+
+- Widget status check: 2 seconds (only when pending)
+- Widget message poll: 1 second (only when active)
+- Agent queue refresh: 2-10 seconds (based on tab)
+- Agent chat messages: 1 second
+
+**Optimization**: WebSocket provides instant updates without polling overhead
+
+### Troubleshooting
+
+**Handoff Button Not Appearing**:
+
+- Wait 3 seconds after widget initialization
+- Check browser console for errors
+- Verify widget.js is latest version
+
+**"No agents available" Always Showing**:
+
+- Verify human_agents exist in database
+- Check agent status is 'available'
+- Ensure activeChats < maxChats
+- Review `getAvailableHumanAgents()` query
+
+**Agent Can't Pick Up Handoff**:
+
+- Verify agent has correct role (client_admin or support_staff)
+- Check agent record exists with matching email
+- Ensure handoff status is 'pending'
+- Review browser console and server logs
+
+**Messages Not Delivering**:
+
+- Check WebSocket connection status (console logs)
+- Verify polling is working (network tab)
+- Ensure handoff status is 'active'
+- Check tenant isolation (correct tenantId)
+
+**After-Hours Form Not Showing**:
+
+- Verify all agents are offline or at maxChats
+- Check `getAvailableHumanAgents()` returns empty
+- Review handoff creation logic
+
 ## Next Steps
 
-1. **Production Deployment**: Update production environment with new chat widget
-2. **Documentation**: Update customer-facing docs with chat widget instructions
-3. **Monitoring**: Set up logging/monitoring for chat widget usage
-4. **Analytics**: Track widget engagement and conversation metrics
-5. **Customization**: Add more customization options (avatar, welcome message, etc.)
+1. **Production Deployment**: Deploy handoff feature to production
+2. **Agent Training**: Train support staff on Agent Queue and Chat interfaces
+3. **Monitoring**: Set up alerts for after-hours requests
+4. **Analytics**: Track handoff rates and resolution times
+5. **Enhancements**:
+   - AI-triggered handoffs (sentiment detection)
+   - Typing indicators
+   - File/image sharing
+   - Canned responses
+   - Agent performance metrics
 
 ## Support
 
@@ -249,3 +495,5 @@ For issues or questions:
 - Review Retell AI dashboard for agent configuration
 - Verify API keys and domain whitelisting
 - Test with widget-simple-test.html first before external embedding
+- Review Agent Queue for handoff status
+- Check human_agents table for agent configuration

@@ -59,11 +59,6 @@ export function AppSidebar() {
           icon: BarChart3,
         },
         {
-          title: 'Onboarding',
-          url: '/onboarding',
-          icon: Sparkles,
-        },
-        {
           title: 'Agent Dashboard',
           url: '/agent-dashboard',
           icon: Headphones,
@@ -74,11 +69,6 @@ export function AppSidebar() {
           icon: Users,
         },
         {
-          title: 'Widget Config',
-          url: '/widget-config',
-          icon: Settings,
-        },
-        {
           title: 'API Keys',
           url: '/api-keys',
           icon: Key,
@@ -86,12 +76,12 @@ export function AppSidebar() {
       ];
     }
 
-    // Support Staff menu - Agent Dashboard and Test Chat
+    // Support Staff menu - Agent Queue for handling live chats
     if (user.role === 'support_staff') {
       return [
         {
-          title: 'Agent Dashboard',
-          url: '/agent-dashboard',
+          title: 'Agent Queue',
+          url: '/agent-queue',
           icon: Headphones,
         },
         {

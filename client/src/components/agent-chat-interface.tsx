@@ -11,23 +11,29 @@ import { Send, X, CheckCircle, User, Bot, Headphones } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 
-type Message = {
+type WidgetHandoffMessage = {
   id: string;
-  conversationId: string;
-  role: string;
+  handoffId: string;
+  senderType: string; // 'user', 'agent', 'system'
+  senderId?: string | null;
   content: string;
-  senderType: string;
-  humanAgentId?: string;
-  timestamp: Date;
+  timestamp: string;
 };
 
-type Conversation = {
+type WidgetHandoff = {
   id: string;
-  handoffStatus: string;
-  handoffReason?: string;
-  conversationSummary?: string;
-  handoffTimestamp?: Date;
-  humanAgentId?: string;
+  chatId: string;
+  tenantId: string;
+  status: string;
+  requestedAt: string;
+  pickedUpAt?: string | null;
+  resolvedAt?: string | null;
+  assignedAgentId?: string | null;
+  userEmail?: string | null;
+  userMessage?: string | null;
+  conversationHistory?: any[];
+  lastUserMessage?: string | null;
+  metadata?: any;
 };
 
 type HumanAgent = {
@@ -40,23 +46,26 @@ type HumanAgent = {
 interface AgentChatInterfaceProps {
   conversationId: string;
   onClose: () => void;
+  readOnly?: boolean; // For Client Admin view (no send/complete actions)
 }
 
-export function AgentChatInterface({ conversationId, onClose }: AgentChatInterfaceProps) {
+export function AgentChatInterface({
+  conversationId,
+  onClose,
+  readOnly = false,
+}: AgentChatInterfaceProps) {
   const { toast } = useToast();
   const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Fetch conversation details
-  const { data: conversations = [] } = useQuery<Conversation[]>({
-    queryKey: ['/api/conversations'],
+  // Fetch handoff details
+  const { data: handoff } = useQuery<WidgetHandoff>({
+    queryKey: ['/api/widget-handoffs', conversationId],
   });
 
-  const conversation = conversations.find((c) => c.id === conversationId);
-
-  // Fetch messages
-  const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
-    queryKey: ['/api/conversations', conversationId, 'messages'],
+  // Fetch messages for this handoff
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<WidgetHandoffMessage[]>({
+    queryKey: ['/api/widget-handoffs', conversationId, 'messages'],
     refetchInterval: 2000, // Poll every 2 seconds for new messages
   });
 
@@ -65,24 +74,22 @@ export function AgentChatInterface({ conversationId, onClose }: AgentChatInterfa
     queryKey: ['/api/human-agents'],
   });
 
-  const currentAgent = agents.find((a) => a.id === conversation?.humanAgentId);
+  const currentAgent = agents.find((a) => a.id === handoff?.assignedAgentId);
 
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      if (!conversation?.humanAgentId) {
+      if (!handoff?.assignedAgentId) {
         throw new Error('No agent assigned');
       }
-      return apiRequest('POST', '/api/handoff/send-message', {
-        conversationId,
-        content,
-        humanAgentId: conversation.humanAgentId,
+      return apiRequest('POST', `/api/widget-handoffs/${conversationId}/send-message`, {
+        message: content,
       });
     },
     onSuccess: () => {
       setMessage('');
       queryClient.invalidateQueries({
-        queryKey: ['/api/conversations', conversationId, 'messages'],
+        queryKey: ['/api/widget-handoffs', conversationId, 'messages'],
       });
       toast({
         title: 'Message sent',
@@ -101,16 +108,14 @@ export function AgentChatInterface({ conversationId, onClose }: AgentChatInterfa
   // Complete handoff mutation
   const completeMutation = useMutation({
     mutationFn: async () => {
-      if (!conversation?.humanAgentId) {
+      if (!handoff?.assignedAgentId) {
         throw new Error('No agent assigned');
       }
-      return apiRequest('POST', '/api/handoff/complete', {
-        conversationId,
-        humanAgentId: conversation.humanAgentId,
-      });
+      return apiRequest('POST', `/api/widget-handoffs/${conversationId}/resolve`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/handoff/active'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/widget-handoffs/active'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/widget-handoffs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/human-agents'] });
       toast({
         title: 'Conversation completed',
@@ -150,10 +155,10 @@ export function AgentChatInterface({ conversationId, onClose }: AgentChatInterfa
     switch (senderType) {
       case 'user':
         return <User className="h-4 w-4" />;
-      case 'ai':
-        return <Bot className="h-4 w-4" />;
-      case 'human':
+      case 'agent':
         return <Headphones className="h-4 w-4" />;
+      case 'system':
+        return <Bot className="h-4 w-4" />;
       default:
         return <User className="h-4 w-4" />;
     }
@@ -163,12 +168,12 @@ export function AgentChatInterface({ conversationId, onClose }: AgentChatInterfa
     switch (senderType) {
       case 'user':
         return 'Customer';
-      case 'ai':
-        return 'AI Agent';
-      case 'human':
-        return currentAgent?.name || 'Human Agent';
-      default:
+      case 'agent':
+        return currentAgent?.name || 'Agent';
+      case 'system':
         return 'System';
+      default:
+        return 'Unknown';
     }
   };
 
@@ -178,36 +183,29 @@ export function AgentChatInterface({ conversationId, onClose }: AgentChatInterfa
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <CardTitle className="text-lg" data-testid="text-chat-title">
-              Conversation {conversationId.slice(0, 8)}
+              {currentAgent?.name || 'Agent'} &{' '}
+              {handoff?.userEmail || handoff?.metadata?.phoneNumber || 'Customer'}
             </CardTitle>
             <CardDescription className="flex items-center gap-2 mt-1">
-              {currentAgent && (
-                <>
-                  <Headphones className="h-3 w-3" />
-                  <span data-testid="text-agent-name">{currentAgent.name}</span>
-                </>
+              {handoff?.lastUserMessage && (
+                <span className="text-xs italic">
+                  "{handoff.lastUserMessage.slice(0, 60)}
+                  {handoff.lastUserMessage.length > 60 ? '...' : ''}"
+                </span>
               )}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="default" data-testid="badge-chat-status">
-              Active
-            </Badge>
-            <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-chat">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
 
-        {/* Conversation Summary */}
-        {conversation?.conversationSummary && (
+        {/* Last User Message Context */}
+        {handoff?.lastUserMessage && handoff.lastUserMessage.length > 60 && (
           <div className="mt-4">
-            <h4 className="text-sm font-medium mb-2">Context Summary</h4>
+            <h4 className="text-sm font-medium mb-2">Last Message</h4>
             <div
               className="text-sm text-muted-foreground bg-muted p-3 rounded-md"
               data-testid="text-chat-summary"
             >
-              {conversation.conversationSummary}
+              {handoff.lastUserMessage}
             </div>
           </div>
         )}
@@ -276,41 +274,43 @@ export function AgentChatInterface({ conversationId, onClose }: AgentChatInterfa
         </ScrollArea>
       </CardContent>
 
-      {/* Input Area */}
-      <div className="border-t p-4">
-        <div className="flex gap-2 mb-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => completeMutation.mutate()}
-            disabled={completeMutation.isPending}
-            data-testid="button-complete-chat"
-          >
-            <CheckCircle className="h-4 w-4 mr-1" />
-            Complete Handoff
-          </Button>
+      {/* Input Area - Only show for agents, not for read-only (Client Admin) view */}
+      {!readOnly && (
+        <div className="border-t p-4">
+          <div className="flex gap-2 mb-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => completeMutation.mutate()}
+              disabled={completeMutation.isPending}
+              data-testid="button-complete-chat"
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Complete Handoff
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Type your message..."
+              className="resize-none"
+              rows={3}
+              disabled={sendMessageMutation.isPending}
+              data-testid="input-message"
+            />
+            <Button
+              size="icon"
+              onClick={handleSend}
+              disabled={!message.trim() || sendMessageMutation.isPending}
+              data-testid="button-send-message"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Type your message..."
-            className="resize-none"
-            rows={3}
-            disabled={sendMessageMutation.isPending}
-            data-testid="input-message"
-          />
-          <Button
-            size="icon"
-            onClick={handleSend}
-            disabled={!message.trim() || sendMessageMutation.isPending}
-            data-testid="button-send-message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      )}
     </Card>
   );
 }

@@ -90,6 +90,68 @@ export function useWebSocket() {
 
             console.log('[WebSocket] Invalidated queries for conversation:', conversationId);
           }
+
+          // Handle handoff events
+          if (message.type === 'new_handoff') {
+            console.log('[WebSocket] New handoff received:', message.payload);
+            // Invalidate pending handoffs to show new request
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs/pending'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs'],
+            });
+          }
+
+          if (message.type === 'handoff_picked_up') {
+            console.log('[WebSocket] Handoff picked up:', message.payload);
+            // Invalidate all handoff queries
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs/pending'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs/active'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs'],
+            });
+          }
+
+          if (message.type === 'handoff_message') {
+            const { handoffId } = message.payload;
+            console.log('[WebSocket] New handoff message:', handoffId);
+            // Invalidate messages for this specific handoff
+            queryClient.invalidateQueries({
+              queryKey: [`/api/widget-handoffs/${handoffId}/messages`],
+            });
+          }
+
+          if (message.type === 'handoff_resolved') {
+            const { handoffId } = message.payload;
+            console.log('[WebSocket] Handoff resolved:', handoffId);
+            // Invalidate all handoff queries (pending, active, and history)
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs/pending'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs/active'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['/api/widget-handoffs'],
+            });
+            queryClient.invalidateQueries({
+              queryKey: [`/api/widget-handoffs/${handoffId}`],
+            });
+          }
+
+          if (message.type === 'agent_message') {
+            const { handoffId } = message.payload;
+            console.log('[WebSocket] Agent message received:', handoffId);
+            // Invalidate messages for widget polling
+            queryClient.invalidateQueries({
+              queryKey: [`/api/widget-handoffs/${handoffId}/messages`],
+            });
+          }
         } catch (error) {
           console.error('[WebSocket] Failed to parse message:', error);
         }

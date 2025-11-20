@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Embellics Widget Test Page</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #9b87f5;
+      border-bottom: 2px solid #9b87f5;
+      padding-bottom: 10px;
+    }
+    .info-box {
+      background: #f5f5f5;
+      border-left: 4px solid #9b87f5;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    code {
+      background: #2d2d2d;
+      color: #9b87f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+    .steps {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .steps ol {
+      margin-left: 20px;
+    }
+    .steps li {
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚀 Embellics Chat Widget - Test Page</h1>
+  
+  <div class="info-box">
+    <p><strong>This is a test page for the Embellics AI Chat Widget.</strong></p>
+    <p>The chat widget should appear in the bottom-right corner of this page.</p>
+  </div>
+
+  <div class="steps">
+    <h2>How to Use This Test Page</h2>
+    <ol>
+      <li>Replace <code>YOUR_API_KEY_HERE</code> in the script below with your actual API key</li>
+      <li>Open this HTML file in a browser</li>
+      <li>Click the purple chat button in the bottom-right corner</li>
+      <li>Start chatting with the AI assistant</li>
+    </ol>
+  </div>
+
+  <div class="info-box">
+    <h3>📝 Installation Instructions</h3>
+    <p>To add this widget to your website, copy the code below (with your API key) and paste it before the closing <code>&lt;/body&gt;</code> tag:</p>
+  </div>
+
+  <!-- 
+    ⚠️ IMPORTANT: Replace 'YOUR_API_KEY_HERE' with your actual API key
+    Get your API key from: https://app.embellics.com/api-keys
+  -->
+  <script>
+    (function() {
+      var script = document.createElement('script');
+      script.src = 'https://app.embellics.com/widget.js?v=4';
+      script.setAttribute('data-api-key', 'YOUR_API_KEY_HERE');
+      document.head.appendChild(script);
+    })();
+  </script>
+
+</body>
+</html>
