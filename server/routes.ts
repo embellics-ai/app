@@ -344,6 +344,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Find user by email
       const user = await storage.getClientUserByEmail(email);
 
+      console.log(
+        `[Forgot Password] Request for email: ${email}, User found: ${user ? `Yes (ID: ${user.id}, Role: ${user.role})` : 'No'}`,
+      );
+
       // SECURITY: Always return success even if user doesn't exist (prevent email enumeration)
       if (!user) {
         console.log(`[Forgot Password] Email not found: ${email}`);
@@ -435,6 +439,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         });
       }
 
+      console.log(`[Reset Password] Token matched for userID: ${matchedToken.userId}`);
+
       // Mark token as used BEFORE updating password (prevents race conditions)
       await storage.markTokenAsUsedById(matchedToken.id);
 
@@ -444,10 +450,15 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Mark onboarding as complete if it wasn't already (in case of temp password reset)
       const user = await storage.getClientUser(matchedToken.userId);
-      if (user && !user.onboardingCompleted) {
-        await storage.updateClientUser(matchedToken.userId, {
-          onboardingCompleted: true,
-        });
+      if (user) {
+        console.log(
+          `[Reset Password] User after password update - ID: ${user.id}, Email: ${user.email}, Role: ${user.role}, TenantID: ${user.tenantId}`,
+        );
+        if (!user.onboardingCompleted) {
+          await storage.updateClientUser(matchedToken.userId, {
+            onboardingCompleted: true,
+          });
+        }
       }
 
       console.log(`[Reset Password] Password successfully reset for user: ${matchedToken.userId}`);
@@ -729,26 +740,14 @@ export async function registerRoutes(app: Express): Promise<void> {
           updateData.retellAgentId = retellAgentId.trim();
         }
 
-        console.log(
-          `[Update Retell API Key] Data to save:`,
-          JSON.stringify({
-            retellApiKey: updateData.retellApiKey.substring(0, 12) + '...',
-            retellAgentId: updateData.retellAgentId || 'null',
-          }),
-        );
-
         if (!widgetConfig) {
           // Create a new widget config with the Retell API key
-          console.log(`[Update Retell API Key] Creating new widget config for tenant: ${tenantId}`);
           widgetConfig = await storage.createWidgetConfig({
             tenantId,
             ...updateData,
           });
         } else {
           // Update existing widget config
-          console.log(
-            `[Update Retell API Key] Updating existing widget config for tenant: ${tenantId}`,
-          );
           widgetConfig = await storage.updateWidgetConfig(tenantId, updateData);
         }
 
@@ -756,13 +755,23 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(500).json({ error: 'Failed to update Retell API key' });
         }
 
-        console.log(
-          `[Update Retell API Key] Saved config - Agent ID in DB: ${widgetConfig.retellAgentId || 'null'}`,
-        );
+        // Auto-generate widget API key if one doesn't exist
+        const existingApiKeys = await storage.getApiKeysByTenant(tenantId);
 
-        console.log(
-          `[Update Retell API Key] ✓ Successfully updated Retell API key for tenant: ${tenantId}`,
-        );
+        if (existingApiKeys.length === 0) {
+          // Generate API key (matches the format in POST /api/api-keys)
+          const apiKey = randomBytes(32).toString('hex');
+          const keyPrefix = apiKey.substring(0, 8);
+          const fullApiKey = `embellics_${apiKey}`;
+          const keyHash = createHash('sha256').update(fullApiKey).digest('hex');
+
+          await storage.createApiKey({
+            tenantId,
+            keyHash,
+            keyPrefix,
+            name: 'Default Widget Key (Auto-generated)',
+          });
+        }
 
         res.json({
           message: 'Retell API key updated successfully',
@@ -1834,9 +1843,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Generate a secure random API key (32 bytes = 64 hex chars)
         const apiKey = randomBytes(32).toString('hex');
         const keyPrefix = apiKey.substring(0, 8); // First 8 chars for display
+        const fullApiKey = `embellics_${apiKey}`;
 
-        // Hash the API key for secure storage
-        const keyHash = createHash('sha256').update(apiKey).digest('hex');
+        // Hash the FULL API key (with embellics_ prefix) for secure storage
+        const keyHash = createHash('sha256').update(fullApiKey).digest('hex');
 
         // Create API key record
         const apiKeyRecord = await storage.createApiKey({
@@ -1849,7 +1859,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Return the full API key ONLY on creation (never again)
         res.json({
           id: apiKeyRecord.id,
-          apiKey: `embellics_${apiKey}`, // Prefix for identification
+          apiKey: fullApiKey, // Prefix for identification
           keyPrefix: apiKeyRecord.keyPrefix,
           name: apiKeyRecord.name,
           createdAt: apiKeyRecord.createdAt,
@@ -3654,9 +3664,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
-      }
-
-      // Update last used timestamp
+      } // Update last used timestamp
       await storage.updateApiKeyLastUsed(apiKeyRecord.id);
 
       // Get widget configuration for this tenant

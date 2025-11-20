@@ -10,6 +10,7 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "init-admin": "tsx init-admin.ts",
+    "clean-db": "tsx scripts/clean-database.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

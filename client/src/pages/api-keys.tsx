@@ -76,6 +76,8 @@ export default function ApiKeysPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/api-keys'] });
+      // Clear the newly created key banner when deleting
+      setNewlyCreatedKey(null);
       toast({
         title: 'API key deleted',
         description: 'The API key has been permanently deleted.',
@@ -219,13 +221,9 @@ export default function ApiKeysPage() {
             <CardContent className="py-12 text-center">
               <Key className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No API keys yet</h3>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-muted-foreground">
                 Create your first API key to start embedding the chat widget on your website
               </p>
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create API Key
-              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -305,7 +303,8 @@ export default function ApiKeysPage() {
                   Copy and paste this code snippet into your website
                   <br />
                   <span className="text-xs text-muted-foreground mt-1 inline-block">
-                    Production URL: <code className="text-primary">https://app.embellics.com/widget.js</code>
+                    Production URL:{' '}
+                    <code className="text-primary">https://app.embellics.com/widget.js</code>
                   </span>
                 </CardDescription>
               </div>
@@ -316,7 +315,7 @@ export default function ApiKeysPage() {
                   const embedCode = `<script>
   (function() {
     var script = document.createElement('script');
-    script.src = '${window.location.origin}/widget.js?v=4';
+    script.src = '${window.location.origin}/widget.js';
     script.setAttribute('data-api-key', '${firstKey.keyPrefix}...');
     document.head.appendChild(script);
   })();
@@ -351,7 +350,7 @@ export default function ApiKeysPage() {
                   {'\n    '}
                   <span className="text-blue-400">script</span>.
                   <span className="text-blue-400">src</span> ={' '}
-                  <span className="text-green-400">'{window.location.origin}/widget.js?v=4'</span>;
+                  <span className="text-green-400">'{window.location.origin}/widget.js'</span>;
                   {'\n    '}
                   <span className="text-blue-400">script</span>.
                   <span className="text-yellow-400">setAttribute</span>

@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       skipDefaultFetch: true,
     },
     queryFn: async () => {
+      console.log('[Auth Context] useQuery fetching user data with token');
       const response = await fetch('/api/auth/me', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -49,20 +50,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) {
         // Token is invalid, clear it
+        console.log('[Auth Context] Token invalid, clearing');
         localStorage.removeItem('auth_token');
         setToken(null);
         throw new Error('Not authenticated');
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('[Auth Context] useQuery user data:', {
+        id: data.id,
+        email: data.email,
+        role: data.role,
+        tenantId: data.tenantId,
+      });
+      return data;
     },
   });
 
   const login = async (newToken: string) => {
+    console.log('[Auth Context] Login called with new token');
+
+    // Clear any existing cached data to prevent stale data issues
+    queryClient.removeQueries({ queryKey: ['/api/auth/me'] });
+
     localStorage.setItem('auth_token', newToken);
     setToken(newToken);
+
     // Explicitly fetch user data to ensure hydration before navigation (prevents UI flash)
-    await queryClient.fetchQuery({
+    const userData = await queryClient.fetchQuery({
       queryKey: ['/api/auth/me'],
       queryFn: async () => {
         const response = await fetch('/api/auth/me', {
@@ -78,13 +93,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error('Not authenticated');
         }
 
-        return response.json();
+        const data = await response.json();
+        console.log('[Auth Context] User data fetched after login:', {
+          id: data.id,
+          email: data.email,
+          role: data.role,
+          tenantId: data.tenantId,
+        });
+        return data;
       },
     });
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
+    console.log('[Auth Context] Logging out - clearing all localStorage and cache');
+
+    // Save theme preference before clearing
+    const savedTheme = localStorage.getItem('theme');
+
+    // Clear ALL localStorage to prevent any cached data from persisting
+    localStorage.clear();
+
+    // Restore theme preference
+    if (savedTheme) {
+      localStorage.setItem('theme', savedTheme);
+    }
+
     setToken(null);
     queryClient.clear();
     setLocation('/login');

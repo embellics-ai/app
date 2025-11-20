@@ -49,20 +49,33 @@ export default function Login() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginForm) => {
+      console.log('[Login Page] Attempting login for:', data.email);
       const response = await apiRequest('POST', '/api/auth/login', data);
-      return await response.json();
+      const result = await response.json();
+      console.log('[Login Page] Login API response:', {
+        userId: result.user?.id,
+        email: result.user?.email,
+        role: result.user?.role,
+        tenantId: result.user?.tenantId,
+      });
+      return result;
     },
     onSuccess: async (data) => {
       // Clear any previous errors
       setLoginError(null);
 
+      console.log('[Login Page] Login successful, calling auth.login()');
+
       // Use auth context's login function to properly set token and trigger auth refresh
       await login(data.token);
+
+      console.log('[Login Page] Auth.login() complete, redirecting to home');
 
       // Redirect to home after user is hydrated
       setLocation('/');
     },
     onError: (error: any) => {
+      console.error('[Login Page] Login error:', error);
       setLoginError('Username or Password is incorrect');
     },
   });
