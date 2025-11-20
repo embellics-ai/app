@@ -350,7 +350,7 @@ export default function ApiKeysPage() {
                   {'\n    '}
                   <span className="text-blue-400">script</span>.
                   <span className="text-blue-400">src</span> ={' '}
-                  <span className="text-green-400">'{window.location.origin}/widget.js'</span>;
+                  <span className="text-green-400">'{`${window.location.origin}/widget.js`}'</span>;
                   {'\n    '}
                   <span className="text-blue-400">script</span>.
                   <span className="text-yellow-400">setAttribute</span>

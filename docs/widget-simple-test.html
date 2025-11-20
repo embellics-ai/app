@@ -58,11 +58,16 @@
         font-family: monospace;
       }
       pre {
-        background: #1e293b;
-        color: #e2e8f0;
+        background: #f8fafc;
+        color: #1e293b;
         padding: 15px;
         border-radius: 8px;
         overflow-x: auto;
+        border: 1px solid #e2e8f0;
+      }
+      pre code {
+        background: transparent;
+        color: inherit;
       }
     </style>
   </head>
@@ -104,7 +109,9 @@
         <ul>
           <li>
             <strong>API Key:</strong>
-            <code>embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f</code>
+            <code
+              >embellics_4c742a************************************************************</code
+            >
           </li>
           <li><strong>Server:</strong> <code>http://localhost:3000</code></li>
           <li><strong>Agent Type:</strong> Text Chat (Retell AI)</li>
@@ -117,15 +124,18 @@
           To embed this widget on your website, add this code before the closing
           <code>&lt;/body&gt;</code> tag:
         </p>
-        <pre><code>&lt;script src="http://localhost:3000/widget.js" 
-        data-api-key="embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f"&gt;
+        <pre><code>&lt;script&gt;
+  (function() {
+    var script = document.createElement('script');
+    script.src = 'http://localhost:3000/widget.js';
+    script.setAttribute('data-api-key', 'embellics_4c742a****...');
+    document.head.appendChild(script);
+  })();
 &lt;/script&gt;</code></pre>
       </div>
     </div>
 
     <script>
-      const API_KEY = 'embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f';
-
       // Wait for widget to load
       setTimeout(() => {
         const widgetButton = document.getElementById('embellics-widget-button');
@@ -150,7 +160,7 @@
         script.src = 'http://localhost:3000/widget.js';
         script.setAttribute(
           'data-api-key',
-          'embellics_aa1ff891b3b0fc6cce1aa42464a303fd9a2a81107cc7caa90540e915b5c32d2a',
+          'embellics_aa1ff8************************************************************',
         );
         document.head.appendChild(script);
       })();
