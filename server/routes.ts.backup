@@ -154,41 +154,6 @@ export async function registerRoutes(app: Express): Promise<void> {
           // Mark the invitation as used and clear plaintext immediately
           await storage.markInvitationUsed(pendingInvitation.id);
 
-          // Mark onboarding as complete for new user
-          if (!user.onboardingCompleted) {
-            await storage.updateClientUser(user.id, {
-              onboardingCompleted: true,
-            });
-            user.onboardingCompleted = true;
-            console.log(`[Login] Marked onboarding complete for new user: ${user.email}`);
-          }
-
-          // Auto-create human_agents record for support staff on first login
-          if (user.role === 'support_staff' && user.tenantId) {
-            try {
-              const agentName =
-                user.firstName && user.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user.email!.split('@')[0];
-
-              await storage.createHumanAgent(
-                {
-                  name: agentName,
-                  email: user.email!,
-                  status: 'available',
-                  activeChats: 0,
-                  maxChats: 5,
-                },
-                user.tenantId,
-              );
-
-              console.log(`[Login] Created human agent record for new user: ${user.email}`);
-            } catch (agentError) {
-              console.error('[Login] Failed to create agent record:', agentError);
-              // Don't fail login if agent creation fails - just log it
-            }
-          }
-
           // Generate JWT token and return same shape as normal login
           const token = generateToken({
             userId: user.id,
@@ -224,46 +189,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       const isValidPassword = await verifyPassword(password, user.password);
       if (!isValidPassword) {
         return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      // Mark onboarding as complete on successful login (if not already)
-      if (!user.onboardingCompleted) {
-        await storage.updateClientUser(user.id, {
-          onboardingCompleted: true,
-        });
-        user.onboardingCompleted = true;
-        console.log(`[Login] Marked onboarding complete for user: ${user.email}`);
-      }
-
-      // Auto-create human_agents record for support staff on first login
-      if (user.role === 'support_staff' && user.tenantId) {
-        const agents = await storage.getHumanAgentsByTenant(user.tenantId);
-        const agentExists = agents.some((a) => a.email === user.email);
-
-        if (!agentExists) {
-          try {
-            const agentName =
-              user.firstName && user.lastName
-                ? `${user.firstName} ${user.lastName}`
-                : user.email!.split('@')[0];
-
-            await storage.createHumanAgent(
-              {
-                name: agentName,
-                email: user.email!,
-                status: 'available',
-                activeChats: 0,
-                maxChats: 5,
-              },
-              user.tenantId,
-            );
-
-            console.log(`[Login] Created human agent record for ${user.email}`);
-          } catch (agentError) {
-            console.error('[Login] Failed to create agent record:', agentError);
-            // Don't fail login if agent creation fails - just log it
-          }
-        }
       }
 
       // Generate JWT token for existing user
@@ -533,37 +458,6 @@ export async function registerRoutes(app: Express): Promise<void> {
           await storage.updateClientUser(matchedToken.userId, {
             onboardingCompleted: true,
           });
-        }
-
-        // Auto-create human_agents record for support staff after password reset
-        if (user.role === 'support_staff' && user.tenantId) {
-          try {
-            const agents = await storage.getHumanAgentsByTenant(user.tenantId);
-            const agentExists = agents.some((a) => a.email === user.email);
-
-            if (!agentExists) {
-              const agentName =
-                user.firstName && user.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user.email!.split('@')[0];
-
-              await storage.createHumanAgent(
-                {
-                  name: agentName,
-                  email: user.email!,
-                  status: 'available',
-                  activeChats: 0,
-                  maxChats: 5,
-                },
-                user.tenantId,
-              );
-
-              console.log(`[Reset Password] Created human agent record for: ${user.email}`);
-            }
-          } catch (agentError) {
-            console.error('[Reset Password] Failed to create agent record:', agentError);
-            // Don't fail password reset if agent creation fails
-          }
         }
       }
 
@@ -3582,54 +3476,36 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Assign human agent to widget handoff
+  // Assign human agent to conversation
   app.post('/api/handoff/assign', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const tenantId = assertTenant(req, res);
       if (!tenantId) return;
       const { conversationId, humanAgentId } = z
         .object({
-          conversationId: z.string(), // This is actually the widget_handoff ID
+          conversationId: z.string(),
           humanAgentId: z.string(),
         })
         .parse(req.body);
 
-      console.log(`[Assign Handoff] Assigning handoff ${conversationId} to agent ${humanAgentId}`);
-
-      // Get the widget handoff
-      const handoff = await storage.getWidgetHandoff(conversationId);
-
-      if (!handoff || handoff.tenantId !== tenantId) {
-        return res.status(404).json({ error: 'Handoff not found' });
-      }
-
-      if (handoff.status !== 'pending') {
-        return res.status(400).json({ error: 'Handoff is not available for assignment' });
-      }
-
-      // Update widget handoff status to active and assign agent
-      await storage.assignHandoffToAgent(conversationId, humanAgentId, tenantId);
+      // Update conversation
+      await storage.updateConversation(
+        conversationId,
+        {
+          handoffStatus: 'with_human',
+          humanAgentId,
+        },
+        tenantId,
+      );
 
       // Increment agent's active chats
       await storage.incrementActiveChats(humanAgentId, tenantId);
 
-      console.log(`[Assign Handoff] Successfully assigned handoff ${conversationId} to agent ${humanAgentId}`);
-
-      // Broadcast assignment via WebSocket
-      const wss = (req as any).ws;
-      if (wss) {
-        wss.clients.forEach((client: any) => {
-          if (client.tenantId === tenantId && client.readyState === 1) {
-            client.send(
-              JSON.stringify({
-                type: 'handoff_assigned',
-                handoffId: conversationId,
-                agentId: humanAgentId,
-              }),
-            );
-          }
-        });
-      }
+      // Broadcast assignment to chat widget
+      broadcastToTenant(tenantId, 'handoff_assigned', {
+        conversationId,
+        humanAgentId,
+      });
 
       res.json({ success: true });
     } catch (error) {
@@ -4119,17 +3995,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
-
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
-        }
-      }
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
@@ -4210,17 +4078,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
-
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
-        }
-      }
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
@@ -4266,17 +4126,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
-
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
-        }
-      }
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
@@ -4350,17 +4202,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
-
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
-        }
-      }
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
@@ -4432,17 +4276,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
-
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
-        }
-      }
+      // Validate API key
+      const keyHash = createHash('sha256').update(apiKey).digest('hex');
+      const apiKeyRecord = await storage.getApiKeyByHash(keyHash);
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });

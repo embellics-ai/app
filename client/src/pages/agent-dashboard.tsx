@@ -80,19 +80,28 @@ export default function AgentDashboard() {
     mutationFn: async ({
       conversationId,
       humanAgentId,
+      agentName,
     }: {
       conversationId: string;
       humanAgentId: string;
+      agentName?: string;
     }) => {
-      return apiRequest('POST', '/api/handoff/assign', { conversationId, humanAgentId });
+      return apiRequest('POST', '/api/handoff/assign', { conversationId, humanAgentId }).then(
+        (result) => ({
+          ...result,
+          agentName,
+        }),
+      );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/handoff/pending'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/handoff/active'] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/widget-handoffs/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/widget-handoffs/active'] });
       queryClient.invalidateQueries({ queryKey: ['/api/human-agents'] });
       toast({
         title: 'Handoff assigned',
-        description: "You've been assigned to this conversation",
+        description: data.agentName
+          ? `Successfully assigned to ${data.agentName}`
+          : 'Handoff has been assigned to an agent',
       });
     },
     onError: () => {
@@ -105,7 +114,12 @@ export default function AgentDashboard() {
   });
 
   const handleClaimHandoff = (conversationId: string, agentId: string) => {
-    assignMutation.mutate({ conversationId, humanAgentId: agentId });
+    const agent = agents.find((a) => a.id === agentId);
+    assignMutation.mutate({
+      conversationId,
+      humanAgentId: agentId,
+      agentName: agent?.name,
+    });
   };
 
   const handleOpenChat = (conversationId: string) => {
