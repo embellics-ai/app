@@ -8,7 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/use-websocket';
-import { Users, Clock, CheckCircle, MessageSquare, Mail, User } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { Users, Clock, CheckCircle, MessageSquare, Mail, User, UserCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'wouter';
@@ -40,6 +41,7 @@ type HumanAgent = {
 
 export default function AgentQueue() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>('pending');
 
@@ -130,10 +132,17 @@ export default function AgentQueue() {
 
   const renderHandoffCard = (handoff: WidgetHandoff, showPickupButton: boolean = false) => {
     const assignedAgent = agents.find((a) => a.id === handoff.assignedAgentId);
+    const currentAgent = agents.find((a) => a.email === user?.email);
+    const isMyConversation = handoff.assignedAgentId === currentAgent?.id;
     const conversationLength = handoff.conversationHistory?.length || 0;
 
     return (
-      <Card key={handoff.id} className="mb-4 hover:shadow-md transition-shadow">
+      <Card
+        key={handoff.id}
+        className={`mb-4 hover:shadow-md transition-shadow ${
+          isMyConversation ? 'border-blue-200 bg-blue-50/30' : ''
+        }`}
+      >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -141,6 +150,12 @@ export default function AgentQueue() {
                 <MessageSquare className="h-4 w-4" />
                 Chat {handoff.chatId.slice(0, 8)}...
                 {getStatusBadge(handoff.status)}
+                {isMyConversation && (
+                  <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                    <UserCheck className="h-3 w-3 mr-1" />
+                    My Chat
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription className="text-sm mt-1">
                 <Clock className="h-3 w-3 inline mr-1" />
@@ -309,19 +324,27 @@ export default function AgentQueue() {
                     <p className="text-sm">Pick up a pending handoff to start chatting</p>
                   </div>
                 ) : (
-                  activeHandoffs.map((handoff) => (
-                    <div key={handoff.id}>
-                      {renderHandoffCard(handoff, false)}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full mb-4"
-                        onClick={() => navigate(`/agent-chat/${handoff.id}`)}
-                      >
-                        Open Chat
-                      </Button>
-                    </div>
-                  ))
+                  activeHandoffs.map((handoff) => {
+                    const currentAgent = agents.find((a) => a.email === user?.email);
+                    const isMyConversation = handoff.assignedAgentId === currentAgent?.id;
+                    const assignedAgent = agents.find((a) => a.id === handoff.assignedAgentId);
+
+                    return (
+                      <div key={handoff.id}>
+                        {renderHandoffCard(handoff, false)}
+                        <Button
+                          variant={isMyConversation ? 'default' : 'outline'}
+                          size="sm"
+                          className="w-full mb-4"
+                          onClick={() => navigate(`/agent-chat/${handoff.id}`)}
+                        >
+                          {isMyConversation
+                            ? 'Continue Chat'
+                            : `View (Assigned to ${assignedAgent?.name || 'Another Agent'})`}
+                        </Button>
+                      </div>
+                    );
+                  })
                 )}
               </ScrollArea>
             </TabsContent>
