@@ -1,6 +1,7 @@
 import 'dotenv/config';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import pg from 'pg';
+const { Pool } = pg;
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { clientUsers } from './shared/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
@@ -10,8 +11,12 @@ async function initializeAdmin() {
     throw new Error('DATABASE_URL is required');
   }
 
-  const sql = neon(process.env.DATABASE_URL);
-  const db = drizzle(sql);
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  });
+
+  const db = drizzle(pool);
 
   const ADMIN_EMAIL = 'admin@embellics.com';
   const ADMIN_PASSWORD = 'admin123';

@@ -9,8 +9,24 @@ dist/
 build/
 *.log
 coverage/
+
 # Ignore Terraform secrets and state files
 *.tfvars
 *.tfstate
 *.tfstate.*
 .terraform/
+
+# Ignore debug/test scripts (keep production scripts only)
+check-*.ts
+verify-*.ts
+fix-*.ts
+show-*.ts
+create-test-*.ts
+regenerate-*.ts
+cleanup-*.ts
+update-*.ts
+*-test-*.ts
+*.mjs
+test-*.sql
+debug-*.sql
+

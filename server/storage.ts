@@ -46,8 +46,9 @@ import {
   widgetChatMessages,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import pg from 'pg';
+const { Pool } = pg;
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, desc, and, or, gte, lte, gt, sql } from 'drizzle-orm';
 import { encryptApiKey, decryptApiKey } from './encryption';
 
@@ -1092,8 +1093,14 @@ export class DbStorage implements IStorage {
     }
 
     try {
-      const sql = neon(process.env.DATABASE_URL);
-      this.db = drizzle(sql);
+      const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        // In production Render requires SSL for external databases; set to false for self-signed
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+      });
+
+      // Drizzle accepts a pg Pool for node-postgres integration
+      this.db = drizzle(pool);
     } catch (error) {
       console.error('Failed to initialize database connection:', error);
       throw new Error('Database initialization failed');
