@@ -82,12 +82,12 @@ Result: **5 endpoints fixed** (plus the 2 already using bcrypt = 7 total)
 ## Current API Key
 
 ```
-embellics_d310fe4eca6791a4425e18e6af0614a9ceacb9269122a3bf965f04955df8e595
+embellics_YOUR_API_KEY_HERE
 ```
 
 **Tenant:** SWC  
-**Prefix:** d310fe4e  
-**Created:** Thu Nov 20 2025 21:08:25 GMT
+**Prefix:** [first 8 chars]  
+**Created:** [timestamp]
 
 ## Testing
 

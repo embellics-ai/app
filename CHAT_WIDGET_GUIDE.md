@@ -120,7 +120,7 @@ Add this script tag before the closing `</body>` tag of your HTML:
     <!-- Embellics Chat Widget -->
     <script
       src="http://localhost:3000/widget.js"
-      data-api-key="embellics_915f494a4e853a5dc97a2f09de314572460c7b40dc6c9699d41c23d7575a6844"
+      data-api-key="embellics_YOUR_API_KEY_HERE"
     ></script>
   </body>
 </html>

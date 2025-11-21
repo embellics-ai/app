@@ -7,7 +7,18 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Clock, User, Bot, X, ArrowLeft } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import {
+  MessageSquare,
+  Send,
+  CheckCircle,
+  Clock,
+  User,
+  Bot,
+  X,
+  ArrowLeft,
+  AlertCircle,
+} from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useLocation, useRoute } from 'wouter';
@@ -37,8 +48,18 @@ type HandoffMessage = {
   timestamp: string;
 };
 
+type HumanAgent = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  activeChats: number;
+  maxChats: number;
+};
+
 export default function AgentChat() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
   const [, params] = useRoute('/agent-chat/:id');
   const handoffId = params?.id;
@@ -53,6 +74,15 @@ export default function AgentChat() {
     enabled: !!handoffId,
     refetchInterval: 3000, // Refresh every 3 seconds for status updates
   });
+
+  // Fetch agents to check authorization
+  const { data: agents = [] } = useQuery<HumanAgent[]>({
+    queryKey: ['/api/human-agents'],
+    enabled: !!handoffId,
+  });
+
+  // Find current user's agent record
+  const currentAgent = agents.find((a) => a.email === user?.email);
 
   // Fetch messages
   const { data: messages = [], isLoading: messagesLoading } = useQuery<HandoffMessage[]>({
@@ -283,6 +313,44 @@ export default function AgentChat() {
               <X className="h-12 w-12 mx-auto mb-3 text-red-400" />
               <p className="text-lg font-medium">Handoff not found</p>
               <Button className="mt-4" onClick={() => navigate('/agent-queue')}>
+                Back to Queue
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Authorization check: only the assigned agent can access this conversation
+  const isAuthorized =
+    handoff.status === 'pending' || // Anyone can view pending (for assignment)
+    !handoff.assignedAgentId || // No agent assigned yet
+    handoff.assignedAgentId === currentAgent?.id; // Current user is the assigned agent
+
+  if (!isAuthorized) {
+    const assignedAgent = agents.find((a) => a.id === handoff.assignedAgentId);
+    return (
+      <div className="container mx-auto p-6 max-w-4xl">
+        <Card>
+          <CardContent className="py-8">
+            <div className="text-center">
+              <AlertCircle className="h-16 w-16 mx-auto mb-4 text-amber-500" />
+              <p className="text-xl font-semibold text-gray-900 mb-2">Access Denied</p>
+              <p className="text-gray-600 mb-1">
+                This conversation is currently being handled by another agent.
+              </p>
+              {assignedAgent && (
+                <p className="text-gray-600 mb-4">
+                  Assigned to: <span className="font-medium">{assignedAgent.name}</span>
+                </p>
+              )}
+              <p className="text-sm text-gray-500 mb-6">
+                Only one agent can work on a conversation at a time to ensure consistent customer
+                experience.
+              </p>
+              <Button onClick={() => navigate('/agent-queue')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Queue
               </Button>
             </div>

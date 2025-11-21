@@ -12,7 +12,7 @@ The auto-generation feature is working correctly. When you assigned the Retell A
 The test page at `docs/widget-simple-test.html` has a **hardcoded old API key** from a previous setup:
 
 ```
-embellics_915f494a4e853a5dc97a2f09de314572460c7b40dc6c9699d41c23d7575a6844
+embellics_YOUR_API_KEY_HERE_64_CHAR_HEX_STRING
 ```
 
 This key doesn't exist in the database anymore (it was deleted during cleanup). That's why you're seeing "Invalid API key" errors.

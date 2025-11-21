@@ -77,16 +77,16 @@ This is the **correct security implementation** because:
 ### Key Storage
 
 ```
-User's Browser    →  Full Key: embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f
-Server Database   →  Hash:     8364c2d56f6bedbd0e185c4846bf909aa0aeb41175bd129a8103c5a0aa8c41f1
-Server Database   →  Prefix:   4c742acc (for display only)
+User's Browser    →  Full Key: embellics_YOUR_API_KEY_HERE
+Server Database   →  Hash:     [SHA-256 hash of the key]
+Server Database   →  Prefix:   [first 8 chars] (for display only)
 ```
 
 ### Widget Authentication Flow
 
 ```
-1. Widget sends:  embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f
-2. Server hashes: SHA-256(embellics_4c742acc29b150844e6ba1ee19a47b58c3125eff2fc9e4a6f8824dc2613b133f)
+1. Widget sends:  embellics_YOUR_API_KEY_HERE
+2. Server hashes: SHA-256(embellics_YOUR_API_KEY_HERE)
 3. Server compares hash with database
 4. If match → authenticate ✅
 5. If no match → reject ❌

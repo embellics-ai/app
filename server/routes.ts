@@ -3462,6 +3462,22 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(400).json({ error: 'Handoff is not active' });
         }
 
+        // Find agent record for authorization check
+        const agents = await storage.getHumanAgentsByTenant(tenantId);
+        const agent = agents.find((a) => a.email === req.user?.email);
+
+        if (!agent) {
+          return res.status(404).json({ error: 'Agent record not found' });
+        }
+
+        // Authorization check: only the assigned agent can resolve
+        if (handoff.assignedAgentId !== agent.id) {
+          return res.status(403).json({
+            error: 'Unauthorized',
+            message: 'This conversation is assigned to another agent',
+          });
+        }
+
         // Update handoff status
         const updatedHandoff = await storage.updateWidgetHandoffStatus(id, 'resolved');
 
@@ -3520,6 +3536,14 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         if (!agent) {
           return res.status(404).json({ error: 'Agent record not found' });
+        }
+
+        // Authorization check: only the assigned agent can send messages
+        if (handoff.assignedAgentId !== agent.id) {
+          return res.status(403).json({
+            error: 'Unauthorized',
+            message: 'This conversation is assigned to another agent',
+          });
         }
 
         // Save message

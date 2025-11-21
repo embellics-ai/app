@@ -91,12 +91,14 @@ export default function WidgetConfigPage() {
   useEffect(() => {
     if (config) {
       form.reset({
-        primaryColor: config.primaryColor || '#3b82f6',
-        position: (config.position as 'bottom-right' | 'bottom-left') || 'bottom-right',
+        // Note: primaryColor, position, placeholder, customCss removed from schema
+        // Widget styling is now fixed in CSS following application design system
+        primaryColor: '#3b82f6', // Default value (not stored in DB)
+        position: 'bottom-right', // Default value (not stored in DB)
         greeting: config.greeting || 'Hi! How can I help you today?',
-        placeholder: config.placeholder || 'Type your message...',
+        placeholder: 'Type your message...', // Default value (not stored in DB)
         allowedDomains: config.allowedDomains?.join(', ') || '',
-        customCss: config.customCss || '',
+        customCss: '', // Default value (not stored in DB)
       });
     }
   }, [config]);

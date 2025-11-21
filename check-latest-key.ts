@@ -20,7 +20,7 @@ async function checkLatestKey() {
   }
 
   const latestKey = allApiKeys[allApiKeys.length - 1];
-  
+
   console.log('Latest API Key in Database:');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('ID:', latestKey.id);
@@ -38,7 +38,7 @@ async function checkLatestKey() {
 
 checkLatestKey()
   .then(() => process.exit(0))
-  .catch(err => {
+  .catch((err) => {
     console.error('Error:', err);
     process.exit(1);
   });

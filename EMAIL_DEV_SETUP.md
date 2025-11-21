@@ -9,7 +9,7 @@ SMTP_HOST='smtp.gmail.com'
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER='admin@embellics.com'
-SMTP_PASS='opqqxaseywcizqry'
+SMTP_PASS='your-gmail-app-password-here'
 SMTP_FROM_EMAIL='admin@embellics.com'
 ```
 
@@ -22,7 +22,7 @@ Simply comment out `SMTP_HOST` in your `.env`:
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER='admin@embellics.com'
-SMTP_PASS='opqqxaseywcizqry'
+SMTP_PASS='your-gmail-app-password-here'
 SMTP_FROM_EMAIL='admin@embellics.com'
 ```
 

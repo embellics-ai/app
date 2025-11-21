@@ -44,7 +44,7 @@ Database: neondb
 
 ```
 Username: neondb_owner
-Password: npg_unhR1evq9Wza
+Password: your-neon-database-password
 ```
 
 ✅ Check **"Save password"** (optional, for convenience)
@@ -197,7 +197,7 @@ ORDER BY table_name;
 If you prefer to use the connection string directly:
 
 ```
-postgresql://neondb_owner:npg_unhR1evq9Wza@ep-empty-violet-agoe0tmd.c-2.eu-central-1.aws.neon.tech:5432/neondb?sslmode=require
+postgresql://neondb_owner:your-password@ep-empty-violet-agoe0tmd.c-2.eu-central-1.aws.neon.tech:5432/neondb?sslmode=require
 ```
 
 You can paste this in DBeaver:

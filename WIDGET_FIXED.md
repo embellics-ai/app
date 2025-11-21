@@ -34,7 +34,7 @@ Tested with curl - the endpoint now responds correctly:
 curl -X POST http://localhost:3000/api/widget/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "apiKey": "embellics_d310fe4eca6791a4425e18e6af0614a9ceacb9269122a3bf965f04955df8e595",
+    "apiKey": "embellics_YOUR_API_KEY_HERE",
     "message": "test",
     "chatId": null
   }'
@@ -57,11 +57,11 @@ curl -X POST http://localhost:3000/api/widget/chat \
 ## 📝 Current API Key
 
 ```
-embellics_d310fe4eca6791a4425e18e6af0614a9ceacb9269122a3bf965f04955df8e595
+embellics_YOUR_API_KEY_HERE
 ```
 
 - **Tenant**: SWC
-- **Prefix**: d310fe4e
+- **Prefix**: [first 8 chars]
 - **Status**: ✅ Working
 
 ## 🧪 Test Now!
