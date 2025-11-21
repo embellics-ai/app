@@ -163,8 +163,9 @@ export async function registerRoutes(app: Express): Promise<void> {
             console.log(`[Login] Marked onboarding complete for new user: ${user.email}`);
           }
 
-          // Auto-create human_agents record for support staff on first login
-          if (user.role === 'support_staff' && user.tenantId) {
+          // Auto-create human_agents record for support staff AND client admins on first login
+          // This allows client admins to also handle chats for small teams
+          if ((user.role === 'support_staff' || user.role === 'client_admin') && user.tenantId) {
             try {
               const agentName =
                 user.firstName && user.lastName
@@ -182,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<void> {
                 user.tenantId,
               );
 
-              console.log(`[Login] Created human agent record for new user: ${user.email}`);
+              console.log(`[Login] Created human agent record for new ${user.role}: ${user.email}`);
             } catch (agentError) {
               console.error('[Login] Failed to create agent record:', agentError);
               // Don't fail login if agent creation fails - just log it
@@ -235,8 +236,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.log(`[Login] Marked onboarding complete for user: ${user.email}`);
       }
 
-      // Auto-create human_agents record for support staff on first login
-      if (user.role === 'support_staff' && user.tenantId) {
+      // Auto-create human_agents record for support staff AND client admins on first login
+      // This allows client admins to also handle chats for small teams
+      if ((user.role === 'support_staff' || user.role === 'client_admin') && user.tenantId) {
         const agents = await storage.getHumanAgentsByTenant(user.tenantId);
         const agentExists = agents.some((a) => a.email === user.email);
 
@@ -258,10 +260,24 @@ export async function registerRoutes(app: Express): Promise<void> {
               user.tenantId,
             );
 
-            console.log(`[Login] Created human agent record for ${user.email}`);
+            console.log(`[Login] Created human agent record for ${user.role}: ${user.email}`);
           } catch (agentError) {
             console.error('[Login] Failed to create agent record:', agentError);
             // Don't fail login if agent creation fails - just log it
+          }
+        } else {
+          // Agent exists - ALWAYS update status to 'available' and last_seen on login
+          try {
+            const agent = agents.find((a) => a.email === user.email);
+            if (agent) {
+              await storage.updateHumanAgentStatus(agent.id, 'available', user.tenantId);
+              await storage.updateAgentLastSeen(agent.id, user.tenantId);
+              console.log(
+                `[Login] Updated agent status to 'available' and last_seen: ${user.email}`,
+              );
+            }
+          } catch (statusError) {
+            console.error('[Login] Failed to update agent status:', statusError);
           }
         }
       }
@@ -335,9 +351,63 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Logout (client-side only, just returns success)
-  app.post('/api/auth/logout', (req, res) => {
-    res.json({ message: 'Logged out successfully' });
+  // Heartbeat - update last_seen timestamp to track active sessions
+  app.post('/api/auth/heartbeat', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user;
+
+      if (
+        user &&
+        user.tenantId &&
+        (user.role === 'support_staff' || user.role === 'client_admin')
+      ) {
+        const agents = await storage.getHumanAgentsByTenant(user.tenantId);
+        const agent = agents.find((a) => a.email === user.email);
+
+        if (agent) {
+          // Update last_seen timestamp
+          await storage.updateAgentLastSeen(agent.id, user.tenantId);
+
+          // Ensure status is 'available' (update if not already)
+          if (agent.status !== 'available') {
+            await storage.updateHumanAgentStatus(agent.id, 'available', user.tenantId);
+            console.log(`[Heartbeat] Updated ${user.email} status to 'available'`);
+          }
+        }
+      }
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('[Heartbeat] Error:', error);
+      res.status(500).json({ error: 'Heartbeat failed' });
+    }
+  });
+
+  // Logout - update agent status to offline
+  app.post('/api/auth/logout', requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user;
+      if (
+        user &&
+        user.tenantId &&
+        (user.role === 'support_staff' || user.role === 'client_admin')
+      ) {
+        // Get agent record and update status to offline
+        const agents = await storage.getHumanAgentsByTenant(user.tenantId);
+        const agent = agents.find((a) => a.email === user.email);
+
+        if (agent) {
+          await storage.updateHumanAgentStatus(agent.id, 'offline', user.tenantId);
+          await storage.updateAgentLastSeen(agent.id, user.tenantId);
+          console.log(`[Logout] Updated agent status to 'offline' and last_seen: ${user.email}`);
+        }
+      }
+      res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+      console.error('[Logout] Error updating agent status:', error);
+      // Don't fail logout even if status update fails
+      res.json({ message: 'Logged out successfully' });
+    }
   });
 
   // Complete onboarding (PROTECTED)
@@ -535,8 +605,9 @@ export async function registerRoutes(app: Express): Promise<void> {
           });
         }
 
-        // Auto-create human_agents record for support staff after password reset
-        if (user.role === 'support_staff' && user.tenantId) {
+        // Auto-create human_agents record for support staff AND client admins after password reset
+        // This allows client admins to also handle chats for small teams
+        if ((user.role === 'support_staff' || user.role === 'client_admin') && user.tenantId) {
           try {
             const agents = await storage.getHumanAgentsByTenant(user.tenantId);
             const agentExists = agents.some((a) => a.email === user.email);
@@ -558,7 +629,9 @@ export async function registerRoutes(app: Express): Promise<void> {
                 user.tenantId,
               );
 
-              console.log(`[Reset Password] Created human agent record for: ${user.email}`);
+              console.log(
+                `[Reset Password] Created human agent record for ${user.role}: ${user.email}`,
+              );
             }
           } catch (agentError) {
             console.error('[Reset Password] Failed to create agent record:', agentError);
@@ -3613,7 +3686,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Increment agent's active chats
       await storage.incrementActiveChats(humanAgentId, tenantId);
 
-      console.log(`[Assign Handoff] Successfully assigned handoff ${conversationId} to agent ${humanAgentId}`);
+      console.log(
+        `[Assign Handoff] Successfully assigned handoff ${conversationId} to agent ${humanAgentId}`,
+      );
 
       // Broadcast assignment via WebSocket
       const wss = (req as any).ws;

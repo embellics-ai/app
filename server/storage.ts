@@ -103,6 +103,7 @@ export interface IStorage {
     tenantId: string,
   ): Promise<HumanAgent | undefined>;
   updateHumanAgentStatus(id: string, status: string, tenantId: string): Promise<void>;
+  updateAgentLastSeen(id: string, tenantId: string): Promise<void>;
   incrementActiveChats(id: string, tenantId: string): Promise<void>;
   decrementActiveChats(id: string, tenantId: string): Promise<void>;
 
@@ -507,6 +508,7 @@ export class MemStorage implements IStorage {
       activeChats: 0,
       maxChats: insertAgent.maxChats ?? 5,
       createdAt: new Date(),
+      lastSeen: new Date(),
     };
     this.humanAgents.set(id, agent);
     return agent;
@@ -530,6 +532,14 @@ export class MemStorage implements IStorage {
     if (!agent || agent.tenantId !== tenantId) return;
 
     agent.status = status;
+    this.humanAgents.set(id, agent);
+  }
+
+  async updateAgentLastSeen(id: string, tenantId: string): Promise<void> {
+    const agent = this.humanAgents.get(id);
+    if (!agent || agent.tenantId !== tenantId) return;
+
+    agent.lastSeen = new Date();
     this.humanAgents.set(id, agent);
   }
 
@@ -1370,6 +1380,13 @@ export class DbStorage implements IStorage {
     await this.db
       .update(humanAgents)
       .set({ status })
+      .where(and(eq(humanAgents.id, id), eq(humanAgents.tenantId, tenantId)));
+  }
+
+  async updateAgentLastSeen(id: string, tenantId: string): Promise<void> {
+    await this.db
+      .update(humanAgents)
+      .set({ lastSeen: new Date() })
       .where(and(eq(humanAgents.id, id), eq(humanAgents.tenantId, tenantId)));
   }
 

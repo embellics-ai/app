@@ -244,11 +244,12 @@
         handoffStatus = savedHandoffStatus;
         console.log('[Embellics Widget] Restored handoff session:', handoffId, handoffStatus);
 
-        // If handoff is active, restart message polling
+        // If handoff is active, restart message polling AND status checking
         if (handoffStatus === 'active') {
           const menuHandoff = document.getElementById('embellics-menu-handoff');
           if (menuHandoff) menuHandoff.disabled = true;
           startMessagePolling();
+          startStatusChecking(); // Also check status to detect when agent resolves
         } else if (handoffStatus === 'pending') {
           const menuHandoff = document.getElementById('embellics-menu-handoff');
           if (menuHandoff) menuHandoff.disabled = true;
@@ -751,7 +752,7 @@
           handoffStatus = 'active';
           saveSessionState(); // Save active status
           addMessage('system', `${data.agentName || 'An agent'} has joined the chat`);
-          clearInterval(statusCheckInterval);
+          // Don't clear interval - continue checking for resolved status
           startMessagePolling();
         } else if (newStatus === 'resolved' && handoffStatus !== 'resolved') {
           // Chat resolved - clear session for fresh start next time

@@ -9,7 +9,9 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { useWebSocket } from '@/hooks/use-websocket';
+import { useHeartbeat } from '@/hooks/use-heartbeat';
 import { ProtectedRoute } from '@/components/protected-route';
+import { RoleProtectedRoute } from '@/components/role-protected-route';
 import { ChangePasswordRequired } from '@/components/change-password-required';
 import Chat from '@/pages/chat';
 import Analytics from '@/pages/analytics';
@@ -50,7 +52,9 @@ function Router() {
       </Route>
       <Route path="/analytics">
         <ProtectedRoute path="/analytics">
-          <Analytics />
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <Analytics />
+          </RoleProtectedRoute>
         </ProtectedRoute>
       </Route>
       <Route path="/platform-analytics">
@@ -65,12 +69,16 @@ function Router() {
       </Route>
       <Route path="/api-keys">
         <ProtectedRoute path="/api-keys">
-          <ApiKeysPage />
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <ApiKeysPage />
+          </RoleProtectedRoute>
         </ProtectedRoute>
       </Route>
       <Route path="/agent-dashboard">
         <ProtectedRoute path="/agent-dashboard">
-          <AgentDashboard />
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <AgentDashboard />
+          </RoleProtectedRoute>
         </ProtectedRoute>
       </Route>
       <Route path="/agent-queue">
@@ -90,7 +98,9 @@ function Router() {
       </Route>
       <Route path="/team-management">
         <ProtectedRoute path="/team-management">
-          <TeamManagementPage />
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <TeamManagementPage />
+          </RoleProtectedRoute>
         </ProtectedRoute>
       </Route>
       <Route path="/change-password">
@@ -109,8 +119,9 @@ function Router() {
 }
 
 function AuthenticatedApp({ user, style }: { user: any; style: any }) {
-  // WebSocket connection is initialized but status is not displayed
-  useWebSocket();
+  // WebSocket is now conditionally enabled only on pages that need it
+  // (Agent Dashboard, Agent Queue, etc.)
+  // No global connection - saves resources when not chatting
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
@@ -142,6 +153,9 @@ function ProtectedAppContent() {
   const { user, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
 
+  // Initialize heartbeat for agents (support_staff and client_admin)
+  useHeartbeat();
+
   const style = {
     '--sidebar-width': '16rem',
     '--sidebar-width-icon': '3rem',
@@ -171,7 +185,7 @@ function ProtectedAppContent() {
       if (user.isPlatformAdmin) {
         setLocation('/platform-admin');
       } else if (user.role === 'support_staff') {
-        setLocation('/agent-dashboard');
+        setLocation('/agent-queue'); // Support staff goes to their queue, NOT dashboard
       } else if (user.role === 'client_admin') {
         setLocation('/analytics');
       } else {
