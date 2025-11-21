@@ -12,7 +12,7 @@ async function checkHtmlKey() {
   const sql = neon(DATABASE_URL);
   const db = drizzle(sql);
 
-  const htmlKey = 'embellics_a30ec232bff311b45537c0fe626d4e365b4da69581160082468e2ac887434169';
+  const htmlKey = 'embellics_YOUR_API_KEY_HERE'; // Replace with actual key for testing
   const htmlKeyHash = createHash('sha256').update(htmlKey).digest('hex');
   
   console.log('Key in your HTML file:');

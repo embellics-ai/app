@@ -72,7 +72,7 @@ embellics_[64 hexadecimal characters]
 Example (yours will be different):
 
 ```
-embellics_4fd1dfd3daa54a9c8b2e1f7d3c9a8b6e5f4d3c2b1a9e8d7c6b5a4f3e2d1c0b9a8
+embellics_YOUR_64_CHARACTER_HEX_STRING_HERE
 ```
 
 Count the characters after `embellics_` - should be EXACTLY 64!

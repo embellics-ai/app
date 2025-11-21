@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 
-const fullKey = 'embellics_2e5a123d6582c4f1f89c8b180cbef73b67a0af76d849a6a43632b2de93521a05';
+const fullKey = 'embellics_YOUR_API_KEY_HERE'; // Replace with actual key for testing
 const keyHash = createHash('sha256').update(fullKey).digest('hex');
 
 console.log('Full API Key:', fullKey);

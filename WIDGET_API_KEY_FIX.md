@@ -9,10 +9,10 @@ The widget was initializing successfully but showing "Invalid API key" error whe
 The test file (`docs/widget-simple-test.html`) had an **old API key** that no longer exists in the database:
 
 ```
-OLD KEY: embellics_de81b5ae9282712cd1f55247f5cfa3a67e9431793d96aea5bda96d17ca729729
+OLD KEY: embellics_[REDACTED]
 ```
 
-This key had the correct prefix (`embellics_de81b5ae`) but the full key value didn't match what was in the database anymore. This is because:
+This key had the correct prefix but the full key value didn't match what was in the database anymore. This is because:
 
 1. API keys are hashed and stored in the database for security
 2. The full key is only shown ONCE when created
@@ -26,7 +26,7 @@ This key had the correct prefix (`embellics_de81b5ae`) but the full key value di
 **New API Key:**
 
 ```
-embellics_01ba1bdd3ae1fedd2ebdc98c665f9d971ff21c65aa421618a4cb1d9bc84b0845
+embellics_YOUR_API_KEY_HERE
 ```
 
 **Updated Files:**
@@ -45,7 +45,7 @@ embellics_01ba1bdd3ae1fedd2ebdc98c665f9d971ff21c65aa421618a4cb1d9bc84b0845
 ```
 Widget sends message with API key
      ↓
-Server receives: "embellics_01ba1bdd3ae1fedd2ebdc98c665f9d971ff21c65aa421618a4cb1d9bc84b0845"
+Server receives: "embellics_YOUR_API_KEY_HERE"
      ↓
 Server gets all API keys from database
      ↓

@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 
-const yourKey = 'embellics_4fd1dfd3da533b716356bd2108f53c821015a16c89a5b3212d49dfc0fb6acfdb';
+const yourKey = 'embellics_YOUR_API_KEY_HERE'; // Replace with actual key for testing
 const yourHash = createHash('sha256').update(yourKey).digest('hex');
 
 const dbHash = '8364c2d56f6bedbd0e185c4846bf909aa0aeb41175bd129a8103c5a0aa8c41f1';
