@@ -40,15 +40,15 @@ async function revokeExposedKeys() {
 
     console.log(`Found ${existingKeys.length} exposed API keys:`);
     existingKeys.forEach((key: any) => {
-      console.log(`  - Prefix: ${key.keyPrefix} | Tenant ID: ${key.tenantId} | Created: ${key.createdAt}`);
+      console.log(
+        `  - Prefix: ${key.keyPrefix} | Tenant ID: ${key.tenantId} | Created: ${key.createdAt}`,
+      );
     });
 
     console.log('\n🗑️  Deleting exposed API keys...\n');
 
     // Delete the exposed keys
-    await db
-      .delete(apiKeys)
-      .where(inArray(apiKeys.keyPrefix, exposedPrefixes));
+    await db.delete(apiKeys).where(inArray(apiKeys.keyPrefix, exposedPrefixes));
 
     console.log('✅ Successfully deleted exposed API keys!\n');
 
@@ -61,7 +61,9 @@ async function revokeExposedKeys() {
     if (remainingKeys.length === 0) {
       console.log('✅ Verification: All exposed keys have been removed from the database.\n');
     } else {
-      console.log(`⚠️  Warning: ${remainingKeys.length} keys still remain. May need manual deletion.`);
+      console.log(
+        `⚠️  Warning: ${remainingKeys.length} keys still remain. May need manual deletion.`,
+      );
     }
 
     // Show remaining active keys
@@ -77,7 +79,9 @@ async function revokeExposedKeys() {
     if (allKeys.length > 0) {
       console.log('\nActive keys:');
       allKeys.forEach((key: any) => {
-        console.log(`  - Prefix: ${key.keyPrefix} | Tenant ID: ${key.tenantId} | Created: ${key.createdAt}`);
+        console.log(
+          `  - Prefix: ${key.keyPrefix} | Tenant ID: ${key.tenantId} | Created: ${key.createdAt}`,
+        );
       });
     }
 

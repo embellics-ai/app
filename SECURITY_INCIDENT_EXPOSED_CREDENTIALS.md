@@ -11,6 +11,7 @@
 GitGuardian detected SMTP credentials exposed in the GitHub repository `embellics-ai/app`.
 
 ### What Was Exposed:
+
 - ✅ **REMOVED** SMTP credentials (Gmail app password)
 - ✅ **REMOVED** Database credentials (Neon PostgreSQL)
 - ✅ **REMOVED** API keys (Retell AI)
@@ -18,6 +19,7 @@ GitGuardian detected SMTP credentials exposed in the GitHub repository `embellic
 - ✅ **REMOVED** Session secrets
 
 ### Root Cause:
+
 The `.env` file was accidentally committed to git despite being in `.gitignore`. This happened because the file was already tracked before `.gitignore` was added.
 
 ---
@@ -25,14 +27,17 @@ The `.env` file was accidentally committed to git despite being in `.gitignore`.
 ## Immediate Actions Taken
 
 ### 1. ✅ Removed .env from Git Tracking
+
 ```bash
 git rm --cached .env
 ```
 
 ### 2. ✅ Sanitized .env.example
+
 Replaced all real credentials with placeholder values in the example file.
 
 ### 3. ✅ Committed Fix
+
 This commit removes the `.env` file from tracking going forward.
 
 ---
@@ -44,24 +49,28 @@ This commit removes the `.env` file from tracking going forward.
 All exposed credentials are now public and MUST be changed:
 
 #### A. Gmail SMTP Password
+
 1. Go to: https://myaccount.google.com/apppasswords
 2. **Revoke** the old app password: `opqqxaseywcizqry`
 3. Generate a new app password
 4. Update your production environment variables
 
 #### B. Database Password (Neon)
+
 1. Go to Neon dashboard: https://console.neon.tech
 2. Navigate to your project settings
 3. **Reset the database password**
 4. Update `DATABASE_URL` in your production environment
 
 #### C. Retell API Key
+
 1. Go to Retell dashboard
 2. **Revoke** the exposed key: `key_93f64256e7e3591f07e71d3cbb9b`
 3. Generate a new API key
 4. Update `RETELL_API_KEY` in production
 
 #### D. Encryption Key
+
 1. Generate new encryption key:
    ```bash
    openssl rand -hex 32
@@ -70,6 +79,7 @@ All exposed credentials are now public and MUST be changed:
 3. **Note:** This may invalidate existing encrypted data
 
 #### E. Session Secret
+
 1. Generate new session secret:
    ```bash
    openssl rand -base64 32
@@ -82,6 +92,7 @@ All exposed credentials are now public and MUST be changed:
 The `.env` file still exists in git history. You need to completely remove it:
 
 #### Option A: Using git filter-repo (Recommended)
+
 ```bash
 # Install git-filter-repo
 pip install git-filter-repo
@@ -94,6 +105,7 @@ git push origin --force --all
 ```
 
 #### Option B: Using BFG Repo Cleaner
+
 ```bash
 # Download BFG
 # https://rtyley.github.io/bfg-repo-cleaner/
@@ -116,11 +128,13 @@ git push origin --force --all
 After rotating credentials, update them in your production environment:
 
 **If using Vercel/Railway/Render:**
+
 - Go to project settings
 - Update environment variables
 - Redeploy the application
 
 **If using Docker/VPS:**
+
 - SSH into your server
 - Update `.env` file with new credentials
 - Restart the application
@@ -128,6 +142,7 @@ After rotating credentials, update them in your production environment:
 ### 4. 🟡 Monitor for Suspicious Activity
 
 Check for any unauthorized access:
+
 - Review Gmail sent folder for suspicious emails
 - Check Neon database logs for unusual queries
 - Monitor Retell API usage
@@ -138,21 +153,24 @@ Check for any unauthorized access:
 ## Prevention Measures
 
 ### ✅ Implemented:
+
 1. `.env` removed from git tracking
 2. `.env` is in `.gitignore`
 3. `.env.example` uses placeholder values only
 
 ### 📋 Recommended:
+
 1. Use environment variable management tools:
    - **Doppler** (https://www.doppler.com/)
    - **Vault** (https://www.vaultproject.io/)
    - **AWS Secrets Manager**
 
 2. Enable pre-commit hooks to prevent credential commits:
+
    ```bash
    # Install pre-commit
    pip install pre-commit
-   
+
    # Add .pre-commit-config.yaml
    # Include secret scanning tools
    ```
@@ -168,13 +186,13 @@ Check for any unauthorized access:
 
 ## Timeline
 
-| Time | Action |
-|------|--------|
-| 12:46:53 UTC | ❌ `.env` file pushed to GitHub |
-| ~12:52 UTC | 🔔 GitGuardian alert received |
-| Now | ✅ `.env` removed from tracking |
-| **Next** | 🔴 **YOU: Rotate all credentials** |
-| **Next** | 🔴 **YOU: Remove from git history** |
+| Time         | Action                              |
+| ------------ | ----------------------------------- |
+| 12:46:53 UTC | ❌ `.env` file pushed to GitHub     |
+| ~12:52 UTC   | 🔔 GitGuardian alert received       |
+| Now          | ✅ `.env` removed from tracking     |
+| **Next**     | 🔴 **YOU: Rotate all credentials**  |
+| **Next**     | 🔴 **YOU: Remove from git history** |
 
 ---
 
@@ -208,6 +226,7 @@ Check for any unauthorized access:
 ---
 
 **IMPORTANT:** Do NOT ignore this. Exposed credentials can lead to:
+
 - Unauthorized email sending (spam, phishing)
 - Database breach (customer data theft)
 - API abuse (financial costs)

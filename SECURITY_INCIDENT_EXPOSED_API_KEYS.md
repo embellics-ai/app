@@ -29,6 +29,7 @@ The following API keys were found exposed in git history:
 ## Impact
 
 These API keys can be used to:
+
 - Impersonate legitimate users
 - Send messages through the chat widget
 - Access chat history
@@ -39,6 +40,7 @@ These API keys can be used to:
 ## Files Affected
 
 ### Sanitized Files
+
 - ✅ `docs/widget-simple-test.html` - API key replaced with placeholder
 - ✅ `WIDGET_TESTING_GUIDE.md` - API key replaced with placeholder
 - ✅ `CHAT_WIDGET_GUIDE.md` - API key replaced with placeholder
@@ -52,6 +54,7 @@ These API keys can be used to:
 - ✅ `HOW_TO_COPY_API_KEY.md` - API key replaced with placeholder
 
 ### Git History
+
 - ❌ All exposed keys still exist in git history (requires git-filter-repo)
 
 ---
@@ -84,6 +87,7 @@ SELECT key_prefix, created_at FROM api_keys ORDER BY created_at DESC;
 ```
 
 Or use the admin dashboard:
+
 1. Go to http://localhost:3000/dashboard
 2. Navigate to API Keys section
 3. Delete all keys with the following prefixes:
@@ -184,7 +188,7 @@ Check your logs and database for any suspicious activity:
 
 ```sql
 -- Check for widget sessions created with exposed keys
-SELECT 
+SELECT
   ws.id,
   ws.created_at,
   ws.updated_at,
@@ -201,7 +205,7 @@ GROUP BY ws.id, ws.created_at, ws.updated_at, ak.key_prefix
 ORDER BY ws.created_at DESC;
 
 -- Check recent widget messages
-SELECT 
+SELECT
   wcm.id,
   wcm.created_at,
   wcm.role,
@@ -220,6 +224,7 @@ LIMIT 100;
 ```
 
 Review for:
+
 - Unusual message patterns
 - High volume of requests
 - Messages from unexpected IP addresses
@@ -267,6 +272,7 @@ exit 0
 ```
 
 Make it executable:
+
 ```bash
 chmod +x .git/hooks/pre-commit
 ```
@@ -286,6 +292,7 @@ const API_KEY = 'embellics_fcba7f5aa6d138549945db5beda9a78102faf32c07e0a51d2e7a8
 ### 3. Secret Management
 
 Consider using:
+
 - **Doppler** - Secret management platform
 - **AWS Secrets Manager** - For AWS deployments
 - **HashiCorp Vault** - Enterprise secret management
@@ -337,6 +344,7 @@ git grep -E '(password|secret|key).*=.*[a-zA-Z0-9]{20,}'
 ## Contact
 
 If you have questions or need assistance with this security incident, contact:
+
 - Security Team: security@embellics.com
 - DevOps Lead: [contact info]
 

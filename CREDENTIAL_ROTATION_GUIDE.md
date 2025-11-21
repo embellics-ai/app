@@ -8,11 +8,13 @@
 ## ✅ COMPLETED ACTIONS
 
 ### 1. Sanitized Exposed Files
+
 - ✅ All API keys removed from documentation and test files
 - ✅ Placeholders added to prevent future leaks
 - ✅ Changes committed and pushed to repository
 
 ### 2. Revoked Exposed API Keys
+
 - ✅ Script created: `revoke-exposed-keys.ts`
 - ✅ Successfully executed - deleted all 9 exposed API keys from database
 - ✅ Verified: No exposed keys remain in database
@@ -34,6 +36,7 @@
 ### 3. Rotate Gmail SMTP Password
 
 **Current Exposed Credential:**
+
 - SMTP_PASS='opqqxaseywcizqry'
 - SMTP_USER='admin@embellics.com'
 
@@ -58,6 +61,7 @@
 ### 4. Reset Neon Database Password
 
 **Current Exposed Credential:**
+
 - PGPASSWORD='npg_unhR1evq9Wza'
 - DATABASE_URL contains this password
 
@@ -81,6 +85,7 @@
 ### 5. Revoke Retell API Key
 
 **Current Exposed Credential:**
+
 - RETELL_API_KEY='key_93f64256e7e3591f07e71d3cbb9b'
 
 **Steps to Rotate:**
@@ -103,24 +108,29 @@
 ### 6. Generate New Encryption Key ✅ (Generated Below)
 
 **Current Exposed Credential:**
+
 - ENCRYPTION_KEY='80e466f3375fd03dab78a44061d6d3d061d7c3a1e38dd536f21bb827c6b8d150'
 
 **New Encryption Key Generated:**
+
 ```
 ENCRYPTION_KEY='d35467a92d990df675285ba1a7de8d8bff39de03389063892fe7d06606eacecd'
 ```
 
 **⚠️ IMPORTANT WARNING:**
 Changing the encryption key will invalidate all existing encrypted data. If you have encrypted data in your database, you need to:
+
 1. Decrypt all data with the old key first
 2. Update the encryption key
 3. Re-encrypt all data with the new key
 
 OR if you don't have critical encrypted data:
+
 1. Update the encryption key
 2. Clear any encrypted data that can't be decrypted
 
 **Steps to Update:**
+
 1. Copy the new key from above
 2. Update your .env file:
    ```
@@ -132,14 +142,17 @@ OR if you don't have critical encrypted data:
 ### 7. Generate New Session Secret ✅ (Generated Below)
 
 **Current Exposed Credential:**
+
 - SESSION_SECRET='6k0Bpp+ujiFicfwTrbCdkMNy+fxpoDNEynopIrrXQKw='
 
 **New Session Secret Generated:**
+
 ```
 SESSION_SECRET='ArZdeZDJ4e/g7Ay1un48IF++42kjjT8x4JKiAZUH3dc='
 ```
 
 **Steps to Update:**
+
 1. Copy the new secret from above
 2. Update your .env file:
    ```
@@ -195,6 +208,7 @@ git push origin --force --tags
 ```
 
 **⚠️ CRITICAL WARNING:**
+
 - This rewrites ALL git history
 - ALL team members MUST delete their local repo and re-clone
 - Notify your team BEFORE doing this
@@ -291,6 +305,7 @@ git push origin --force --all
 ## 📞 Support
 
 If you encounter issues during credential rotation:
+
 - Check application logs for connection errors
 - Verify environment variables are correctly set
 - Test each service individually

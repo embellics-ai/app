@@ -10,7 +10,9 @@
 ## ✅ COMPLETED ACTIONS
 
 ### 1. ✅ API Keys Sanitized (12 files)
+
 All exposed widget API keys have been removed from code and documentation:
+
 - `docs/widget-simple-test.html`
 - `WIDGET_TESTING_GUIDE.md`
 - `CHAT_WIDGET_GUIDE.md`
@@ -26,9 +28,11 @@ All exposed widget API keys have been removed from code and documentation:
 All replaced with: `embellics_YOUR_API_KEY_HERE`
 
 ### 2. ✅ API Keys Revoked from Database
+
 **Script:** `revoke-exposed-keys.ts`
 
 Successfully deleted **9 exposed API keys** by prefix:
+
 - fcba7f5a
 - 915f494a
 - d310fe4e
@@ -42,22 +46,27 @@ Successfully deleted **9 exposed API keys** by prefix:
 **Verification:** ✅ No exposed keys remain in database
 
 ### 3. ✅ .env File Removed from Git Tracking
+
 - Removed `.env` from git tracking
 - Sanitized `.env.example` with placeholders
 - Created comprehensive security documentation
 
 ### 4. ✅ New Credentials Generated
+
 **New Encryption Key:**
+
 ```
 d35467a92d990df675285ba1a7de8d8bff39de03389063892fe7d06606eacecd
 ```
 
 **New Session Secret:**
+
 ```
 ArZdeZDJ4e/g7Ay1un48IF++42kjjT8x4JKiAZUH3dc=
 ```
 
 ### 5. ✅ Documentation Created
+
 - `SECURITY_INCIDENT_EXPOSED_CREDENTIALS.md` - .env leak details
 - `SECURITY_INCIDENT_EXPOSED_API_KEYS.md` - API keys leak details
 - `CREDENTIAL_ROTATION_GUIDE.md` - Complete step-by-step guide
@@ -69,22 +78,26 @@ ArZdeZDJ4e/g7Ay1un48IF++42kjjT8x4JKiAZUH3dc=
 ### YOU MUST DO THESE MANUALLY:
 
 ### 1. 🔴 Rotate Gmail SMTP Password
+
 **Link:** https://myaccount.google.com/apppasswords
 
 **Exposed:** `opqqxaseywcizqry`
 
 **Steps:**
+
 1. Revoke old app password
 2. Generate new app password
 3. Update `.env` file: `SMTP_PASS='your-new-password'`
 4. Update production environment
 
 ### 2. 🔴 Reset Neon Database Password
+
 **Link:** https://console.neon.tech
 
 **Exposed:** `npg_unhR1evq9Wza`
 
 **Steps:**
+
 1. Navigate to your database settings
 2. Reset password
 3. Update `.env` file:
@@ -94,11 +107,13 @@ ArZdeZDJ4e/g7Ay1un48IF++42kjjT8x4JKiAZUH3dc=
 5. Restart application
 
 ### 3. 🔴 Revoke Retell API Key
+
 **Link:** https://app.retellai.com (or your Retell dashboard)
 
 **Exposed:** `key_93f64256e7e3591f07e71d3cbb9b`
 
 **Steps:**
+
 1. Revoke exposed key
 2. Generate new key
 3. Update `.env` file: `RETELL_API_KEY='new-key'`
@@ -125,6 +140,7 @@ RETELL_API_KEY='[YOUR NEW RETELL KEY]'
 All credentials are still in git history!
 
 **Command to run (after coordinating with team):**
+
 ```bash
 pip install git-filter-repo
 cd /Users/animeshsingh/Documents/Embellics/RetellChatFlow
@@ -139,17 +155,17 @@ git push origin --force --all
 
 ## 📊 Security Status
 
-| Task | Status | Critical |
-|------|--------|----------|
-| Sanitize exposed files | ✅ DONE | YES |
-| Revoke API keys from DB | ✅ DONE | YES |
-| Generate new encryption key | ✅ DONE | YES |
-| Generate new session secret | ✅ DONE | YES |
-| Rotate SMTP password | ⏳ PENDING | YES |
-| Reset database password | ⏳ PENDING | YES |
-| Revoke Retell API key | ⏳ PENDING | YES |
-| Update production env | ⏳ PENDING | YES |
-| Clean git history | ⏳ PENDING | CRITICAL |
+| Task                        | Status     | Critical |
+| --------------------------- | ---------- | -------- |
+| Sanitize exposed files      | ✅ DONE    | YES      |
+| Revoke API keys from DB     | ✅ DONE    | YES      |
+| Generate new encryption key | ✅ DONE    | YES      |
+| Generate new session secret | ✅ DONE    | YES      |
+| Rotate SMTP password        | ⏳ PENDING | YES      |
+| Reset database password     | ⏳ PENDING | YES      |
+| Revoke Retell API key       | ⏳ PENDING | YES      |
+| Update production env       | ⏳ PENDING | YES      |
+| Clean git history           | ⏳ PENDING | CRITICAL |
 
 ---
 
@@ -219,24 +235,16 @@ Copy this and check off as you complete each step:
 ## 🚀 Next Steps Priority
 
 **IMMEDIATE (Do now - 10 minutes):**
+
 1. Rotate Gmail SMTP password
 2. Reset Neon database password
 3. Revoke Retell API key
 
-**HIGH (Do today - 1 hour):**
-4. Update local .env with all new credentials
-5. Update production environment variables
-6. Deploy and test production
+**HIGH (Do today - 1 hour):** 4. Update local .env with all new credentials 5. Update production environment variables 6. Deploy and test production
 
-**CRITICAL (Do today - 2 hours):**
-7. Generate new widget API keys
-8. Clean git history with git-filter-repo
-9. Force push cleaned repository
+**CRITICAL (Do today - 2 hours):** 7. Generate new widget API keys 8. Clean git history with git-filter-repo 9. Force push cleaned repository
 
-**MONITORING (Next 7 days):**
-10. Check logs daily for suspicious activity
-11. Monitor API usage
-12. Review access patterns
+**MONITORING (Next 7 days):** 10. Check logs daily for suspicious activity 11. Monitor API usage 12. Review access patterns
 
 ---
 
@@ -253,6 +261,7 @@ Copy this and check off as you complete each step:
 ## 📞 Emergency Contacts
 
 If you discover unauthorized access:
+
 1. Immediately revoke all credentials
 2. Check database for unauthorized changes
 3. Review application logs

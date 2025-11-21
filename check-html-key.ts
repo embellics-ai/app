@@ -14,25 +14,25 @@ async function checkHtmlKey() {
 
   const htmlKey = 'embellics_YOUR_API_KEY_HERE'; // Replace with actual key for testing
   const htmlKeyHash = createHash('sha256').update(htmlKey).digest('hex');
-  
+
   console.log('Key in your HTML file:');
   console.log('  Key:', htmlKey);
   console.log('  Hash:', htmlKeyHash);
   console.log('');
 
   const allKeys = await db.select().from(apiKeys);
-  
+
   console.log('Keys in database:');
-  allKeys.forEach(key => {
+  allKeys.forEach((key) => {
     console.log(`  Prefix: ${key.keyPrefix}`);
     console.log(`  Hash: ${key.keyHash}`);
     console.log(`  Match: ${key.keyHash === htmlKeyHash ? '✅ YES!' : '❌ No'}`);
     console.log('');
   });
 
-  if (allKeys.some(k => k.keyHash === htmlKeyHash)) {
+  if (allKeys.some((k) => k.keyHash === htmlKeyHash)) {
     console.log('✅ Your HTML key EXISTS in the database!');
-    console.log('The widget SHOULD work. If it doesn\'t, check:');
+    console.log("The widget SHOULD work. If it doesn't, check:");
     console.log('1. Is the server running on port 3000?');
     console.log('2. Are there any CORS errors in browser console?');
     console.log('3. Is the widget.js file loading correctly?');
@@ -44,7 +44,7 @@ async function checkHtmlKey() {
 
 checkHtmlKey()
   .then(() => process.exit(0))
-  .catch(err => {
+  .catch((err) => {
     console.error('Error:', err);
     process.exit(1);
   });
