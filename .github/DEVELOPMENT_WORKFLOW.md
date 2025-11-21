@@ -42,13 +42,12 @@ npm run format && npm run lint && git add -A && git commit -m "your message" && 
 
 ## Automated Setup (Recommended)
 
-### Option 1: Husky + Lint-Staged (Automatic on commit)
+### Option 1: Lint-Staged (Automatic on commit)
 
-Install husky and lint-staged:
+Install lint-staged:
 
 ```bash
-npm install --save-dev husky lint-staged
-npx husky init
+npm install --save-dev lint-staged
 ```
 
 Add to `package.json`:
@@ -61,14 +60,7 @@ Add to `package.json`:
 }
 ```
 
-Create `.husky/pre-commit`:
-
-```bash
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-npx lint-staged
-```
+Configure your git hooks manually or with another tool if desired.
 
 ### Option 2: Git Hooks (Manual setup)
 
