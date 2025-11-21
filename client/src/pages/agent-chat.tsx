@@ -8,7 +8,17 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
-import { MessageSquare, Send, CheckCircle, Clock, User, Bot, X, ArrowLeft, AlertCircle } from 'lucide-react';
+import {
+  MessageSquare,
+  Send,
+  CheckCircle,
+  Clock,
+  User,
+  Bot,
+  X,
+  ArrowLeft,
+  AlertCircle,
+} from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useLocation, useRoute } from 'wouter';
