@@ -31,7 +31,7 @@ async function showApiKeys() {
     console.log(`Hash (first 40 chars): ${key.keyHash.substring(0, 40)}...`);
     console.log(`Created: ${key.createdAt}`);
     console.log(`Last Used: ${key.lastUsedAt || 'Never'}`);
-    
+
     // Note: We cannot reconstruct the actual key from the hash
     // The key should have been shown only once when created
     console.log(`⚠️  Full key NOT stored in DB (security feature)`);
@@ -45,7 +45,7 @@ async function showApiKeys() {
 
 showApiKeys()
   .then(() => process.exit(0))
-  .catch(err => {
+  .catch((err) => {
     console.error('Error:', err);
     process.exit(1);
   });

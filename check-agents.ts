@@ -11,7 +11,7 @@ const db = drizzle(sql);
 
 async function checkAgents() {
   console.log('🔍 Checking human agents in database...\n');
-  
+
   const agents = await db
     .select({
       id: humanAgents.id,
@@ -29,7 +29,7 @@ async function checkAgents() {
     console.log('The logged-in user needs a human_agents record to pick up handoffs.\n');
   } else {
     console.log(`Found ${agents.length} agent(s):\n`);
-    agents.forEach(agent => {
+    agents.forEach((agent) => {
       console.log(`  Name: ${agent.name}`);
       console.log(`  Email: ${agent.email}`);
       console.log(`  Status: ${agent.status}`);
@@ -37,11 +37,11 @@ async function checkAgents() {
       console.log('');
     });
   }
-  
+
   console.log('\n🔍 Checking users table...\n');
   const allUsers = await db.select().from(users);
   console.log(`Found ${allUsers.length} user(s):\n`);
-  allUsers.forEach(user => {
+  allUsers.forEach((user) => {
     console.log(`  Name: ${user.username}`);
     console.log(`  Email: ${user.email}`);
     console.log(`  Role: ${user.role}`);
@@ -52,7 +52,7 @@ async function checkAgents() {
 
 checkAgents()
   .then(() => process.exit(0))
-  .catch(err => {
+  .catch((err) => {
     console.error('Error:', err);
     process.exit(1);
   });

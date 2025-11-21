@@ -95,7 +95,7 @@ For external websites to use the widget, use the production URL:
 
 ```html
 <script>
-  (function() {
+  (function () {
     var script = document.createElement('script');
     script.src = 'https://app.embellics.com/widget.js';
     script.setAttribute('data-api-key', 'your-api-key-here');

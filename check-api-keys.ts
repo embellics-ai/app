@@ -24,21 +24,23 @@ async function checkApiKeys() {
   if (allTenants.length > 0) {
     for (const tenant of allTenants) {
       console.log(`\n--- Tenant: ${tenant.name} (ID: ${tenant.id}) ---`);
-      
-      const widgetConfig = allWidgetConfigs.find(w => w.tenantId === tenant.id);
+
+      const widgetConfig = allWidgetConfigs.find((w) => w.tenantId === tenant.id);
       if (widgetConfig) {
         console.log(`  Widget Config:`);
-        console.log(`    - Retell API Key: ${widgetConfig.retellApiKey ? `${widgetConfig.retellApiKey.substring(0, 10)}...` : 'NOT SET'}`);
+        console.log(
+          `    - Retell API Key: ${widgetConfig.retellApiKey ? `${widgetConfig.retellApiKey.substring(0, 10)}...` : 'NOT SET'}`,
+        );
         console.log(`    - Retell Agent ID: ${widgetConfig.retellAgentId || 'NOT SET'}`);
         console.log(`    - Greeting: ${widgetConfig.greeting || 'NOT SET'}`);
       } else {
         console.log(`  Widget Config: NOT FOUND`);
       }
 
-      const tenantApiKeys = allApiKeys.filter(k => k.tenantId === tenant.id);
+      const tenantApiKeys = allApiKeys.filter((k) => k.tenantId === tenant.id);
       if (tenantApiKeys.length > 0) {
         console.log(`  API Keys (${tenantApiKeys.length}):`);
-        tenantApiKeys.forEach(key => {
+        tenantApiKeys.forEach((key) => {
           console.log(`    - Name: ${key.name || 'Unnamed'}`);
           console.log(`      Prefix: ${key.keyPrefix}`);
           console.log(`      Created: ${key.createdAt}`);
@@ -57,7 +59,7 @@ async function checkApiKeys() {
 
 checkApiKeys()
   .then(() => process.exit(0))
-  .catch(err => {
+  .catch((err) => {
     console.error('Error:', err);
     process.exit(1);
   });
