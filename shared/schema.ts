@@ -174,7 +174,7 @@ export const widgetConfigs = pgTable('widget_configs', {
   allowedDomains: text('allowed_domains').array(), // Array of allowed domains
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   // Note: Widget styling is now fixed in CSS following application design system
-  // Removed: primaryColor, position, placeholder, customCss (no longer customizable)
+  // ...existing code...
 });
 
 // Widget Chat Messages (Store all chat messages for history persistence)
@@ -227,7 +227,7 @@ export type UpdateSafeWidgetConfig = z.infer<typeof safeWidgetConfigUpdateSchema
 // UPDATED EXISTING TABLES WITH TENANT SCOPING
 // ============================================
 
-// Users (keeping for backward compatibility, might be deprecated)
+// ...existing code...
 export const users = pgTable('users', {
   id: varchar('id')
     .primaryKey()
