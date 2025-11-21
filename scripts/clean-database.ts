@@ -1,5 +1,6 @@
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
+import pg from 'pg';
+const { Pool } = pg;
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, ne } from 'drizzle-orm';
 import {
   clientUsers,
@@ -37,8 +38,11 @@ async function cleanDatabase() {
   // Give user time to cancel
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  const sql = neon(DATABASE_URL);
-  const db = drizzle(sql);
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  });
+  const db = drizzle(pool);
 
   try {
     console.log('📋 Current database state:');
