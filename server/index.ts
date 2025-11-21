@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import express, { type Request, Response, NextFunction, type Express } from 'express';
 import expressWs from 'express-ws';
 import { createServer } from 'http';
@@ -6,6 +5,8 @@ import rateLimit from 'express-rate-limit';
 import { registerRoutes } from './routes';
 import { setupVite, serveStatic, log } from './vite';
 import { initializeDatabase } from './db-init';
+import { startAgentCleanupJob } from './agent-cleanup';
+import { storage } from './storage';
 
 const app = express();
 // Create HTTP server first, then add WebSocket support to it
@@ -96,6 +97,18 @@ app.use((req, res, next) => {
 
   // Initialize database with platform owner if needed
   await initializeDatabase();
+
+  // Start agent cleanup background job
+  const stopCleanupJob = startAgentCleanupJob(storage);
+
+  // Graceful shutdown handler
+  process.on('SIGTERM', () => {
+    log('SIGTERM signal received: closing HTTP server and stopping cleanup job');
+    stopCleanupJob();
+    httpServer.close(() => {
+      log('HTTP server closed');
+    });
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

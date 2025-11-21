@@ -7,11 +7,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Clock, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
+import { useWebSocket } from '@/hooks/use-websocket';
+import { useAuth } from '@/contexts/auth-context';
+import { Users, Clock, CheckCircle, AlertCircle, MessageSquare, MoreVertical } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { AgentChatInterface } from '@/components/agent-chat-interface';
+import { useLocation } from 'wouter';
 
 type HumanAgent = {
   id: string;
@@ -20,6 +29,7 @@ type HumanAgent = {
   status: string;
   activeChats: number;
   maxChats: number;
+  lastSeen?: string | null;
 };
 
 type WidgetHandoff = {
@@ -40,9 +50,14 @@ type WidgetHandoff = {
 
 export default function AgentDashboard() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [chatDialogOpen, setChatDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
+
+  // Enable WebSocket for real-time handoff updates
+  useWebSocket(true);
 
   // Fetch all human agents with auto-refresh
   const { data: agents = [], isLoading: agentsLoading } = useQuery<HumanAgent[]>({
@@ -81,15 +96,19 @@ export default function AgentDashboard() {
       conversationId,
       humanAgentId,
       agentName,
+      isCurrentUser,
     }: {
       conversationId: string;
       humanAgentId: string;
       agentName?: string;
+      isCurrentUser?: boolean;
     }) => {
       return apiRequest('POST', '/api/handoff/assign', { conversationId, humanAgentId }).then(
         (result) => ({
           ...result,
           agentName,
+          conversationId,
+          isCurrentUser,
         }),
       );
     },
@@ -97,12 +116,20 @@ export default function AgentDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/widget-handoffs/pending'] });
       queryClient.invalidateQueries({ queryKey: ['/api/widget-handoffs/active'] });
       queryClient.invalidateQueries({ queryKey: ['/api/human-agents'] });
+
       toast({
         title: 'Handoff assigned',
         description: data.agentName
           ? `Successfully assigned to ${data.agentName}`
           : 'Handoff has been assigned to an agent',
       });
+
+      // If assigned to current user, navigate to chat after a short delay
+      if (data.isCurrentUser && data.conversationId) {
+        setTimeout(() => {
+          navigate(`/agent-chat/${data.conversationId}`);
+        }, 500);
+      }
     },
     onError: () => {
       toast({
@@ -115,10 +142,14 @@ export default function AgentDashboard() {
 
   const handleClaimHandoff = (conversationId: string, agentId: string) => {
     const agent = agents.find((a) => a.id === agentId);
+    // Check if assigning to current user (by email match)
+    const isCurrentUser = user?.email === agent?.email;
+
     assignMutation.mutate({
       conversationId,
       humanAgentId: agentId,
       agentName: agent?.name,
+      isCurrentUser,
     });
   };
 
@@ -143,6 +174,46 @@ export default function AgentDashboard() {
       default:
         return 'outline';
     }
+  };
+
+  // Format last seen time
+  const formatLastSeen = (lastSeen?: string | null, status?: string) => {
+    if (status === 'available') {
+      return 'Online now';
+    }
+    if (!lastSeen) {
+      return 'Never';
+    }
+    try {
+      return formatDistanceToNow(new Date(lastSeen), { addSuffix: true });
+    } catch {
+      return 'Unknown';
+    }
+  };
+
+  // Mutation to update agent status manually
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ agentId, status }: { agentId: string; status: string }) => {
+      return apiRequest('PATCH', `/api/human-agents/${agentId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/human-agents'] });
+      toast({
+        title: 'Status updated',
+        description: 'Agent status has been updated successfully.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Update failed',
+        description: error.message || 'Failed to update agent status.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleStatusChange = (agentId: string, newStatus: string) => {
+    updateStatusMutation.mutate({ agentId, status: newStatus });
   };
 
   return (
@@ -297,17 +368,20 @@ export default function AgentDashboard() {
                             (agent) =>
                               agent.status === 'available' && agent.activeChats < agent.maxChats,
                           )
-                          .map((agent) => (
-                            <Button
-                              key={agent.id}
-                              size="sm"
-                              onClick={() => handleClaimHandoff(conversation.id, agent.id)}
-                              disabled={assignMutation.isPending}
-                              data-testid={`button-assign-${agent.id}-${conversation.id}`}
-                            >
-                              Assign to {agent.name}
-                            </Button>
-                          ))}
+                          .map((agent) => {
+                            const isCurrentUser = user?.email === agent.email;
+                            return (
+                              <Button
+                                key={agent.id}
+                                size="sm"
+                                onClick={() => handleClaimHandoff(conversation.id, agent.id)}
+                                disabled={assignMutation.isPending}
+                                data-testid={`button-assign-${agent.id}-${conversation.id}`}
+                              >
+                                {isCurrentUser ? 'Pick Up' : `Assign to ${agent.name}`}
+                              </Button>
+                            );
+                          })}
                         {agents.filter(
                           (agent) =>
                             agent.status === 'available' && agent.activeChats < agent.maxChats,
@@ -561,23 +635,67 @@ export default function AgentDashboard() {
                   <Card key={agent.id} data-testid={`card-agent-${agent.id}`}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle
-                            className="text-base"
-                            data-testid={`text-agent-name-${agent.id}`}
-                          >
-                            {agent.name}
-                          </CardTitle>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <CardTitle
+                              className="text-base"
+                              data-testid={`text-agent-name-${agent.id}`}
+                            >
+                              {agent.name}
+                            </CardTitle>
+                            <Badge
+                              variant={getStatusBadgeVariant(agent.status)}
+                              data-testid={`badge-status-${agent.id}`}
+                            >
+                              {agent.status}
+                            </Badge>
+                          </div>
                           <CardDescription data-testid={`text-agent-email-${agent.id}`}>
                             {agent.email}
                           </CardDescription>
+                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span data-testid={`text-last-seen-${agent.id}`}>
+                              {formatLastSeen(agent.lastSeen, agent.status)}
+                            </span>
+                          </div>
                         </div>
-                        <Badge
-                          variant={getStatusBadgeVariant(agent.status)}
-                          data-testid={`badge-status-${agent.id}`}
-                        >
-                          {agent.status}
-                        </Badge>
+                        {user?.role === 'client_admin' && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-status-menu-${agent.id}`}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(agent.id, 'available')}
+                                disabled={agent.status === 'available'}
+                                data-testid={`menu-set-available-${agent.id}`}
+                              >
+                                Set as Available
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(agent.id, 'busy')}
+                                disabled={agent.status === 'busy'}
+                                data-testid={`menu-set-busy-${agent.id}`}
+                              >
+                                Set as Busy
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(agent.id, 'offline')}
+                                disabled={agent.status === 'offline'}
+                                data-testid={`menu-set-offline-${agent.id}`}
+                              >
+                                Set as Offline
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent>

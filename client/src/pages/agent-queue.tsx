@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { useWebSocket } from '@/hooks/use-websocket';
 import { Users, Clock, CheckCircle, MessageSquare, Mail, User } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
@@ -41,6 +42,9 @@ export default function AgentQueue() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>('pending');
+
+  // Enable WebSocket for real-time handoff updates
+  useWebSocket(true);
 
   // Fetch pending handoffs with auto-refresh
   const { data: pendingHandoffs = [], isLoading: pendingLoading } = useQuery<WidgetHandoff[]>({

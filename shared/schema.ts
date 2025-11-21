@@ -118,6 +118,7 @@ export const humanAgents = pgTable(
     activeChats: integer('active_chats').notNull().default(0),
     maxChats: integer('max_chats').notNull().default(5),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    lastSeen: timestamp('last_seen').defaultNow(),
   },
   (table) => ({
     uniqueTenantEmail: uniqueIndex('unique_tenant_agent_email').on(table.tenantId, table.email),
@@ -127,6 +128,7 @@ export const humanAgents = pgTable(
 export const insertHumanAgentSchema = createInsertSchema(humanAgents).omit({
   id: true,
   createdAt: true,
+  lastSeen: true,
   tenantId: true,
 });
 

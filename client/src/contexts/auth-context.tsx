@@ -105,8 +105,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const logout = () => {
-    console.log('[Auth Context] Logging out - clearing all localStorage and cache');
+  const logout = async () => {
+    console.log('[Auth Context] Logging out - notifying server and clearing cache');
+
+    try {
+      // Get token before clearing localStorage
+      const token = localStorage.getItem('auth_token');
+
+      // Call server logout endpoint to update agent status
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      console.log('[Auth Context] Server logout successful');
+    } catch (error) {
+      console.error('[Auth Context] Server logout failed:', error);
+      // Continue with client-side logout even if server call fails
+    }
 
     // Save theme preference before clearing
     const savedTheme = localStorage.getItem('theme');

@@ -22,6 +22,7 @@ import {
   Users,
   Lock,
   Sparkles,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +63,11 @@ export function AppSidebar() {
           title: 'Agent Dashboard',
           url: '/agent-dashboard',
           icon: Headphones,
+        },
+        {
+          title: 'Agent Queue',
+          url: '/agent-queue',
+          icon: ClipboardList,
         },
         {
           title: 'Team Management',

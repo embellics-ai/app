@@ -8,7 +8,7 @@ type WebSocketMessage = {
   payload: any;
 };
 
-export function useWebSocket() {
+export function useWebSocket(enabled: boolean = false) {
   const { user } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -18,6 +18,12 @@ export function useWebSocket() {
   const maxReconnectAttempts = 5;
 
   const connect = useCallback(() => {
+    // Only connect if explicitly enabled
+    if (!enabled) {
+      console.log('[WebSocket] Connection disabled (enabled=false)');
+      return;
+    }
+
     console.log('[WebSocket] connect() called, user:', user);
 
     // Get fresh user check and token at connection time (not closure)
@@ -217,13 +223,13 @@ export function useWebSocket() {
   }, []);
 
   useEffect(() => {
-    console.log('[WebSocket] useEffect triggered, user:', user);
+    console.log('[WebSocket] useEffect triggered, enabled:', enabled, 'user:', user);
 
-    if (user) {
-      // User logged in or tenant changed - establish fresh connection
+    if (enabled && user) {
+      // User logged in AND WebSocket is explicitly enabled - connect
       connect();
     } else {
-      // User logged out - clean up everything
+      // User logged out OR WebSocket disabled - clean up everything
       disconnect();
     }
 
@@ -231,7 +237,7 @@ export function useWebSocket() {
     return () => {
       disconnect();
     };
-  }, [user, connect, disconnect]);
+  }, [user, enabled, connect, disconnect]);
 
   return {
     isConnected,

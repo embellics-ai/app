@@ -13,16 +13,19 @@ When a client admin clicked "Assign to [Agent Name]" button to assign a pending 
 The `/api/handoff/assign` endpoint had two major issues:
 
 ### Issue 1: Wrong Table Updates
+
 - The endpoint was updating the `conversations` table
 - However, the UI queries the `widget_handoffs` table
 - These are two separate tracking systems, causing a disconnect
 
 ### Issue 2: ID Mismatch
+
 - The frontend passes the `widget_handoff.id` as `conversationId`
 - The backend was treating it as a `conversations` table ID
 - This caused the update to fail silently (no matching record in conversations table)
 
 ### Issue 3: Misleading Toast Message
+
 - The success message said "You've been assigned to this conversation"
 - This implied the client admin was assigned, not the selected agent
 - Caused confusion about who was actually handling the handoff
@@ -65,7 +68,7 @@ Changed the `/api/handoff/assign` endpoint to:
 ✅ Staff member's active chat count increments  
 ✅ Handoff appears in "Active Chats" tab for assigned agent  
 ✅ Clear toast message shows which agent was assigned  
-✅ UI automatically refreshes to show updated status  
+✅ UI automatically refreshes to show updated status
 
 ## Testing
 
