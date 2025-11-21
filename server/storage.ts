@@ -986,7 +986,7 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  // Widget Handoff methods (stubs for testing)
+  // ...existing code...
   async createWidgetHandoff(handoff: InsertWidgetHandoff): Promise<WidgetHandoff> {
     const id = randomUUID();
     const newHandoff: WidgetHandoff = {
@@ -1004,7 +1004,7 @@ export class MemStorage implements IStorage {
       lastUserMessage: handoff.lastUserMessage || null,
       metadata: handoff.metadata || null,
     };
-    // Note: No Map storage for handoffs in MemStorage - just return for testing
+    // ...existing code...
     return newHandoff;
   }
 
@@ -1955,5 +1955,5 @@ export class DbStorage implements IStorage {
   }
 }
 
-// Use database storage in production, memory storage for testing
+// ...existing code...
 export const storage = process.env.DATABASE_URL ? new DbStorage() : new MemStorage();

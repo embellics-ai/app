@@ -32,12 +32,6 @@ import { inviteUser } from './services/inviteService';
 import { registerClient, broadcastToTenant } from './websocket';
 import type { WebSocket } from 'ws';
 
-// Initialize global Retell client (legacy - for backward compatibility only)
-// New tenants should use their own API keys stored in widget_configs
-const retellClient = new Retell({
-  apiKey: process.env.RETELL_API_KEY || '',
-});
-
 // NOTE: The system uses tenant-specific Retell Agent IDs from widget_configs.retellAgentId
 // Platform Admins configure these via: PATCH /api/platform/tenants/:tenantId/retell-api-key
 // No hardcoded agent IDs are used - each tenant has their own agent configuration
@@ -1855,9 +1849,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         const retellChatId = metadata?.retellChatId;
         if (retellChatId) {
           try {
-            console.log('[Retell] Ending chat session:', retellChatId);
-            await retellClient.chat.end(retellChatId);
-            console.log('[Retell] Chat session ended successfully');
+            // Get tenant's widget config for API key
+            const widgetConfig = await storage.getWidgetConfig(tenantId);
+            if (widgetConfig?.retellApiKey) {
+              const tenantRetellClient = new Retell({ apiKey: widgetConfig.retellApiKey });
+              console.log('[Retell] Ending chat session:', retellChatId);
+              await tenantRetellClient.chat.end(retellChatId);
+              console.log('[Retell] Chat session ended successfully');
+            } else {
+              console.warn('[Retell] No API key configured for tenant, cannot end chat session.');
+            }
           } catch (retellError) {
             console.error('[Retell] Error ending chat session:', retellError);
             // Continue even if Retell end fails
@@ -4635,11 +4636,15 @@ async function getRetellAgentResponse(
     let retellChatId = conversation.metadata?.retellChatId;
 
     // If no Retell session exists, create one
+    if (!widgetConfig?.retellApiKey) {
+      throw new Error('Retell API key not configured for this tenant.');
+    }
     if (!retellChatId) {
       console.log('[Retell] Creating new chat session for conversation:', conversationId);
       console.log('[Retell] Using agent ID:', agentId);
 
-      const chatSession = await retellClient.chat.create({
+      const tenantRetellClient = new Retell({ apiKey: widgetConfig.retellApiKey });
+      const chatSession = await tenantRetellClient.chat.create({
         agent_id: agentId,
         metadata: {
           conversationId: conversationId,
@@ -4662,8 +4667,9 @@ async function getRetellAgentResponse(
     }
 
     // Send message to Retell and get response
+    const tenantRetellClient = new Retell({ apiKey: widgetConfig.retellApiKey });
     console.log('[Retell] Sending message to agent:', userMessage);
-    const completion = await retellClient.chat.createChatCompletion({
+    const completion = await tenantRetellClient.chat.createChatCompletion({
       chat_id: retellChatId,
       content: userMessage,
     });
