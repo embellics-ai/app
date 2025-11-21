@@ -8,6 +8,7 @@ vite.config.ts.*
 dist/
 build/
 *.log
+coverage/
 # Ignore Terraform secrets and state files
 *.tfvars
 *.tfstate
