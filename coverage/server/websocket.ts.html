@@ -1,63 +1,68 @@
+
 <!doctype html>
 <html lang="en">
-  <head>
+
+<head>
     <title>Code coverage report for server/websocket.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
     <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style type="text/css">
-      .coverage-summary .sorter {
-        background-image: url(../sort-arrow-sprite.png);
-      }
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
     </style>
-  </head>
-
-  <body>
-    <div class="wrapper">
-      <div class="pad1">
-        <h1>
-          <a href="../index.html">All files</a> / <a href="index.html">server</a> websocket.ts
-        </h1>
-        <div class="clearfix">
-          <div class="fl pad1y space-right2">
-            <span class="strong">0% </span>
-            <span class="quiet">Statements</span>
-            <span class="fraction">0/12</span>
-          </div>
-
-          <div class="fl pad1y space-right2">
-            <span class="strong">0% </span>
-            <span class="quiet">Branches</span>
-            <span class="fraction">0/6</span>
-          </div>
-
-          <div class="fl pad1y space-right2">
-            <span class="strong">0% </span>
-            <span class="quiet">Functions</span>
-            <span class="fraction">0/6</span>
-          </div>
-
-          <div class="fl pad1y space-right2">
-            <span class="strong">0% </span>
-            <span class="quiet">Lines</span>
-            <span class="fraction">0/12</span>
-          </div>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">server</a> websocket.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/12</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/6</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/6</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/12</span>
+            </div>
+        
+            
         </div>
         <p class="quiet">
-          Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>,
-          <em>p</em> or <em>k</em> for the previous block.
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
         </p>
         <template id="filterTemplate">
-          <div class="quiet">
-            Filter:
-            <input type="search" id="fileSearch" />
-          </div>
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
         </template>
-      </div>
-      <div class="status-line low"></div>
-      <pre><table class="coverage">
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
 <a name='L3'></a><a href='#L3'>3</a>
@@ -122,22 +127,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { WebSocket } from "ws";
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { WebSocket } from 'ws';
 &nbsp;
 // Store connected clients with their tenant IDs
 const clients = <span class="cstat-no" title="statement not covered" >new Map&lt;WebSocket, string&gt;();</span>
 &nbsp;
 export function <span class="fstat-no" title="function not covered" >registerClient(w</span>s: WebSocket, tenantId: string) {
 <span class="cstat-no" title="statement not covered" >  clients.set(ws, tenantId);</span>
-  
-<span class="cstat-no" title="statement not covered" >  ws.on("close", <span class="fstat-no" title="function not covered" >() =&gt; {</span></span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  ws.on('close', <span class="fstat-no" title="function not covered" >() =&gt; {</span></span>
 <span class="cstat-no" title="statement not covered" >    clients.delete(ws);</span>
   });
 }
 &nbsp;
 export function <span class="fstat-no" title="function not covered" >broadcastToTenant(t</span>enantId: string, event: string, data: any) {
   const message = <span class="cstat-no" title="statement not covered" >JSON.stringify({ event, data });</span>
-  
+&nbsp;
 <span class="cstat-no" title="statement not covered" >  clients.forEach(<span class="fstat-no" title="function not covered" >(c</span>lientTenantId, ws) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    if (clientTenantId === tenantId &amp;&amp; ws.readyState === ws.OPEN) {</span>
 <span class="cstat-no" title="statement not covered" >      ws.send(message);</span>
@@ -147,7 +152,7 @@ export function <span class="fstat-no" title="function not covered" >broadcastTo
 &nbsp;
 export function <span class="fstat-no" title="function not covered" >broadcast(e</span>vent: string, data: any) {
   const message = <span class="cstat-no" title="statement not covered" >JSON.stringify({ event, data });</span>
-  
+&nbsp;
 <span class="cstat-no" title="statement not covered" >  clients.forEach(<span class="fstat-no" title="function not covered" >(_</span>, ws) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    if (ws.readyState === ws.OPEN) {</span>
 <span class="cstat-no" title="statement not covered" >      ws.send(message);</span>
@@ -156,22 +161,21 @@ export function <span class="fstat-no" title="function not covered" >broadcast(e
 }
 &nbsp;</pre></td></tr></table></pre>
 
-      <div class="push"></div>
-      <!-- for sticky footer -->
-    </div>
-    <!-- /wrapper -->
-    <div class="footer quiet pad2 space-top1 center small">
-      Code coverage generated by
-      <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-      at 2025-11-18T19:30:07.674Z
-    </div>
-    <script src="../prettify.js"></script>
-    <script>
-      window.onload = function () {
-        prettyPrint();
-      };
-    </script>
-    <script src="../sorter.js"></script>
-    <script src="../block-navigation.js"></script>
-  </body>
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2025-11-21T17:21:49.990Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
 </html>
+    
