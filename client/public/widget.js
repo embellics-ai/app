@@ -731,6 +731,36 @@
     }
   }
 
+  // Use sendBeacon for more reliable delivery when page is unloading
+  window.addEventListener('beforeunload', () => {
+    if (handoffStatus !== 'resolved' && (chatId || handoffId)) {
+      const data = JSON.stringify({
+        apiKey: API_KEY,
+        chatId: chatId,
+        handoffId: handoffId,
+      });
+
+      // Try sendBeacon first (more reliable), fallback to fetch
+      if (navigator.sendBeacon) {
+        const blob = new Blob([data], { type: 'application/json' });
+        navigator.sendBeacon(`${WIDGET_API_BASE}/api/widget/end-chat`, blob);
+      } else {
+        // Fallback for browsers that don't support sendBeacon
+        fetch(`${WIDGET_API_BASE}/api/widget/end-chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: data,
+          keepalive: true, // Keeps request alive even after page unload
+        }).catch((error) => console.error('[Embellics Widget] Failed to end chat:', error));
+      }
+    }
+  });
+
+  // Note: visibilitychange removed - too aggressive, users often switch tabs temporarily
+  // If you need this, consider adding a delay before ending the chat
+
   function startStatusChecking() {
     if (statusCheckInterval) clearInterval(statusCheckInterval);
 
