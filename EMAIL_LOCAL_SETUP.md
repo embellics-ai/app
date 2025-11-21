@@ -12,7 +12,7 @@ Contains **production Gmail SMTP** settings:
 SMTP_HOST='smtp.gmail.com'
 SMTP_PORT=587
 SMTP_USER='admin@embellics.com'
-SMTP_PASS='opqqxaseywcizqry'
+SMTP_PASS='your-gmail-app-password-here'
 ```
 
 - Used in production/staging
