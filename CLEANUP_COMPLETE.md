@@ -1,11 +1,13 @@
 # Cleanup Summary - November 21, 2025
 
 ## Overview
+
 Cleaned up test/debug artifacts and reorganized development documentation before production deployment.
 
 ## Files Deleted (33 files)
 
 ### Test/Debug TypeScript Scripts
+
 - `fix-bhukkha-status.ts` - Debug script for specific test user
 - `update-bhukkha-available.ts` - Test user availability updater
 - `check-agents.ts` - Agent checker script
@@ -40,10 +42,12 @@ Cleaned up test/debug artifacts and reorganized development documentation before
 - `create-widget-chat-messages-table.ts` - Table creation script
 
 ### SQL Test Files
+
 - `add-agent.sql` - Test SQL
 - `create-test-agent.sql` - Test SQL
 
 ### JavaScript Debug Files
+
 - `fix-agent-record.mjs` - Agent record fixer
 - `fix-api-key-validation.mjs` - Key validation fixer
 - `generate-ethereal-credentials.js` - Email test credentials
@@ -53,6 +57,7 @@ Cleaned up test/debug artifacts and reorganized development documentation before
 Moved to `docs/archive/` for historical reference:
 
 ### Agent & Handoff Debugging
+
 - AGENT_HEARTBEAT_SOLUTION.md
 - AGENT_RECORD_MISSING_FIX.md
 - AGENT_STATUS_HEARTBEAT_MANUAL_CONTROLS.md
@@ -63,12 +68,14 @@ Moved to `docs/archive/` for historical reference:
 - LIVE_HANDOFF_IMPLEMENTATION.md
 
 ### Security Incidents
+
 - SECURITY_INCIDENT_EXPOSED_API_KEYS.md
 - SECURITY_INCIDENT_EXPOSED_CREDENTIALS.md
 - CREDENTIAL_ROTATION_GUIDE.md
 - CRITICAL_API_KEY_BUG_FIX.md
 
 ### Feature Implementation Notes
+
 - API_KEY_HASH_FIX.md
 - API_KEY_VISIBILITY_UPDATE.md
 - AUTO_GENERATED_API_KEYS.md
