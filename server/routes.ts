@@ -4027,6 +4027,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Use existing chatId or create new session
       let retellChatId = chatId;
+      let isNewSession = false;
 
       if (!retellChatId) {
         console.log('[Widget Chat] Creating new chat session');
@@ -4038,15 +4039,43 @@ export async function registerRoutes(app: Express): Promise<void> {
           },
         });
         retellChatId = chatSession.chat_id;
+        isNewSession = true;
         console.log('[Widget Chat] Created session:', retellChatId);
+
+        // Give Retell a moment to fully initialize the new session
+        // This prevents the first message from failing due to session not being ready
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
-      // Send message to Retell and get response
+      // Send message to Retell and get response with retry logic for new sessions
       console.log('[Widget Chat] Sending message:', message);
-      const completion = await tenantRetellClient.chat.createChatCompletion({
-        chat_id: retellChatId,
-        content: message,
-      });
+      let completion;
+      let retries = isNewSession ? 3 : 1;
+      let lastError;
+
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          completion = await tenantRetellClient.chat.createChatCompletion({
+            chat_id: retellChatId,
+            content: message,
+          });
+          break; // Success, exit retry loop
+        } catch (error: any) {
+          lastError = error;
+          console.error(`[Widget Chat] Attempt ${attempt}/${retries} failed:`, error.message);
+
+          if (attempt < retries) {
+            // Exponential backoff: 300ms, 600ms
+            const delay = 300 * attempt;
+            console.log(`[Widget Chat] Retrying in ${delay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      if (!completion) {
+        throw lastError || new Error('Failed to get completion from Retell');
+      }
 
       // Extract the agent's response
       const messages = completion.messages || [];
@@ -4090,12 +4119,26 @@ export async function registerRoutes(app: Express): Promise<void> {
         response,
         chatId: retellChatId,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Widget Chat] Error:', error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Invalid request', details: error.errors });
       }
-      res.status(500).json({ error: 'Failed to process chat message' });
+
+      // Provide more specific error messages
+      let errorMessage = 'Failed to process chat message';
+      if (error.message?.includes('chat_id')) {
+        errorMessage = 'Chat session error. Please try again.';
+      } else if (error.message?.includes('agent_id')) {
+        errorMessage = 'AI agent configuration error. Please contact support.';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      }
+
+      res.status(500).json({
+        error: errorMessage,
+        message: error.message, // Include detailed error for debugging
+      });
     }
   });
 
