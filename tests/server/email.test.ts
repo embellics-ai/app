@@ -23,6 +23,8 @@ describe('Server Email', () => {
     process.env.SMTP_PASS = 'testpass';
     process.env.SMTP_FROM_EMAIL = 'noreply@test.com';
     process.env.APP_URL = 'http://localhost:3000';
+    // Ensure SKIP_EMAIL is not set during tests (CI might set it)
+    delete process.env.SKIP_EMAIL;
   });
 
   describe('sendInvitationEmail', () => {
