@@ -63,10 +63,13 @@ export default function OnboardingPage() {
   // Pre-populate form state from existing config
   useEffect(() => {
     if (existingConfig) {
-      setPrimaryColor(existingConfig.primaryColor ?? '#6366f1');
-      setPosition((existingConfig.position as 'bottom-right' | 'bottom-left') ?? 'bottom-right');
+      // Note: primaryColor, position, placeholder removed from schema
+      // Widget styling is now fixed in CSS following application design system
       setGreeting(existingConfig.greeting ?? 'Hi! How can I help you today?');
-      setPlaceholder(existingConfig.placeholder ?? 'Type your message...');
+      // Keep default values for removed fields
+      setPrimaryColor('#6366f1');
+      setPosition('bottom-right');
+      setPlaceholder('Type your message...');
     }
   }, [existingConfig]);
 
