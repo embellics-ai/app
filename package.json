@@ -15,7 +15,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepare": "husky"
+    "prepare": "[ -d .git ] && husky || echo 'Skipping husky in CI'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
