@@ -4077,18 +4077,22 @@ export async function registerRoutes(app: Express): Promise<void> {
         throw lastError || new Error('Failed to get completion from Retell');
       }
 
-      // Extract the agent's response
+      // Extract ALL agent responses from this interaction
       const messages = completion.messages || [];
-      const lastAssistantMessage = messages
-        .reverse()
-        .find((msg: any) => msg.role === 'agent' || msg.role === 'assistant');
+      const assistantMessages = messages.filter(
+        (msg: any) =>
+          (msg.role === 'agent' || msg.role === 'assistant') &&
+          typeof msg.content === 'string' &&
+          msg.content.trim().length > 0,
+      );
 
-      let response = "I'm processing your request...";
-      if (lastAssistantMessage && typeof (lastAssistantMessage as any).content === 'string') {
-        response = (lastAssistantMessage as any).content;
+      // Return all messages as an array for client-side display with delays
+      let responseMessages = ["I'm processing your request..."];
+      if (assistantMessages.length > 0) {
+        responseMessages = assistantMessages.map((msg: any) => msg.content);
       }
 
-      console.log('[Widget Chat] Response:', response.slice(0, 100));
+      console.log('[Widget Chat] Total assistant messages:', assistantMessages.length);
 
       // Save messages to database for history persistence
       try {
@@ -4100,12 +4104,13 @@ export async function registerRoutes(app: Express): Promise<void> {
           content: message,
         });
 
-        // Save assistant response
+        // Save combined assistant response
+        const combinedResponse = responseMessages.join('\n\n');
         await storage.createWidgetChatMessage({
           tenantId: apiKeyRecord.tenantId,
           chatId: retellChatId,
           role: 'assistant',
-          content: response,
+          content: combinedResponse,
         });
 
         console.log('[Widget Chat] Messages saved to database');
@@ -4114,9 +4119,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Don't fail the request if database save fails
       }
 
-      // Return response and chatId for continuation
+      // Return all messages for client-side sequential display
       res.json({
-        response,
+        messages: responseMessages,
         chatId: retellChatId,
       });
     } catch (error: any) {

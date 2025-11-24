@@ -155,8 +155,11 @@
     <script>
       (function () {
         var script = document.createElement('script');
-        script.src = 'http://localhost:3000/widget.js';
-        script.setAttribute('data-api-key', 'embellics_YOUR_API_KEY_HERE');
+        script.src = 'http://localhost:3000/widget.js?v=' + Date.now();
+        script.setAttribute(
+          'data-api-key',
+          'embellics_3b78ab0018cfa90a737f520367ca82c37f8af459044891f4ed505b5645ac4f7e',
+        );
         document.head.appendChild(script);
       })();
     </script>

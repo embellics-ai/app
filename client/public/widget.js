@@ -100,6 +100,22 @@
         .embellics-email-form button { width: 100%; padding: 12px; background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); border: none; border-radius: 0.5625rem; font-size: 14px; font-weight: 500; cursor: pointer; box-shadow: 0 4px 12px hsla(262, 75%, 65%, 0.3); transition: transform 0.2s, box-shadow 0.2s; }
         .embellics-email-form button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px hsla(262, 75%, 65%, 0.4); }
         
+        /* Contact Details Form */
+        .embellics-contact-form { background: hsl(0, 0%, 98%); padding: 16px; border-radius: 0.75rem; margin: 8px 0; border: 1px solid hsl(0, 0%, 94%); align-self: flex-start; max-width: 85%; }
+        .embellics-contact-form-title { font-size: 14px; font-weight: 600; color: hsl(262, 75%, 40%); margin: 0 0 12px 0; }
+        .embellics-contact-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        .embellics-contact-form input { width: 100%; padding: 10px 12px; border: 1px solid hsl(262, 15%, 85%); border-radius: 0.5rem; font-size: 14px; box-sizing: border-box; background: hsl(0, 0%, 100%); color: hsl(0, 0%, 9%); font-family: inherit; transition: border-color 0.2s, box-shadow 0.2s; }
+        .embellics-contact-form input:focus { outline: none; border-color: hsl(262, 75%, 65%); box-shadow: 0 0 0 3px hsla(262, 75%, 65%, 0.1); }
+        .embellics-contact-form input.error { border-color: hsl(0, 72%, 50%); }
+        .embellics-contact-form input::placeholder { color: hsl(262, 10%, 60%); }
+        .embellics-contact-form-full { grid-column: 1 / -1; }
+        .embellics-contact-form-error { font-size: 12px; color: hsl(0, 72%, 42%); margin-top: 4px; display: none; }
+        .embellics-contact-form-error.show { display: block; }
+        .embellics-contact-form button { width: 100%; padding: 12px; background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); border: none; border-radius: 0.5625rem; font-size: 14px; font-weight: 500; cursor: pointer; box-shadow: 0 4px 12px hsla(262, 75%, 65%, 0.3); transition: transform 0.2s, box-shadow 0.2s; margin-top: 8px; }
+        .embellics-contact-form button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px hsla(262, 75%, 65%, 0.4); }
+        .embellics-contact-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+        @media (max-width: 480px) { .embellics-contact-form-row { grid-template-columns: 1fr; } .embellics-contact-form { max-width: 95%; } }
+        
         /* End Chat Confirmation Modal */
         #embellics-end-chat-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: none; align-items: center; justify-content: center; z-index: 9999999; animation: fadeIn 0.2s ease-out; }
         #embellics-end-chat-modal.show { display: flex; }
@@ -117,6 +133,13 @@
         .embellics-modal-btn-cancel:hover { background: hsl(262, 10%, 94%); }
         .embellics-modal-btn-confirm { background: hsl(0, 72%, 42%); color: hsl(0, 72%, 98%); }
         .embellics-modal-btn-confirm:hover { background: hsl(0, 72%, 35%); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+        
+        /* Interactive Option Buttons */
+        .embellics-options-container { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 80%; align-self: flex-start; }
+        .embellics-option-button { padding: 10px 16px; background: hsl(0, 0%, 100%); color: hsl(262, 75%, 65%); border: 2px solid hsl(262, 75%, 65%); border-radius: 0.75rem; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: left; box-shadow: 0 2px 8px hsla(262, 75%, 65%, 0.15); }
+        .embellics-option-button:hover:not(:disabled) { background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); transform: translateX(4px); box-shadow: 0 4px 12px hsla(262, 75%, 65%, 0.3); }
+        .embellics-option-button:disabled { cursor: not-allowed; }
+        .embellics-option-button:active { transform: scale(0.98); }
         
         @media (max-width: 480px) {
           #embellics-widget-panel { width: calc(100vw - 40px); right: 20px; }
@@ -295,6 +318,19 @@
       const response = await fetch(url);
       if (!response.ok) {
         console.error('[Embellics Widget] Failed to load history:', response.status);
+
+        // If 400 or 404, chat might have ended - clear session and start fresh
+        if (response.status === 400 || response.status === 404) {
+          console.log('[Embellics Widget] Chat no longer valid, starting fresh');
+          clearSessionState();
+
+          // Show greeting for fresh start
+          if (widgetConfig && widgetConfig.greeting) {
+            const messagesContainer = document.getElementById('embellics-widget-messages');
+            messagesContainer.innerHTML = '';
+            addMessageToUI('system', widgetConfig.greeting);
+          }
+        }
         return;
       }
 
@@ -321,7 +357,21 @@
           if (msg.role === 'user') {
             addMessageToUI('user', msg.content);
           } else if (msg.role === 'assistant' || msg.role === 'agent') {
-            addMessageToUI('assistant', msg.content);
+            // Try to parse JSON format for assistant messages from history
+            let responseText = msg.content;
+            let responseOptions = null;
+
+            try {
+              const parsed = JSON.parse(msg.content);
+              if (parsed.message && parsed.options) {
+                responseText = parsed.message;
+                responseOptions = parsed.options;
+              }
+            } catch (e) {
+              // Not JSON, use as plain text
+            }
+
+            addMessageToUI('assistant', responseText, responseOptions);
           }
         });
 
@@ -377,24 +427,235 @@
   }
 
   // Add message to UI only (for displaying history)
-  function addMessageToUI(role, content) {
+  function addMessageToUI(role, content, options = null) {
     const messagesContainer = document.getElementById('embellics-widget-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `embellics-message ${role}`;
     messageDiv.textContent = content;
     messagesContainer.appendChild(messageDiv);
+
+    // If options are provided, render interactive buttons
+    if (options && Array.isArray(options) && options.length > 0) {
+      const optionsContainer = document.createElement('div');
+      optionsContainer.className = 'embellics-options-container';
+
+      options.forEach((option) => {
+        const button = document.createElement('button');
+        button.className = 'embellics-option-button';
+        button.textContent = option.label || option.text || option;
+        button.dataset.value = option.value || option.id || option.label || option;
+
+        button.onclick = function () {
+          // Disable all option buttons after one is clicked
+          optionsContainer.querySelectorAll('.embellics-option-button').forEach((btn) => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+          });
+
+          // Highlight the selected button
+          button.style.opacity = '1';
+          button.style.background = 'hsl(262, 75%, 65%)';
+          button.style.color = 'hsl(262, 75%, 98%)';
+
+          // Send the selected option as user message
+          const selectedValue = button.dataset.value;
+          handleOptionClick(selectedValue);
+        };
+
+        optionsContainer.appendChild(button);
+      });
+
+      messagesContainer.appendChild(optionsContainer);
+    }
+
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
   // Add message to UI and track in messages array (for new messages)
-  function addMessage(role, content) {
-    addMessageToUI(role, content);
+  function addMessage(role, content, options = null) {
+    addMessageToUI(role, content, options);
 
     // Track user and assistant messages
     if (role === 'user' || role === 'assistant') {
-      messages.push({ role, content });
+      messages.push({ role, content, options });
     }
   }
+
+  // Handle option button click
+  async function handleOptionClick(selectedValue) {
+    // Show the selection as a user message
+    addMessage('user', selectedValue);
+
+    // Disable input while processing
+    const input = document.getElementById('embellics-widget-input');
+    const sendBtn = document.getElementById('embellics-widget-send');
+    input.disabled = true;
+    sendBtn.disabled = true;
+
+    try {
+      // If in handoff mode with active agent, send to handoff endpoint
+      if (handoffStatus === 'active' && handoffId) {
+        const response = await fetch(`${WIDGET_API_BASE}/api/widget/handoff/${handoffId}/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: API_KEY,
+            message: selectedValue,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send selection to agent');
+        }
+      } else {
+        // Normal AI chat flow
+        showTyping(true);
+
+        const response = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apiKey: API_KEY,
+            chatId: chatId,
+            message: selectedValue,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMsg = errorData.message || errorData.error || 'Failed to send selection';
+
+          // Check if error indicates chat has ended
+          if (
+            response.status === 400 ||
+            response.status === 404 ||
+            (response.status === 500 && errorMsg.includes('chat'))
+          ) {
+            throw new Error(`CHAT_ENDED: ${errorMsg}`);
+          }
+
+          throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+
+        showTyping(false);
+
+        // Check if first message is a trigger for contact form
+        if (data.messages && data.messages.length > 0) {
+          const firstMessage = data.messages[0];
+
+          if (firstMessage.trim() === 'SHOW_CONTACT_FORM') {
+            // Show contact form and handle submission
+            showContactForm(async (contactData) => {
+              // Send contact data back to agent as JSON
+              const contactDetails = {
+                first_name: contactData.firstName,
+                last_name: contactData.lastName,
+                email: contactData.email,
+                phone: contactData.phone,
+              };
+              const contactMessage = JSON.stringify(contactDetails);
+
+              try {
+                const followupResponse = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    apiKey: API_KEY,
+                    chatId: chatId,
+                    message: contactMessage,
+                  }),
+                });
+
+                if (followupResponse.ok) {
+                  const followupData = await followupResponse.json();
+                  if (followupData.messages && followupData.messages.length > 0) {
+                    // Display messages sequentially with delays
+                    await displayMessagesSequentially(followupData.messages);
+                  }
+                }
+              } catch (error) {
+                console.error('[Embellics Widget] Failed to send contact data:', error);
+                showError('Failed to submit contact details. Please try again.');
+              }
+            });
+
+            if (data.chatId) {
+              chatId = data.chatId;
+              saveSessionState();
+            }
+
+            return; // Don't show the trigger text
+          }
+
+          // Display all messages sequentially with delays
+          await displayMessagesSequentially(data.messages);
+        }
+
+        if (data.chatId) {
+          chatId = data.chatId;
+          saveSessionState();
+
+          // Enable actions menu after first message
+          const actionsBtn = document.getElementById('embellics-widget-actions-btn');
+          const menuHandoff = document.getElementById('embellics-menu-handoff');
+          const menuEndChat = document.getElementById('embellics-menu-end-chat');
+
+          if (actionsBtn) actionsBtn.classList.add('show');
+          if (menuHandoff) menuHandoff.disabled = false;
+          if (menuEndChat) menuEndChat.classList.remove('hidden');
+        }
+      }
+    } catch (error) {
+      showTyping(false);
+      console.error('[Embellics Widget] Error sending selection:', error);
+
+      // Check if error indicates chat has ended
+      const errorMsg = error.message || '';
+      if (
+        errorMsg.startsWith('CHAT_ENDED:') ||
+        (errorMsg.includes('chat') &&
+          (errorMsg.includes('ended') ||
+            errorMsg.includes('session') ||
+            errorMsg.includes('error')))
+      ) {
+        // Chat has ended - clear session and allow fresh start
+        console.log('[Embellics Widget] Chat ended, starting fresh');
+        clearSessionState();
+
+        // Clear messages UI
+        const messagesContainer = document.getElementById('embellics-widget-messages');
+        messagesContainer.innerHTML = '';
+
+        // Show greeting for fresh start
+        if (widgetConfig && widgetConfig.greeting) {
+          addMessageToUI('system', widgetConfig.greeting);
+        }
+
+        // Hide actions menu
+        const actionsBtn = document.getElementById('embellics-widget-actions-btn');
+        const menuHandoff = document.getElementById('embellics-menu-handoff');
+        const menuEndChat = document.getElementById('embellics-menu-end-chat');
+
+        if (actionsBtn) actionsBtn.classList.remove('show');
+        if (menuHandoff) menuHandoff.disabled = true;
+        if (menuEndChat) {
+          menuEndChat.classList.add('hidden');
+          menuEndChat.disabled = false;
+        }
+
+        showError('Chat session ended. Starting fresh - please try again.');
+      } else {
+        showError('Failed to send your selection. Please try again.');
+      }
+    } finally {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
   function showTyping(show) {
     const typing = document.getElementById('embellics-widget-typing');
     if (show) {
@@ -411,6 +672,155 @@
     errorDiv.textContent = message;
     errorDiv.classList.add('show');
     setTimeout(() => errorDiv.classList.remove('show'), 5000);
+  }
+
+  // Show contact details form
+  function showContactForm(callback) {
+    const messagesContainer = document.getElementById('embellics-widget-messages');
+
+    const formContainer = document.createElement('div');
+    formContainer.className = 'embellics-contact-form';
+
+    formContainer.innerHTML = `
+      <div class="embellics-contact-form-title">Please provide your contact details:</div>
+      <div class="embellics-contact-form-row">
+        <input type="text" id="embellics-form-firstname" placeholder="First Name *" required autocomplete="given-name">
+        <input type="text" id="embellics-form-lastname" placeholder="Last Name *" required autocomplete="family-name">
+      </div>
+      <div class="embellics-contact-form-row">
+        <input type="email" id="embellics-form-email" class="embellics-contact-form-full" placeholder="Email *" required autocomplete="email">
+      </div>
+      <div class="embellics-contact-form-row">
+        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-full" placeholder="Phone Number *" required autocomplete="tel">
+      </div>
+      <div class="embellics-contact-form-error" id="embellics-form-error"></div>
+      <button type="button" id="embellics-form-submit">Submit Details</button>
+    `;
+
+    messagesContainer.appendChild(formContainer);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Focus first input
+    const firstNameInput = document.getElementById('embellics-form-firstname');
+    setTimeout(() => firstNameInput.focus(), 100);
+
+    // Handle form submission
+    const submitBtn = document.getElementById('embellics-form-submit');
+    const errorDiv = document.getElementById('embellics-form-error');
+
+    const handleSubmit = () => {
+      const firstName = document.getElementById('embellics-form-firstname').value.trim();
+      const lastName = document.getElementById('embellics-form-lastname').value.trim();
+      const email = document.getElementById('embellics-form-email').value.trim();
+      const phone = document.getElementById('embellics-form-phone').value.trim();
+
+      // Validation
+      errorDiv.classList.remove('show');
+      let isValid = true;
+
+      if (!firstName) {
+        document.getElementById('embellics-form-firstname').classList.add('error');
+        isValid = false;
+      } else {
+        document.getElementById('embellics-form-firstname').classList.remove('error');
+      }
+
+      if (!lastName) {
+        document.getElementById('embellics-form-lastname').classList.add('error');
+        isValid = false;
+      } else {
+        document.getElementById('embellics-form-lastname').classList.remove('error');
+      }
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
+        document.getElementById('embellics-form-email').classList.add('error');
+        isValid = false;
+      } else {
+        document.getElementById('embellics-form-email').classList.remove('error');
+      }
+
+      // Phone validation (basic - at least 10 digits)
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (!phone || phoneDigits.length < 10) {
+        document.getElementById('embellics-form-phone').classList.add('error');
+        isValid = false;
+      } else {
+        document.getElementById('embellics-form-phone').classList.remove('error');
+      }
+
+      if (!isValid) {
+        errorDiv.textContent = 'Please fill in all fields correctly';
+        errorDiv.classList.add('show');
+        return;
+      }
+
+      // Disable form
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      // Return formatted data
+      const contactData = {
+        firstName,
+        lastName,
+        email,
+        phone,
+      };
+
+      // Remove form and show confirmation
+      formContainer.remove();
+
+      // Add confirmation message
+      const confirmText = `✓ Contact details saved:\nName: ${firstName} ${lastName}\nEmail: ${email}\nPhone: ${phone}`;
+      addMessageToUI('system', confirmText);
+
+      // Call callback with data
+      if (callback) {
+        callback(contactData);
+      }
+    };
+
+    // Submit on button click
+    submitBtn.addEventListener('click', handleSubmit);
+
+    // Submit on Enter key in any input
+    formContainer.querySelectorAll('input').forEach((input) => {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSubmit();
+        }
+      });
+    });
+  }
+
+  // Display multiple messages sequentially with delays
+  async function displayMessagesSequentially(messages) {
+    for (let i = 0; i < messages.length; i++) {
+      // Parse for structured options
+      let responseText = messages[i];
+      let responseOptions = null;
+
+      try {
+        const parsed = JSON.parse(messages[i]);
+        if (parsed.message && parsed.options) {
+          responseText = parsed.message;
+          responseOptions = parsed.options;
+        }
+      } catch (e) {
+        // Not JSON, use as plain text
+      }
+
+      addMessage('assistant', responseText, responseOptions);
+
+      // Wait 1 second before showing next message (except for the last one)
+      if (i < messages.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    showTyping(false);
   }
 
   async function sendMessage() {
@@ -465,8 +875,20 @@
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to send message');
+          const errorData = await response.json().catch(() => ({}));
+          const errorMsg = errorData.message || errorData.error || 'Failed to send message';
+
+          // Check if error indicates chat has ended (400, 404, or 500 with chat_id error)
+          if (
+            response.status === 400 ||
+            response.status === 404 ||
+            (response.status === 500 && errorMsg.includes('chat'))
+          ) {
+            // Chat likely ended - throw error with clear indicator
+            throw new Error(`CHAT_ENDED: ${errorMsg}`);
+          }
+
+          throw new Error(errorMsg);
         }
 
         const data = await response.json();
@@ -486,14 +908,94 @@
 
         showTyping(false);
 
-        if (data.response) {
-          addMessage('assistant', data.response);
+        if (data.messages && data.messages.length > 0) {
+          const firstMessage = data.messages[0];
+
+          // Check if first message is a trigger for contact form
+          if (firstMessage.trim() === 'SHOW_CONTACT_FORM') {
+            // Show contact form and handle submission
+            showContactForm(async (contactData) => {
+              // Send contact data back to agent as JSON
+              const contactDetails = {
+                first_name: contactData.firstName,
+                last_name: contactData.lastName,
+                email: contactData.email,
+                phone: contactData.phone,
+              };
+              const contactMessage = JSON.stringify(contactDetails);
+
+              try {
+                const followupResponse = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    apiKey: API_KEY,
+                    chatId: chatId,
+                    message: contactMessage,
+                  }),
+                });
+
+                if (followupResponse.ok) {
+                  const followupData = await followupResponse.json();
+                  if (followupData.messages && followupData.messages.length > 0) {
+                    // Display messages sequentially with delays
+                    await displayMessagesSequentially(followupData.messages);
+                  }
+                }
+              } catch (error) {
+                console.error('[Embellics Widget] Failed to send contact data:', error);
+                showError('Failed to submit contact details. Please try again.');
+              }
+            });
+            return; // Don't show the trigger text
+          }
+
+          // Display all messages sequentially with delays
+          await displayMessagesSequentially(data.messages);
         }
       }
     } catch (error) {
       console.error('[Embellics Widget] Send message failed:', error);
       showTyping(false);
-      showError(error.message || 'Failed to send message. Please try again.');
+
+      // Check if error indicates chat has ended
+      const errorMsg = error.message || '';
+      if (
+        errorMsg.startsWith('CHAT_ENDED:') ||
+        (errorMsg.includes('chat') &&
+          (errorMsg.includes('ended') ||
+            errorMsg.includes('session') ||
+            errorMsg.includes('error')))
+      ) {
+        // Chat has ended - clear session and allow fresh start
+        console.log('[Embellics Widget] Chat ended, starting fresh');
+        clearSessionState();
+
+        // Clear messages UI
+        const messagesContainer = document.getElementById('embellics-widget-messages');
+        messagesContainer.innerHTML = '';
+
+        // Show greeting for fresh start
+        if (widgetConfig && widgetConfig.greeting) {
+          addMessageToUI('system', widgetConfig.greeting);
+        }
+
+        // Hide actions menu
+        const actionsBtn = document.getElementById('embellics-widget-actions-btn');
+        const menuHandoff = document.getElementById('embellics-menu-handoff');
+        const menuEndChat = document.getElementById('embellics-menu-end-chat');
+
+        if (actionsBtn) actionsBtn.classList.remove('show');
+        if (menuHandoff) menuHandoff.disabled = true;
+        if (menuEndChat) {
+          menuEndChat.classList.add('hidden');
+          menuEndChat.disabled = false;
+        }
+
+        showError('Chat session ended. Starting fresh - please send your message again.');
+      } else {
+        showError(error.message || 'Failed to send message. Please try again.');
+      }
     } finally {
       input.disabled = false;
       sendBtn.disabled = false;
