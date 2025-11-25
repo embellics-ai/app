@@ -32,6 +32,8 @@
   let handoffId = null;
   let handoffStatus = 'none'; // none, pending, active, resolved
   let statusCheckInterval = null;
+  let inactivityTimer = null;
+  const INACTIVITY_TIMEOUT = 300000;
 
   // LocalStorage keys for persistence (only store IDs, not messages)
   const STORAGE_KEYS = {
@@ -46,11 +48,11 @@
     widgetContainer.innerHTML = `
       <style>
         /* Using application's design system - matching Tailwind config and index.css */
-        #embellics-widget-container { position: fixed; bottom: 20px; right: 20px; z-index: 999999; font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        #embellics-widget-container { position: fixed; z-index: 999999; font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         #embellics-widget-button { width: 60px; height: 60px; border-radius: 50%; background: hsl(262, 75%, 65%); border: none; cursor: pointer; box-shadow: 0 8px 24px hsla(262, 75%, 65%, 0.4); display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.3s; }
         #embellics-widget-button:hover { transform: scale(1.08); box-shadow: 0 12px 32px hsla(262, 75%, 65%, 0.5); }
         #embellics-widget-button svg { width: 28px; height: 28px; fill: white; }
-        #embellics-widget-panel { position: fixed; bottom: 90px; right: 20px; width: 380px; height: 600px; max-height: calc(100vh - 120px); border-radius: 0.75rem; box-shadow: 0 12px 48px hsla(262, 75%, 65%, 0.2), 0 0 0 1px hsla(262, 75%, 65%, 0.1); background: hsl(0, 0%, 100%); display: none; flex-direction: column; overflow: hidden; transition: opacity 0.3s, transform 0.3s; opacity: 0; transform: translateY(10px); }
+        #embellics-widget-panel { position: fixed; width: 380px; height: 600px; max-height: calc(100vh - 120px); border-radius: 0.75rem; box-shadow: 0 12px 48px hsla(262, 75%, 65%, 0.2), 0 0 0 1px hsla(262, 75%, 65%, 0.1); background: hsl(0, 0%, 100%); display: none; flex-direction: column; overflow: hidden; transition: opacity 0.3s, transform 0.3s; opacity: 0; transform: translateY(10px); }
         #embellics-widget-panel.open { display: flex; opacity: 1; transform: translateY(0); }
         #embellics-widget-header { background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; }
         #embellics-widget-title { font-weight: 600; font-size: 16px; margin: 0; }
@@ -116,27 +118,37 @@
         .embellics-contact-form button:disabled { opacity: 0.5; cursor: not-allowed; }
         @media (max-width: 480px) { .embellics-contact-form-row { grid-template-columns: 1fr; } .embellics-contact-form { max-width: 95%; } }
         
-        /* End Chat Confirmation Modal */
-        #embellics-end-chat-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: none; align-items: center; justify-content: center; z-index: 9999999; animation: fadeIn 0.2s ease-out; }
-        #embellics-end-chat-modal.show { display: flex; }
+        /* Animations */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .embellics-modal-content { background: hsl(0, 0%, 100%); border-radius: 0.75rem; padding: 24px; max-width: 400px; width: calc(100% - 40px); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); animation: slideUp 0.3s ease-out; border: 1px solid hsl(0, 0%, 90%); }
-        .embellics-modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-        .embellics-modal-icon { width: 48px; height: 48px; border-radius: 50%; background: hsl(0, 72%, 98%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .embellics-modal-icon svg { width: 24px; height: 24px; color: hsl(0, 72%, 42%); }
-        .embellics-modal-title { font-size: 18px; font-weight: 600; color: hsl(0, 0%, 9%); margin: 0; }
-        .embellics-modal-message { color: hsl(262, 10%, 40%); font-size: 14px; line-height: 1.6; margin: 0 0 24px 0; }
-        .embellics-modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
-        .embellics-modal-btn { padding: 10px 20px; border-radius: 0.5625rem; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
-        .embellics-modal-btn-cancel { background: hsl(262, 15%, 92%); color: hsl(262, 15%, 20%); }
-        .embellics-modal-btn-cancel:hover { background: hsl(262, 10%, 94%); }
-        .embellics-modal-btn-confirm { background: hsl(0, 72%, 42%); color: hsl(0, 72%, 98%); }
-        .embellics-modal-btn-confirm:hover { background: hsl(0, 72%, 35%); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+        @keyframes optionFadeIn { 
+          from { 
+            opacity: 0; 
+            transform: translateX(-10px); 
+          } 
+          to { 
+            opacity: 1; 
+            transform: translateX(0); 
+          } 
+        }
         
-        /* Interactive Option Buttons */
+        /* Interactive Option Buttons with Animation */
         .embellics-options-container { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 80%; align-self: flex-start; }
-        .embellics-option-button { padding: 10px 16px; background: hsl(0, 0%, 100%); color: hsl(262, 75%, 65%); border: 2px solid hsl(262, 75%, 65%); border-radius: 0.75rem; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: left; box-shadow: 0 2px 8px hsla(262, 75%, 65%, 0.15); }
+        .embellics-option-button { 
+          padding: 10px 16px; 
+          background: hsl(0, 0%, 100%); 
+          color: hsl(262, 75%, 65%); 
+          border: 2px solid hsl(262, 75%, 65%); 
+          border-radius: 0.75rem; 
+          font-size: 14px; 
+          font-weight: 500; 
+          cursor: pointer; 
+          transition: all 0.2s; 
+          text-align: left; 
+          box-shadow: 0 2px 8px hsla(262, 75%, 65%, 0.15); 
+          opacity: 0;
+          animation: optionFadeIn 0.4s ease-out forwards;
+        }
         .embellics-option-button:hover:not(:disabled) { background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); transform: translateX(4px); box-shadow: 0 4px 12px hsla(262, 75%, 65%, 0.3); }
         .embellics-option-button:disabled { cursor: not-allowed; }
         .embellics-option-button:active { transform: scale(0.98); }
@@ -155,7 +167,7 @@
       </button>
       <div id="embellics-widget-panel">
         <div id="embellics-widget-header">
-          <h3 id="embellics-widget-title">Chat Assistant</h3>
+          <h3 id="embellics-widget-title">Let's Chat</h3>
           <button id="embellics-widget-close" aria-label="Close">×</button>
         </div>
         <div id="embellics-widget-messages"></div>
@@ -195,33 +207,246 @@
           </div>
         </div>
       </div>
-      
-      <!-- End Chat Confirmation Modal -->
-      <div id="embellics-end-chat-modal">
-        <div class="embellics-modal-content">
-          <div class="embellics-modal-header">
-            <div class="embellics-modal-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h3 class="embellics-modal-title">End Chat?</h3>
-          </div>
-          <p class="embellics-modal-message">
-            Are you sure you want to end this conversation? This will close the chat and clear your session.
-          </p>
-          <div class="embellics-modal-actions">
-            <button class="embellics-modal-btn embellics-modal-btn-cancel" id="embellics-modal-cancel">
-              Cancel
-            </button>
-            <button class="embellics-modal-btn embellics-modal-btn-confirm" id="embellics-modal-confirm">
-              End Chat
-            </button>
-          </div>
-        </div>
-      </div>
     `;
     return widgetContainer;
+  }
+
+  // Apply dynamic theme colors from widget configuration
+  function applyWidgetTheme() {
+    if (!widgetConfig) return;
+
+    const primaryColor = widgetConfig.primaryColor || '#9b7ddd';
+    const textColor = widgetConfig.textColor || '#ffffff';
+    const borderRadius = widgetConfig.borderRadius || '12px';
+
+    // Create a style element with CSS custom properties
+    const styleEl = document.createElement('style');
+    styleEl.id = 'embellics-widget-theme';
+
+    // Convert hex to HSL for consistent theming with transparency
+    const hexToHSL = (hex) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h,
+        s,
+        l = (max + min) / 2;
+
+      if (max === min) {
+        h = s = 0;
+      } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r:
+            h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+            break;
+          case g:
+            h = ((b - r) / d + 2) / 6;
+            break;
+          case b:
+            h = ((r - g) / d + 4) / 6;
+            break;
+        }
+      }
+
+      return {
+        h: Math.round(h * 360),
+        s: Math.round(s * 100),
+        l: Math.round(l * 100),
+      };
+    };
+
+    const hsl = hexToHSL(primaryColor);
+
+    styleEl.textContent = `
+      #embellics-widget-button {
+        background: ${primaryColor} !important;
+        box-shadow: 0 8px 24px ${primaryColor}66 !important;
+      }
+      #embellics-widget-button:hover {
+        box-shadow: 0 12px 32px ${primaryColor}80 !important;
+      }
+      #embellics-widget-button svg {
+        fill: ${textColor} !important;
+      }
+      #embellics-widget-panel {
+        border-radius: ${borderRadius} !important;
+        box-shadow: 0 12px 48px ${primaryColor}33, 0 0 0 1px ${primaryColor}1a !important;
+      }
+      #embellics-widget-header {
+        background: ${primaryColor} !important;
+        color: ${textColor} !important;
+      }
+      #embellics-widget-close {
+        color: ${textColor} !important;
+      }
+      .embellics-message.user {
+        background: ${primaryColor} !important;
+        color: ${textColor} !important;
+        box-shadow: 0 4px 12px ${primaryColor}4d !important;
+        border-radius: ${borderRadius} !important;
+      }
+      .embellics-message.assistant {
+        border-radius: ${borderRadius} !important;
+      }
+      .embellics-message.system {
+        background: hsl(${hsl.h}, ${hsl.s}%, 97%) !important;
+        color: ${primaryColor} !important;
+        border-color: hsl(${hsl.h}, ${hsl.s}%, 90%) !important;
+        border-radius: ${borderRadius} !important;
+      }
+      #embellics-widget-input:focus {
+        border-color: ${primaryColor} !important;
+        box-shadow: 0 0 0 3px ${primaryColor}1a !important;
+      }
+      #embellics-widget-send {
+        background: ${primaryColor} !important;
+        color: ${textColor} !important;
+        box-shadow: 0 4px 12px ${primaryColor}4d !important;
+      }
+      #embellics-widget-send:hover {
+        box-shadow: 0 6px 16px ${primaryColor}66 !important;
+      }
+      .embellics-option-button {
+        border-color: ${primaryColor} !important;
+        color: ${primaryColor} !important;
+        box-shadow: 0 2px 8px ${primaryColor}26 !important;
+        border-radius: ${borderRadius} !important;
+      }
+      .embellics-option-button:hover:not(:disabled) {
+        background: ${primaryColor} !important;
+        color: ${textColor} !important;
+        box-shadow: 0 4px 12px ${primaryColor}4d !important;
+      }
+      .embellics-email-form button,
+      .embellics-contact-form button {
+        background: ${primaryColor} !important;
+        color: ${textColor} !important;
+        box-shadow: 0 4px 12px ${primaryColor}4d !important;
+        border-radius: calc(${borderRadius} - 3px) !important;
+      }
+      .embellics-email-form button:hover,
+      .embellics-contact-form button:hover:not(:disabled) {
+        box-shadow: 0 6px 16px ${primaryColor}66 !important;
+      }
+      .embellics-contact-form input:focus {
+        border-color: ${primaryColor} !important;
+        box-shadow: 0 0 0 3px ${primaryColor}1a !important;
+      }
+      .embellics-contact-form-title {
+        color: ${primaryColor} !important;
+      }
+      #embellics-widget-input {
+        border-radius: calc(${borderRadius} * 2) !important;
+      }
+      #embellics-widget-send,
+      #embellics-widget-actions-btn {
+        border-radius: 50% !important;
+      }
+      .embellics-email-form,
+      .embellics-contact-form {
+        border-radius: ${borderRadius} !important;
+      }
+      .embellics-modal-content {
+        border-radius: ${borderRadius} !important;
+      }
+      .embellics-modal-btn-confirm {
+        background: hsl(0, 72%, 42%) !important;
+        color: hsl(0, 72%, 98%) !important;
+        border-radius: calc(${borderRadius} - 3px) !important;
+      }
+      .embellics-modal-btn-cancel {
+        border-radius: calc(${borderRadius} - 3px) !important;
+      }
+    `;
+
+    document.head.appendChild(styleEl);
+  }
+
+  // Apply dynamic widget positioning
+  function applyWidgetPosition() {
+    if (!widgetConfig) return;
+
+    const position = widgetConfig.position || 'bottom-right';
+    const container = document.getElementById('embellics-widget-container');
+    const panel = document.getElementById('embellics-widget-panel');
+
+    if (!container || !panel) return;
+
+    // Remove all positioning styles first
+    container.style.top = '';
+    container.style.right = '';
+    container.style.bottom = '';
+    container.style.left = '';
+    container.style.transform = '';
+
+    panel.style.top = '';
+    panel.style.right = '';
+    panel.style.bottom = '';
+    panel.style.left = '';
+    panel.style.transform = '';
+
+    // Apply positioning based on config
+    const positions = {
+      'top-left': {
+        container: { top: '20px', left: '20px' },
+        panel: { top: '20px', left: '20px' },
+      },
+      'top-center': {
+        container: { top: '20px', left: '50%', transform: 'translateX(-50%)' },
+        panel: { top: '20px', left: '50%', transform: 'translateX(-50%)' },
+      },
+      'top-right': {
+        container: { top: '20px', right: '20px' },
+        panel: { top: '20px', right: '20px' },
+      },
+      'middle-left': {
+        container: { top: '50%', left: '20px', transform: 'translateY(-50%)' },
+        panel: { top: '50%', left: '20px', transform: 'translateY(-50%)' },
+      },
+      'middle-right': {
+        container: { top: '50%', right: '20px', transform: 'translateY(-50%)' },
+        panel: { top: '50%', right: '20px', transform: 'translateY(-50%)' },
+      },
+      'bottom-left': {
+        container: { bottom: '20px', left: '20px' },
+        panel: { bottom: '20px', left: '20px' },
+      },
+      'bottom-center': {
+        container: { bottom: '20px', left: '50%', transform: 'translateX(-50%)' },
+        panel: { bottom: '20px', left: '50%', transform: 'translateX(-50%)' },
+      },
+      'bottom-right': {
+        container: { bottom: '20px', right: '20px' },
+        panel: { bottom: '20px', right: '20px' },
+      },
+    };
+
+    const config = positions[position] || positions['bottom-right'];
+
+    // Apply container positioning
+    Object.assign(container.style, config.container);
+
+    // Apply panel positioning
+    Object.assign(panel.style, config.panel);
+  }
+
+  // Apply widget title from greeting
+  function applyWidgetTitle() {
+    if (!widgetConfig) return;
+
+    const titleElement = document.getElementById('embellics-widget-title');
+    if (!titleElement) return;
+
+    // Use greeting as title if available, otherwise use default
+    const title =
+      widgetConfig.greeting && widgetConfig.greeting.trim() ? widgetConfig.greeting : "Let's Chat";
+
+    titleElement.textContent = title;
   }
 
   // Save session state to localStorage (only IDs)
@@ -288,6 +513,9 @@
   } // Clear session state (when handoff is resolved)
   function clearSessionState() {
     try {
+      // Stop inactivity timer when clearing session
+      stopInactivityTimer();
+
       localStorage.removeItem(STORAGE_KEYS.CHAT_ID);
       localStorage.removeItem(STORAGE_KEYS.HANDOFF_ID);
       localStorage.removeItem(STORAGE_KEYS.HANDOFF_STATUS);
@@ -302,6 +530,85 @@
     }
   }
 
+  // Inactivity timer functions
+  function startInactivityTimer() {
+    // Clear any existing timer first
+    if (inactivityTimer) {
+      clearTimeout(inactivityTimer);
+    }
+
+    // Only start timer if we have an active chat AND widget is open
+    if (!chatId || !isOpen) {
+      return;
+    }
+
+    console.log('[Embellics Widget] Starting inactivity timer');
+    inactivityTimer = setTimeout(() => {
+      console.log('[Embellics Widget] Inactivity timeout - ending chat');
+      confirmEndChat();
+    }, INACTIVITY_TIMEOUT);
+  }
+
+  function resetInactivityTimer() {
+    // Only reset if a timer is already running
+    if (!inactivityTimer) {
+      return;
+    }
+
+    // Clear the current timer and start a new one
+    clearTimeout(inactivityTimer);
+    startInactivityTimer();
+  }
+
+  function stopInactivityTimer() {
+    if (inactivityTimer) {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = null;
+      console.log('[Embellics Widget] Inactivity timer stopped');
+    }
+  }
+
+  // Auto-start conversation when widget opens
+  async function autoStartConversation() {
+    try {
+      console.log('[Embellics Widget] Auto-starting conversation...');
+
+      // Send an initial message to start the conversation (waving hand for better UX)
+      const response = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: API_KEY,
+          message: '👋',
+          referrer: window.location.host,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('[Embellics Widget] Failed to auto-start:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Save chatId from response
+      if (data.chatId) {
+        chatId = data.chatId;
+        saveSessionState();
+        // Timer will be started by toggleWidget when widget opens
+      }
+
+      // Display assistant messages
+      if (data.messages && data.messages.length > 0) {
+        await displayMessagesSequentially(data.messages);
+      }
+
+      console.log('[Embellics Widget] Conversation auto-started');
+    } catch (error) {
+      console.error('[Embellics Widget] Error auto-starting conversation:', error);
+    }
+  }
+
   // Load chat history from API for restored session
   async function loadChatHistory() {
     if (!chatId) return;
@@ -311,6 +618,7 @@
 
       const url = new URL(`${WIDGET_API_BASE}/api/widget/session/${chatId}/history`);
       url.searchParams.append('apiKey', API_KEY);
+      url.searchParams.append('referrer', window.location.host);
       if (handoffId) {
         url.searchParams.append('handoffId', handoffId);
       }
@@ -319,22 +627,33 @@
       if (!response.ok) {
         console.error('[Embellics Widget] Failed to load history:', response.status);
 
-        // If 400 or 404, chat might have ended - clear session and start fresh
-        if (response.status === 400 || response.status === 404) {
-          console.log('[Embellics Widget] Chat no longer valid, starting fresh');
+        // If chat ended (400) or not found (404), clear and start fresh
+        if (response.status === 400 || response.status === 404 || response.status === 500) {
+          console.log('[Embellics Widget] Chat ended or not found, starting new session');
           clearSessionState();
+          const messagesContainer = document.getElementById('embellics-widget-messages');
+          messagesContainer.innerHTML = '';
 
-          // Show greeting for fresh start
-          if (widgetConfig && widgetConfig.greeting) {
-            const messagesContainer = document.getElementById('embellics-widget-messages');
-            messagesContainer.innerHTML = '';
-            addMessageToUI('system', widgetConfig.greeting);
-          }
+          // Don't show greeting here - autoStartConversation will trigger Retell's greeting
+          await autoStartConversation();
+          return;
         }
-        return;
       }
 
       const data = await response.json();
+
+      // Check if the response indicates chat has ended
+      if (data.chatEnded || data.error) {
+        console.log('[Embellics Widget] Chat ended, starting new session');
+        clearSessionState();
+        const messagesContainer = document.getElementById('embellics-widget-messages');
+        messagesContainer.innerHTML = '';
+        await autoStartConversation();
+        return;
+      }
+
+      // Chat history loaded successfully - display the history
+      console.log('[Embellics Widget] Chat history loaded, displaying messages...');
 
       // Clear message container
       const messagesContainer = document.getElementById('embellics-widget-messages');
@@ -347,16 +666,27 @@
       if (data.messages && data.messages.length > 0) {
         console.log('[Embellics Widget] Loaded', data.messages.length, 'messages from API');
 
-        data.messages.forEach((msg) => {
+        data.messages.forEach((msg, index) => {
           // Track message ID to prevent duplicates
           if (msg.id) {
             displayedMessageIds.add(msg.id);
           }
 
+          // Check if this is the last message
+          const isLastMessage = index === data.messages.length - 1;
+
           // Display message based on role
           if (msg.role === 'user') {
-            addMessageToUI('user', msg.content);
+            addMessageToUI('user', msg.content, null, true); // true = isHistorical
           } else if (msg.role === 'assistant' || msg.role === 'agent') {
+            // Skip special trigger messages like SHOW_CONTACT_FORM (they should trigger forms, not display)
+            if (msg.content.trim() === 'SHOW_CONTACT_FORM') {
+              // When loading from history, don't show the form again (already completed)
+              // Just display a message indicating the form was shown
+              addMessageToUI('system', 'Contact form was requested', null, true);
+              return; // Don't display the trigger text or show form
+            }
+
             // Try to parse JSON format for assistant messages from history
             let responseText = msg.content;
             let responseOptions = null;
@@ -371,7 +701,9 @@
               // Not JSON, use as plain text
             }
 
-            addMessageToUI('assistant', responseText, responseOptions);
+            // Only mark as historical if it's NOT the last message
+            // The last message should remain interactive so user can click options after refresh
+            addMessageToUI('assistant', responseText, responseOptions, !isLastMessage);
           }
         });
 
@@ -397,41 +729,53 @@
       const response = await fetch(`${WIDGET_API_BASE}/api/widget/init`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: API_KEY, referrer: window.location.hostname }),
+        body: JSON.stringify({ apiKey: API_KEY, referrer: window.location.host }),
       });
       if (!response.ok) throw new Error(`Failed to initialize: ${response.status}`);
       widgetConfig = await response.json();
       isInitialized = true;
 
-      // Widget styling is now fixed in CSS - no dynamic color customization
-      // Colors follow the application's design system
+      // Apply dynamic theming based on widget configuration
+      applyWidgetTheme();
+
+      // Apply dynamic positioning based on widget configuration
+      applyWidgetPosition();
+
+      // Apply widget title from greeting
+      applyWidgetTitle();
 
       // Restore existing session if available
       const hasRestoredSession = restoreSessionState();
 
       if (hasRestoredSession && chatId) {
-        // Load conversation history from API for restored session
+        // Try to load conversation history
+        // If chat ended, loadChatHistory will clear and auto-start new conversation
         await loadChatHistory();
       } else {
-        // New session - show greeting
-        if (widgetConfig.greeting) {
-          const title = document.getElementById('embellics-widget-title');
-          if (title) title.textContent = widgetConfig.greeting;
-          addMessage('system', widgetConfig.greeting);
-        }
+        // New session - auto-start (Retell will send the greeting)
+        await autoStartConversation();
       }
     } catch (error) {
       console.error('[Embellics Widget] Init failed:', error);
       showError('Failed to initialize chat widget');
     }
-  }
+  } // Add message to UI only (for displaying history)
+  function addMessageToUI(role, content, options = null, isHistorical = false) {
+    // Don't display empty messages (but allow them if options are provided)
+    if (!content && (!options || options.length === 0)) {
+      return;
+    }
 
-  // Add message to UI only (for displaying history)
-  function addMessageToUI(role, content, options = null) {
     const messagesContainer = document.getElementById('embellics-widget-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `embellics-message ${role}`;
     messageDiv.textContent = content;
+
+    // Hide message div if content is empty but options exist
+    if (!content && options && options.length > 0) {
+      messageDiv.style.display = 'none';
+    }
+
     messagesContainer.appendChild(messageDiv);
 
     // If options are provided, render interactive buttons
@@ -439,28 +783,46 @@
       const optionsContainer = document.createElement('div');
       optionsContainer.className = 'embellics-options-container';
 
-      options.forEach((option) => {
+      options.forEach((option, index) => {
         const button = document.createElement('button');
         button.className = 'embellics-option-button';
         button.textContent = option.label || option.text || option;
         button.dataset.value = option.value || option.id || option.label || option;
 
-        button.onclick = function () {
-          // Disable all option buttons after one is clicked
-          optionsContainer.querySelectorAll('.embellics-option-button').forEach((btn) => {
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-          });
+        // Add staggered animation delay for each button
+        button.style.animationDelay = `${index * 0.1}s`;
 
-          // Highlight the selected button
-          button.style.opacity = '1';
-          button.style.background = 'hsl(262, 75%, 65%)';
-          button.style.color = 'hsl(262, 75%, 98%)';
+        // Disable historical options (already selected in past sessions)
+        if (isHistorical) {
+          button.disabled = true;
+          button.style.opacity = '0.6';
+          button.style.cursor = 'not-allowed';
+        } else {
+          button.onclick = function () {
+            // Get theme colors from widget config
+            const primaryColor = widgetConfig?.primaryColor || '#9b7ddd';
+            const textColor = widgetConfig?.textColor || '#ffffff';
 
-          // Send the selected option as user message
-          const selectedValue = button.dataset.value;
-          handleOptionClick(selectedValue);
-        };
+            // Disable all option buttons after one is clicked
+            optionsContainer.querySelectorAll('.embellics-option-button').forEach((btn) => {
+              btn.disabled = true;
+              btn.style.opacity = '0.5';
+              // Reset non-selected buttons to default style
+              btn.style.background = '';
+              btn.style.color = '';
+            });
+
+            // Highlight the selected button with theme colors
+            button.style.opacity = '1';
+            button.style.background = `${primaryColor} !important`;
+            button.style.color = `${textColor} !important`;
+            button.style.borderColor = `${primaryColor} !important`;
+
+            // Send the selected option as user message
+            const selectedValue = button.dataset.value;
+            handleOptionClick(selectedValue);
+          };
+        }
 
         optionsContainer.appendChild(button);
       });
@@ -483,6 +845,13 @@
 
   // Handle option button click
   async function handleOptionClick(selectedValue) {
+    // Start or reset inactivity timer on option selection (first interaction starts it)
+    if (!inactivityTimer) {
+      startInactivityTimer();
+    } else {
+      resetInactivityTimer();
+    }
+
     // Show the selection as a user message
     addMessage('user', selectedValue);
 
@@ -501,6 +870,7 @@
           body: JSON.stringify({
             apiKey: API_KEY,
             message: selectedValue,
+            referrer: window.location.host,
           }),
         });
 
@@ -518,6 +888,7 @@
             apiKey: API_KEY,
             chatId: chatId,
             message: selectedValue,
+            referrer: window.location.host,
           }),
         });
 
@@ -565,6 +936,7 @@
                     apiKey: API_KEY,
                     chatId: chatId,
                     message: contactMessage,
+                    referrer: window.location.host,
                   }),
                 });
 
@@ -615,40 +987,46 @@
       const errorMsg = error.message || '';
       if (
         errorMsg.startsWith('CHAT_ENDED:') ||
+        errorMsg.includes('already ended') ||
         (errorMsg.includes('chat') &&
           (errorMsg.includes('ended') ||
             errorMsg.includes('session') ||
             errorMsg.includes('error')))
       ) {
-        // Chat has ended - clear session and allow fresh start
-        console.log('[Embellics Widget] Chat ended, starting fresh');
-        clearSessionState();
+        // Chat has ended - inform user and reload widget for fresh start
+        console.log('[Embellics Widget] Chat already ended, informing user and reloading...');
+
+        // Clear any error messages
+        const errorDiv = document.getElementById('embellics-widget-error');
+        if (errorDiv) {
+          errorDiv.classList.remove('show');
+          errorDiv.textContent = '';
+        }
 
         // Clear messages UI
         const messagesContainer = document.getElementById('embellics-widget-messages');
         messagesContainer.innerHTML = '';
 
-        // Show greeting for fresh start
-        if (widgetConfig && widgetConfig.greeting) {
-          addMessageToUI('system', widgetConfig.greeting);
-        }
+        // Show informative message
+        addMessageToUI(
+          'system',
+          'Your previous chat session has ended. Starting a new conversation...',
+        );
 
-        // Hide actions menu
-        const actionsBtn = document.getElementById('embellics-widget-actions-btn');
-        const menuHandoff = document.getElementById('embellics-menu-handoff');
-        const menuEndChat = document.getElementById('embellics-menu-end-chat');
+        // Clear session state
+        clearSessionState();
 
-        if (actionsBtn) actionsBtn.classList.remove('show');
-        if (menuHandoff) menuHandoff.disabled = true;
-        if (menuEndChat) {
-          menuEndChat.classList.add('hidden');
-          menuEndChat.disabled = false;
-        }
+        // Wait a moment for user to see the message, then reinitialize
+        setTimeout(async () => {
+          messagesContainer.innerHTML = '';
+          await initializeWidget();
+        }, 2000);
 
-        showError('Chat session ended. Starting fresh - please try again.');
-      } else {
-        showError('Failed to send your selection. Please try again.');
+        return;
       }
+
+      // For other errors, show error message
+      showError('Failed to send your selection. Please try again.');
     } finally {
       input.disabled = false;
       sendBtn.disabled = false;
@@ -675,7 +1053,7 @@
   }
 
   // Show contact details form
-  function showContactForm(callback) {
+  function showContactForm(callback, isHistorical = false) {
     const messagesContainer = document.getElementById('embellics-widget-messages');
 
     const formContainer = document.createElement('div');
@@ -684,21 +1062,26 @@
     formContainer.innerHTML = `
       <div class="embellics-contact-form-title">Please provide your contact details:</div>
       <div class="embellics-contact-form-row">
-        <input type="text" id="embellics-form-firstname" placeholder="First Name *" required autocomplete="given-name">
-        <input type="text" id="embellics-form-lastname" placeholder="Last Name *" required autocomplete="family-name">
+        <input type="text" id="embellics-form-firstname" placeholder="First Name *" required autocomplete="given-name" ${isHistorical ? 'disabled' : ''}>
+        <input type="text" id="embellics-form-lastname" placeholder="Last Name *" required autocomplete="family-name" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-row">
-        <input type="email" id="embellics-form-email" class="embellics-contact-form-full" placeholder="Email *" required autocomplete="email">
+        <input type="email" id="embellics-form-email" class="embellics-contact-form-full" placeholder="Email *" required autocomplete="email" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-row">
-        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-full" placeholder="Phone Number *" required autocomplete="tel">
+        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-full" placeholder="Phone Number *" required autocomplete="tel" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-error" id="embellics-form-error"></div>
-      <button type="button" id="embellics-form-submit">Submit Details</button>
+      <button type="button" id="embellics-form-submit" ${isHistorical ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>Submit Details</button>
     `;
 
     messagesContainer.appendChild(formContainer);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Don't focus or handle submission if historical
+    if (isHistorical) {
+      return;
+    }
 
     // Focus first input
     const firstNameInput = document.getElementById('embellics-form-firstname');
@@ -830,6 +1213,13 @@
 
     if (!message) return;
 
+    // Start or reset inactivity timer on message send (first interaction starts it)
+    if (!inactivityTimer) {
+      startInactivityTimer();
+    } else {
+      resetInactivityTimer();
+    }
+
     input.value = '';
     input.disabled = true;
     sendBtn.disabled = true;
@@ -845,6 +1235,7 @@
           body: JSON.stringify({
             apiKey: API_KEY,
             message: message,
+            referrer: window.location.host,
           }),
         });
 
@@ -871,7 +1262,10 @@
         const response = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            ...requestBody,
+            referrer: window.location.host,
+          }),
         });
 
         if (!response.ok) {
@@ -932,6 +1326,7 @@
                     apiKey: API_KEY,
                     chatId: chatId,
                     message: contactMessage,
+                    referrer: window.location.host,
                   }),
                 });
 
@@ -962,40 +1357,46 @@
       const errorMsg = error.message || '';
       if (
         errorMsg.startsWith('CHAT_ENDED:') ||
+        errorMsg.includes('already ended') ||
         (errorMsg.includes('chat') &&
           (errorMsg.includes('ended') ||
             errorMsg.includes('session') ||
             errorMsg.includes('error')))
       ) {
-        // Chat has ended - clear session and allow fresh start
-        console.log('[Embellics Widget] Chat ended, starting fresh');
-        clearSessionState();
+        // Chat has ended - inform user and reload widget for fresh start
+        console.log('[Embellics Widget] Chat already ended, informing user and reloading...');
+
+        // Clear any error messages
+        const errorDiv = document.getElementById('embellics-widget-error');
+        if (errorDiv) {
+          errorDiv.classList.remove('show');
+          errorDiv.textContent = '';
+        }
 
         // Clear messages UI
         const messagesContainer = document.getElementById('embellics-widget-messages');
         messagesContainer.innerHTML = '';
 
-        // Show greeting for fresh start
-        if (widgetConfig && widgetConfig.greeting) {
-          addMessageToUI('system', widgetConfig.greeting);
-        }
+        // Show informative message
+        addMessageToUI(
+          'system',
+          'Your previous chat session has ended. Starting a new conversation...',
+        );
 
-        // Hide actions menu
-        const actionsBtn = document.getElementById('embellics-widget-actions-btn');
-        const menuHandoff = document.getElementById('embellics-menu-handoff');
-        const menuEndChat = document.getElementById('embellics-menu-end-chat');
+        // Clear session state
+        clearSessionState();
 
-        if (actionsBtn) actionsBtn.classList.remove('show');
-        if (menuHandoff) menuHandoff.disabled = true;
-        if (menuEndChat) {
-          menuEndChat.classList.add('hidden');
-          menuEndChat.disabled = false;
-        }
+        // Wait a moment for user to see the message, then reinitialize
+        setTimeout(async () => {
+          messagesContainer.innerHTML = '';
+          await initializeWidget();
+        }, 2000);
 
-        showError('Chat session ended. Starting fresh - please send your message again.');
-      } else {
-        showError(error.message || 'Failed to send message. Please try again.');
+        return;
       }
+
+      // For other errors, show error message
+      showError(error.message || 'Failed to send message. Please try again.');
     } finally {
       input.disabled = false;
       sendBtn.disabled = false;
@@ -1025,6 +1426,7 @@
           chatId: chatId,
           conversationHistory: messages.slice(-10), // Last 10 messages for context
           lastUserMessage: messages.filter((m) => m.role === 'user').slice(-1)[0]?.content || '',
+          referrer: window.location.host,
         }),
       });
 
@@ -1095,6 +1497,7 @@
           lastUserMessage: messages.filter((m) => m.role === 'user').slice(-1)[0]?.content || '',
           userEmail: email,
           userMessage: message,
+          referrer: window.location.host,
         }),
       });
 
@@ -1148,35 +1551,12 @@
     }
   }
 
-  function showEndChatModal() {
-    const modal = document.getElementById('embellics-end-chat-modal');
-    if (modal) {
-      modal.classList.add('show');
-    }
-  }
-
-  function hideEndChatModal() {
-    const modal = document.getElementById('embellics-end-chat-modal');
-    if (modal) {
-      modal.classList.remove('show');
-    }
-  }
-
-  function endChat() {
+  async function endChat() {
     if (!chatId) {
       return; // Nothing to end
     }
 
-    // Show confirmation modal instead of native confirm
-    showEndChatModal();
-  }
-
-  async function confirmEndChat() {
     const menuEndChat = document.getElementById('embellics-menu-end-chat');
-
-    // Hide modal
-    hideEndChatModal();
-
     if (menuEndChat) menuEndChat.disabled = true;
 
     try {
@@ -1187,6 +1567,7 @@
           apiKey: API_KEY,
           chatId: chatId,
           handoffId: handoffId || undefined,
+          referrer: window.location.host,
         }),
       });
 
@@ -1198,6 +1579,9 @@
       // Stop polling
       stopMessagePolling();
       stopStatusChecking();
+
+      // Stop inactivity timer
+      stopInactivityTimer();
 
       // Clear session state
       clearSessionState();
@@ -1220,17 +1604,21 @@
       }
       if (menuHandoff) menuHandoff.disabled = true;
 
-      // Show greeting if configured
-      if (widgetConfig && widgetConfig.greeting) {
-        addMessageToUI('system', widgetConfig.greeting);
-      }
-
       console.log('[Embellics Widget] Chat ended successfully');
+
+      // Auto-start a new conversation
+      await autoStartConversation();
     } catch (error) {
       console.error('[Embellics Widget] End chat failed:', error);
       showError(error.message || 'Failed to end chat. Please try again.');
       if (menuEndChat) menuEndChat.disabled = false;
     }
+  }
+
+  async function confirmEndChat() {
+    // This function is no longer needed but keeping for backward compatibility
+    // Just call endChat directly
+    await endChat();
   }
 
   // Use sendBeacon for more reliable delivery when page is unloading
@@ -1240,6 +1628,7 @@
         apiKey: API_KEY,
         chatId: chatId,
         handoffId: handoffId,
+        referrer: window.location.host,
       });
 
       // Try sendBeacon first (more reliable), fallback to fetch
@@ -1271,7 +1660,7 @@
 
       try {
         const response = await fetch(
-          `${WIDGET_API_BASE}/api/widget/handoff/${handoffId}/status?apiKey=${API_KEY}`,
+          `${WIDGET_API_BASE}/api/widget/handoff/${handoffId}/status?apiKey=${API_KEY}&referrer=${encodeURIComponent(window.location.host)}`,
         );
 
         if (!response.ok) return;
@@ -1322,6 +1711,7 @@
       try {
         const url = new URL(`${WIDGET_API_BASE}/api/widget/handoff/${handoffId}/messages`);
         url.searchParams.append('apiKey', API_KEY);
+        url.searchParams.append('referrer', window.location.host);
         if (lastMessageTimestamp) {
           url.searchParams.append('since', lastMessageTimestamp);
         }
@@ -1370,8 +1760,11 @@
     if (isOpen) {
       panel.classList.add('open');
       document.getElementById('embellics-widget-input').focus();
+      // Don't start timer on open - wait for first user interaction
     } else {
       panel.classList.remove('open');
+      // Stop inactivity timer when widget closes
+      stopInactivityTimer();
     }
   }
 
@@ -1392,9 +1785,6 @@
     const actionsMenu = document.getElementById('embellics-widget-actions-menu');
     const menuHandoffButton = document.getElementById('embellics-menu-handoff');
     const menuEndChatButton = document.getElementById('embellics-menu-end-chat');
-    const modalCancelButton = document.getElementById('embellics-modal-cancel');
-    const modalConfirmButton = document.getElementById('embellics-modal-confirm');
-    const modal = document.getElementById('embellics-end-chat-modal');
 
     if (button) button.addEventListener('click', toggleWidget);
     if (closeButton) closeButton.addEventListener('click', toggleWidget);
@@ -1415,18 +1805,6 @@
       });
     }
 
-    if (modalCancelButton) modalCancelButton.addEventListener('click', hideEndChatModal);
-    if (modalConfirmButton) modalConfirmButton.addEventListener('click', confirmEndChat);
-
-    // Close modal when clicking outside
-    if (modal) {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          hideEndChatModal();
-        }
-      });
-    }
-
     // Close actions menu when clicking outside
     document.addEventListener('click', (e) => {
       if (actionsMenu && actionsMenu.classList.contains('show')) {
@@ -1440,6 +1818,20 @@
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
+        }
+      });
+
+      // Reset inactivity timer on typing (only if timer already started)
+      input.addEventListener('input', () => {
+        if (inactivityTimer) {
+          resetInactivityTimer();
+        }
+      });
+
+      // Reset inactivity timer on focus (only if timer already started)
+      input.addEventListener('focus', () => {
+        if (inactivityTimer) {
+          resetInactivityTimer();
         }
       });
     }

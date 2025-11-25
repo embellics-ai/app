@@ -30,12 +30,23 @@ import type { WidgetConfig } from '@shared/schema';
 import { useEffect } from 'react';
 
 const widgetConfigSchema = z.object({
-  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color (e.g., #3B82F6)'),
-  position: z.enum(['bottom-right', 'bottom-left']),
-  greeting: z.string().min(1, 'Greeting is required').max(200),
-  placeholder: z.string().min(1, 'Placeholder is required').max(100),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color (e.g., #9b7ddd)'),
+  textColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color (e.g., #ffffff)'),
+  borderRadius: z.string().regex(/^\d+(px|rem|em)$/, 'Must be a valid CSS size (e.g., 12px)'),
+  position: z
+    .enum([
+      'top-left',
+      'top-center',
+      'top-right',
+      'middle-left',
+      'middle-right',
+      'bottom-left',
+      'bottom-center',
+      'bottom-right',
+    ])
+    .default('bottom-right'),
+  greeting: z.string().max(200).optional(),
   allowedDomains: z.string().optional(),
-  customCss: z.string().optional(),
 });
 
 type WidgetConfigFormData = z.infer<typeof widgetConfigSchema>;
@@ -78,12 +89,11 @@ export default function WidgetConfigPage() {
   const form = useForm<WidgetConfigFormData>({
     resolver: zodResolver(widgetConfigSchema),
     defaultValues: {
-      primaryColor: '#3B82F6',
-      position: 'bottom-right',
+      primaryColor: '#9b7ddd',
+      textColor: '#ffffff',
+      borderRadius: '12px',
       greeting: 'Hi! How can I help you today?',
-      placeholder: 'Type your message...',
       allowedDomains: '',
-      customCss: '',
     },
   });
 
@@ -91,14 +101,20 @@ export default function WidgetConfigPage() {
   useEffect(() => {
     if (config) {
       form.reset({
-        // Note: primaryColor, position, placeholder, customCss removed from schema
-        // Widget styling is now fixed in CSS following application design system
-        primaryColor: '#3b82f6', // Default value (not stored in DB)
-        position: 'bottom-right', // Default value (not stored in DB)
+        primaryColor: config.primaryColor || '#9b7ddd',
+        textColor: config.textColor || '#ffffff',
+        borderRadius: config.borderRadius || '12px',
+        position: (config.position || 'bottom-right') as
+          | 'top-left'
+          | 'top-center'
+          | 'top-right'
+          | 'middle-left'
+          | 'middle-right'
+          | 'bottom-left'
+          | 'bottom-center'
+          | 'bottom-right',
         greeting: config.greeting || 'Hi! How can I help you today?',
-        placeholder: 'Type your message...', // Default value (not stored in DB)
         allowedDomains: config.allowedDomains?.join(', ') || '',
-        customCss: '', // Default value (not stored in DB)
       });
     }
   }, [config]);
@@ -193,7 +209,51 @@ export default function WidgetConfigPage() {
                         </span>
                       </div>
                     </FormControl>
-                    <FormDescription>Click the color box to pick your brand color</FormDescription>
+                    <FormDescription>
+                      Main theme color for buttons, header, and accents
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="textColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Text Color</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          {...field}
+                          type="color"
+                          className="w-24 h-12 cursor-pointer"
+                          data-testid="input-text-color"
+                        />
+                        <span className="text-sm text-muted-foreground font-mono" key={field.value}>
+                          {field.value}
+                        </span>
+                      </div>
+                    </FormControl>
+                    <FormDescription>Text color on primary colored backgrounds</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="borderRadius"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Border Radius</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="12px" data-testid="input-border-radius" />
+                    </FormControl>
+                    <FormDescription>
+                      Corner roundness for widget elements (e.g., 12px, 1rem)
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -204,19 +264,25 @@ export default function WidgetConfigPage() {
                 name="position"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Position</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Widget Position</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || 'bottom-right'}>
                       <FormControl>
                         <SelectTrigger data-testid="select-position">
                           <SelectValue placeholder="Select position" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                        <SelectItem value="top-left">Top Left</SelectItem>
+                        <SelectItem value="top-center">Top Center</SelectItem>
+                        <SelectItem value="top-right">Top Right</SelectItem>
+                        <SelectItem value="middle-left">Middle Left</SelectItem>
+                        <SelectItem value="middle-right">Middle Right</SelectItem>
                         <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                        <SelectItem value="bottom-center">Bottom Center</SelectItem>
+                        <SelectItem value="bottom-right">Bottom Right (Default)</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription>Where the widget appears on your website</FormDescription>
+                    <FormDescription>Where the chat widget appears on your website</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -239,7 +305,7 @@ export default function WidgetConfigPage() {
                 name="greeting"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Greeting Message</FormLabel>
+                    <FormLabel>Greeting Message (Optional)</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -248,27 +314,8 @@ export default function WidgetConfigPage() {
                       />
                     </FormControl>
                     <FormDescription>
-                      The first message users see when opening the chat
+                      Used as the widget title. Leave empty to show "Let's Chat"
                     </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="placeholder"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Input Placeholder</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Type your message..."
-                        data-testid="input-placeholder"
-                      />
-                    </FormControl>
-                    <FormDescription>Placeholder text in the message input field</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -281,9 +328,9 @@ export default function WidgetConfigPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Security & Advanced
+                Security
               </CardTitle>
-              <CardDescription>Configure security settings and custom styles</CardDescription>
+              <CardDescription>Configure domain restrictions for your widget</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField
@@ -295,36 +342,14 @@ export default function WidgetConfigPage() {
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="example.com, app.example.com"
+                        placeholder="example.com, *.yourdomain.com"
                         data-testid="input-allowed-domains"
                       />
                     </FormControl>
                     <FormDescription>
-                      Comma-separated list of domains where the widget can be embedded (leave empty
-                      to allow all)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="customCss"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Custom CSS</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder=".chat-widget { border-radius: 12px; }"
-                        className="font-mono text-sm"
-                        rows={4}
-                        data-testid="input-custom-css"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Optional CSS to customize the widget appearance
+                      Comma-separated list of domains (with ports) where the widget can be embedded.
+                      Examples: localhost:3000, app.example.com, *.example.com (wildcard). Leave
+                      empty to allow all domains.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
