@@ -2123,9 +2123,17 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Get tenant's widget config to find their Retell API key
         const widgetConfig = await storage.getWidgetConfig(tenantId);
 
+        console.log(`[Analytics] Tenant: ${tenantId}`);
+        console.log(`[Analytics] Widget config exists: ${!!widgetConfig}`);
+        console.log(`[Analytics] Retell API key exists: ${!!widgetConfig?.retellApiKey}`);
+        if (widgetConfig?.retellApiKey) {
+          console.log(`[Analytics] API key prefix: ${widgetConfig.retellApiKey.substring(0, 8)}...`);
+        }
+
         // If no widget config or no API key configured, return empty analytics
         if (!widgetConfig?.retellApiKey) {
-          console.log(`[Analytics] No Retell API key configured for tenant: ${tenantId}`);
+          console.log(`[Analytics] ⚠️ No Retell API key configured for tenant: ${tenantId}`);
+          console.log(`[Analytics] ⚠️ Returning empty analytics. Please configure Retell API key in Widget Config.`);
           return res.json({
             totalCalls: 0,
             completedCalls: 0,
