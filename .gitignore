@@ -10,6 +10,9 @@ build/
 *.log
 coverage/
 
+# Widget test files (local testing only)
+docs/widget-simple-test.html
+
 # Ignore Terraform secrets and state files
 *.tfvars
 *.tfstate

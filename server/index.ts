@@ -78,11 +78,6 @@ app.use((req, res, next) => {
 
   app.get('/widget-simple-test.html', testHtmlLimiter, async (req, res) => {
     try {
-      // Only serve test page in development
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(404).send('Test page not available in production');
-      }
-
       const filePath = path.resolve(process.cwd(), 'docs', 'widget-simple-test.html');
 
       if (!fs.existsSync(filePath)) {
