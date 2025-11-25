@@ -2116,6 +2116,10 @@ export async function registerRoutes(app: Express): Promise<void> {
     requireClientAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
+        console.log(`[Analytics] Request from user: ${req.user?.email}`);
+        console.log(`[Analytics] User tenant: ${req.user?.tenantId}`);
+        console.log(`[Analytics] User role: ${req.user?.role}, isPlatformAdmin: ${req.user?.isPlatformAdmin}`);
+        
         // Validate tenant ID exists in token
         const tenantId = assertTenant(req, res);
         if (!tenantId) return;
