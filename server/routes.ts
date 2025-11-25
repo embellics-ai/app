@@ -3951,7 +3951,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (!apiKeyRecord) {
         console.log(`[Widget Init] ❌ No matching API key found in database`);
         console.log(
-          `[Widget Init] Available key prefixes: ${allApiKeys.map((k) => k.keyPrefix).join(', ')}`,
+          `[Widget Init] Number of available API keys: ${allApiKeys.length}`,
         );
         return res.status(401).json({ error: 'Invalid API key' });
       }
