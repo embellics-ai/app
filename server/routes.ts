@@ -3937,6 +3937,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       const allApiKeys = await storage.getAllApiKeys();
       let apiKeyRecord = null;
 
+      console.log(`[Widget Init] Validating API key. Total keys in database: ${allApiKeys.length}`);
+      console.log(`[Widget Init] API key prefix: ${apiKey.substring(0, 12)}...`);
+
       for (const key of allApiKeys) {
         const isMatch = await verifyPassword(apiKey, key.keyHash);
         if (isMatch) {
@@ -3946,8 +3949,12 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       if (!apiKeyRecord) {
+        console.log(`[Widget Init] ❌ No matching API key found in database`);
+        console.log(`[Widget Init] Available key prefixes: ${allApiKeys.map(k => k.keyPrefix).join(', ')}`);
         return res.status(401).json({ error: 'Invalid API key' });
       }
+
+      console.log(`[Widget Init] ✓ Valid API key for tenant: ${apiKeyRecord.tenantId}`);
 
       // Update last used timestamp
       await storage.updateApiKeyLastUsed(apiKeyRecord.id);
