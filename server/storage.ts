@@ -432,8 +432,12 @@ export class MemStorage implements IStorage {
       tenantId: encryptedConfig.tenantId,
       retellAgentId: encryptedConfig.retellAgentId ?? null,
       retellApiKey: encryptedConfig.retellApiKey ?? null,
-      greeting: encryptedConfig.greeting ?? null,
+      greeting: encryptedConfig.greeting ?? 'Hi! How can I help you today?',
       allowedDomains: encryptedConfig.allowedDomains ?? null,
+      position: encryptedConfig.position ?? 'bottom-right',
+      primaryColor: encryptedConfig.primaryColor ?? '#9b7ddd',
+      textColor: encryptedConfig.textColor ?? '#ffffff',
+      borderRadius: encryptedConfig.borderRadius ?? '12px',
       updatedAt: new Date(),
     };
     this.widgetConfigs.set(id, config);
