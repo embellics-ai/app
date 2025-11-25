@@ -929,9 +929,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.log(
           `[Update Retell API Key] Platform admin updating API key for tenant: ${tenantId}`,
         );
-        console.log(
-          `[Update Retell API Key] Received - API Key: ${retellApiKey.substring(0, 12)}..., Agent ID: ${retellAgentId || 'not provided'}`,
-        );
 
         // Check if tenant exists
         const tenant = await storage.getTenant(tenantId);
@@ -2116,10 +2113,6 @@ export async function registerRoutes(app: Express): Promise<void> {
     requireClientAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
-        console.log(`[Analytics] Request from user: ${req.user?.email}`);
-        console.log(`[Analytics] User tenant: ${req.user?.tenantId}`);
-        console.log(`[Analytics] User role: ${req.user?.role}, isPlatformAdmin: ${req.user?.isPlatformAdmin}`);
-        
         // Validate tenant ID exists in token
         const tenantId = assertTenant(req, res);
         if (!tenantId) return;
@@ -2127,17 +2120,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Get tenant's widget config to find their Retell API key
         const widgetConfig = await storage.getWidgetConfig(tenantId);
 
-        console.log(`[Analytics] Tenant: ${tenantId}`);
-        console.log(`[Analytics] Widget config exists: ${!!widgetConfig}`);
-        console.log(`[Analytics] Retell API key exists: ${!!widgetConfig?.retellApiKey}`);
-        if (widgetConfig?.retellApiKey) {
-          console.log(`[Analytics] API key prefix: ${widgetConfig.retellApiKey.substring(0, 8)}...`);
-        }
-
         // If no widget config or no API key configured, return empty analytics
         if (!widgetConfig?.retellApiKey) {
-          console.log(`[Analytics] ⚠️ No Retell API key configured for tenant: ${tenantId}`);
-          console.log(`[Analytics] ⚠️ Returning empty analytics. Please configure Retell API key in Widget Config.`);
+          console.log(`[Analytics] No Retell API key configured for tenant: ${tenantId}`);
           return res.json({
             totalCalls: 0,
             completedCalls: 0,
@@ -3949,9 +3934,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       const allApiKeys = await storage.getAllApiKeys();
       let apiKeyRecord = null;
 
-      console.log(`[Widget Init] Validating API key. Total keys in database: ${allApiKeys.length}`);
-      console.log(`[Widget Init] API key prefix: ${apiKey.substring(0, 12)}...`);
-
       for (const key of allApiKeys) {
         const isMatch = await verifyPassword(apiKey, key.keyHash);
         if (isMatch) {
@@ -3961,12 +3943,8 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       if (!apiKeyRecord) {
-        console.log(`[Widget Init] ❌ No matching API key found in database`);
-        console.log(`[Widget Init] Number of available API keys: ${allApiKeys.length}`);
         return res.status(401).json({ error: 'Invalid API key' });
       }
-
-      console.log(`[Widget Init] ✓ Valid API key for tenant: ${apiKeyRecord.tenantId}`);
 
       // Update last used timestamp
       await storage.updateApiKeyLastUsed(apiKeyRecord.id);
