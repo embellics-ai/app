@@ -334,730 +334,737 @@ export default function PlatformAdminPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Platform Administration</h1>
-        <p className="text-muted-foreground">
-          Manage users, invitations, and platform-wide settings
-        </p>
-      </div>
+    <div className="h-full bg-background">
+      <div className="container max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Platform Administration</h1>
+          <p className="text-muted-foreground">
+            Manage users, invitations, and platform-wide settings
+          </p>
+        </div>
 
-      <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users" data-testid="tab-users">
-            <Users className="w-4 h-4 mr-2" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="tenants" data-testid="tab-tenants">
-            <Building2 className="w-4 h-4 mr-2" />
-            Tenants
-          </TabsTrigger>
-          <TabsTrigger value="invitations" data-testid="tab-invitations">
-            <Mail className="w-4 h-4 mr-2" />
-            Invitations
-          </TabsTrigger>
-          <TabsTrigger value="invite" data-testid="tab-invite">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Invite User
-          </TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="users" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="users" data-testid="tab-users">
+              <Users className="w-4 h-4 mr-2" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="tenants" data-testid="tab-tenants">
+              <Building2 className="w-4 h-4 mr-2" />
+              Tenants
+            </TabsTrigger>
+            <TabsTrigger value="invitations" data-testid="tab-invitations">
+              <Mail className="w-4 h-4 mr-2" />
+              Invitations
+            </TabsTrigger>
+            <TabsTrigger value="invite" data-testid="tab-invite">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Invite User
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Users</CardTitle>
-              <CardDescription>View and manage all users across all tenants</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {usersLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : users.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No users found</div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Tenant</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user: any) => (
-                        <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                          <TableCell
-                            className="font-medium"
-                            data-testid={`text-user-name-${user.id}`}
-                          >
-                            {user.firstName} {user.lastName}
-                          </TableCell>
-                          <TableCell data-testid={`text-user-email-${user.id}`}>
-                            {user.email}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={getRoleBadgeVariant(user.role)}
-                              data-testid={`badge-user-role-${user.id}`}
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Users</CardTitle>
+                <CardDescription>View and manage all users across all tenants</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {usersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No users found</div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Tenant</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user: any) => (
+                          <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                            <TableCell
+                              className="font-medium"
+                              data-testid={`text-user-name-${user.id}`}
                             >
-                              {user.role.replace('_', ' ')}
-                            </Badge>
-                          </TableCell>
-                          <TableCell
-                            className="text-muted-foreground"
-                            data-testid={`text-user-tenant-${user.id}`}
-                          >
-                            {user.tenantId ? user.tenantId.slice(0, 8) : 'Platform'}
-                          </TableCell>
-                          <TableCell>
-                            {user.isPlatformAdmin && (
+                              {user.firstName} {user.lastName}
+                            </TableCell>
+                            <TableCell data-testid={`text-user-email-${user.id}`}>
+                              {user.email}
+                            </TableCell>
+                            <TableCell>
                               <Badge
-                                variant="default"
-                                data-testid={`badge-platform-admin-${user.id}`}
+                                variant={getRoleBadgeVariant(user.role)}
+                                data-testid={`badge-user-role-${user.id}`}
                               >
-                                Platform Admin
+                                {user.role.replace('_', ' ')}
                               </Badge>
+                            </TableCell>
+                            <TableCell
+                              className="text-muted-foreground"
+                              data-testid={`text-user-tenant-${user.id}`}
+                            >
+                              {user.tenantId ? user.tenantId.slice(0, 8) : 'Platform'}
+                            </TableCell>
+                            <TableCell>
+                              {user.isPlatformAdmin && (
+                                <Badge
+                                  variant="default"
+                                  data-testid={`badge-platform-admin-${user.id}`}
+                                >
+                                  Platform Admin
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {!user.isPlatformAdmin && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      data-testid={`button-delete-user-${user.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete {user.firstName}{' '}
+                                        {user.lastName}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel
+                                        data-testid={`button-cancel-delete-${user.id}`}
+                                      >
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteUserMutation.mutate(user.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        data-testid={`button-confirm-delete-${user.id}`}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tenants" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Client Tenants</CardTitle>
+                <CardDescription>
+                  Manage client tenants and assign Retell AI API keys
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {tenantsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : tenants.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No tenants found</div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Company Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Retell API Key</TableHead>
+                          <TableHead>Agent ID</TableHead>
+                          <TableHead className="w-[120px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tenants.map((tenant: any) => (
+                          <TableRow key={tenant.id} data-testid={`row-tenant-${tenant.id}`}>
+                            <TableCell
+                              className="font-medium"
+                              data-testid={`text-tenant-name-${tenant.id}`}
+                            >
+                              {tenant.name}
+                            </TableCell>
+                            <TableCell data-testid={`text-tenant-email-${tenant.id}`}>
+                              {tenant.email}
+                            </TableCell>
+                            <TableCell
+                              className="text-muted-foreground"
+                              data-testid={`text-tenant-phone-${tenant.id}`}
+                            >
+                              {tenant.phone || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {tenant.hasRetellApiKey ? (
+                                <Badge
+                                  variant="default"
+                                  data-testid={`badge-api-key-configured-${tenant.id}`}
+                                >
+                                  <Key className="w-3 h-3 mr-1" />
+                                  Configured
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="secondary"
+                                  data-testid={`badge-api-key-not-configured-${tenant.id}`}
+                                >
+                                  Not Set
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {tenant.hasRetellAgentId ? (
+                                <Badge
+                                  variant="default"
+                                  data-testid={`badge-agent-id-configured-${tenant.id}`}
+                                >
+                                  <Key className="w-3 h-3 mr-1" />
+                                  Configured
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="secondary"
+                                  data-testid={`badge-agent-id-not-configured-${tenant.id}`}
+                                >
+                                  Not Set
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setEditApiKeyDialog({ open: true, tenant });
+                                    // Clear inputs - users should only enter new values
+                                    setApiKeyInput('');
+                                    setSelectedAgentId('');
+                                  }}
+                                  data-testid={`button-edit-api-key-${tenant.id}`}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      data-testid={`button-delete-tenant-${tenant.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Tenant?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete <strong>{tenant.name}</strong>{' '}
+                                        and all associated data including:
+                                        <ul className="list-disc list-inside mt-2 space-y-1">
+                                          <li>All users in this tenant</li>
+                                          <li>Widget configuration</li>
+                                          <li>API keys</li>
+                                          <li>Chat history and analytics</li>
+                                        </ul>
+                                        <p className="mt-2 font-semibold text-destructive">
+                                          This action cannot be undone!
+                                        </p>
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteTenantMutation.mutate(tenant.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete Tenant
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="invitations" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Invitations</CardTitle>
+                <CardDescription>Active user invitations waiting to be accepted</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {invitationsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : invitations.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No pending invitations
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Sent</TableHead>
+                          {isOwner && <TableHead>Temp Password</TableHead>}
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invitations.map((invitation: any) => (
+                          <TableRow
+                            key={invitation.id}
+                            data-testid={`row-invitation-${invitation.id}`}
+                          >
+                            <TableCell
+                              className="font-medium"
+                              data-testid={`text-invitation-name-${invitation.id}`}
+                            >
+                              {invitation.firstName} {invitation.lastName}
+                            </TableCell>
+                            <TableCell data-testid={`text-invitation-email-${invitation.id}`}>
+                              {invitation.email}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={getRoleBadgeVariant(invitation.role)}
+                                data-testid={`badge-invitation-role-${invitation.id}`}
+                              >
+                                {invitation.role.replace('_', ' ')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell
+                              className="text-muted-foreground text-sm"
+                              data-testid={`text-invitation-company-${invitation.id}`}
+                            >
+                              {invitation.companyName || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={invitation.status === 'sent' ? 'default' : 'secondary'}
+                                data-testid={`badge-invitation-status-${invitation.id}`}
+                              >
+                                {invitation.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell
+                              className="text-muted-foreground text-sm"
+                              data-testid={`text-invitation-sent-${invitation.id}`}
+                            >
+                              {invitation.lastSentAt
+                                ? new Date(invitation.lastSentAt).toLocaleDateString()
+                                : '-'}
+                            </TableCell>
+                            {isOwner && (
+                              <TableCell>
+                                {/* For security we no longer return plaintext temporary passwords from the API.
+                                  Show a short explanatory message instead and suggest using the
+                                  "Resend invite" action or checking email logs (MailDev) to retrieve
+                                  the temporary password if needed. */}
+                                <span
+                                  className="text-muted-foreground text-sm"
+                                  data-testid={`text-temp-password-info-${invitation.id}`}
+                                >
+                                  {invitation.status === 'sent' ? 'Sent via email' : '-'}
+                                </span>
+                              </TableCell>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            {!user.isPlatformAdmin && (
+                            <TableCell>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
                                     variant="ghost"
-                                    size="icon"
-                                    data-testid={`button-delete-user-${user.id}`}
+                                    size="sm"
+                                    data-testid={`button-delete-invitation-${invitation.id}`}
                                   >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                    <AlertDialogTitle>Delete Invitation</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Are you sure you want to delete {user.firstName}{' '}
-                                      {user.lastName}? This action cannot be undone.
+                                      Are you sure you want to delete the invitation for{' '}
+                                      {invitation.email}? This action cannot be undone.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel
-                                      data-testid={`button-cancel-delete-${user.id}`}
+                                      data-testid={`button-cancel-delete-${invitation.id}`}
                                     >
                                       Cancel
                                     </AlertDialogCancel>
                                     <AlertDialogAction
-                                      onClick={() => deleteUserMutation.mutate(user.id)}
+                                      onClick={() => deleteInvitationMutation.mutate(invitation.id)}
                                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      data-testid={`button-confirm-delete-${user.id}`}
+                                      data-testid={`button-confirm-delete-invitation-${invitation.id}`}
                                     >
                                       Delete
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tenants" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Client Tenants</CardTitle>
-              <CardDescription>Manage client tenants and assign Retell AI API keys</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tenantsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : tenants.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No tenants found</div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Company Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Retell API Key</TableHead>
-                        <TableHead>Agent ID</TableHead>
-                        <TableHead className="w-[120px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tenants.map((tenant: any) => (
-                        <TableRow key={tenant.id} data-testid={`row-tenant-${tenant.id}`}>
-                          <TableCell
-                            className="font-medium"
-                            data-testid={`text-tenant-name-${tenant.id}`}
-                          >
-                            {tenant.name}
-                          </TableCell>
-                          <TableCell data-testid={`text-tenant-email-${tenant.id}`}>
-                            {tenant.email}
-                          </TableCell>
-                          <TableCell
-                            className="text-muted-foreground"
-                            data-testid={`text-tenant-phone-${tenant.id}`}
-                          >
-                            {tenant.phone || '-'}
-                          </TableCell>
-                          <TableCell>
-                            {tenant.hasRetellApiKey ? (
-                              <Badge
-                                variant="default"
-                                data-testid={`badge-api-key-configured-${tenant.id}`}
-                              >
-                                <Key className="w-3 h-3 mr-1" />
-                                Configured
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="secondary"
-                                data-testid={`badge-api-key-not-configured-${tenant.id}`}
-                              >
-                                Not Set
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {tenant.hasRetellAgentId ? (
-                              <Badge
-                                variant="default"
-                                data-testid={`badge-agent-id-configured-${tenant.id}`}
-                              >
-                                <Key className="w-3 h-3 mr-1" />
-                                Configured
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="secondary"
-                                data-testid={`badge-agent-id-not-configured-${tenant.id}`}
-                              >
-                                Not Set
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setEditApiKeyDialog({ open: true, tenant });
-                                  // Clear inputs - users should only enter new values
-                                  setApiKeyInput('');
-                                  setSelectedAgentId('');
-                                }}
-                                data-testid={`button-edit-api-key-${tenant.id}`}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    data-testid={`button-delete-tenant-${tenant.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Tenant?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will permanently delete <strong>{tenant.name}</strong>{' '}
-                                      and all associated data including:
-                                      <ul className="list-disc list-inside mt-2 space-y-1">
-                                        <li>All users in this tenant</li>
-                                        <li>Widget configuration</li>
-                                        <li>API keys</li>
-                                        <li>Chat history and analytics</li>
-                                      </ul>
-                                      <p className="mt-2 font-semibold text-destructive">
-                                        This action cannot be undone!
-                                      </p>
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => deleteTenantMutation.mutate(tenant.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Delete Tenant
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="invitations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Invitations</CardTitle>
-              <CardDescription>Active user invitations waiting to be accepted</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {invitationsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : invitations.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No pending invitations</div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Sent</TableHead>
-                        {isOwner && <TableHead>Temp Password</TableHead>}
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {invitations.map((invitation: any) => (
-                        <TableRow
-                          key={invitation.id}
-                          data-testid={`row-invitation-${invitation.id}`}
-                        >
-                          <TableCell
-                            className="font-medium"
-                            data-testid={`text-invitation-name-${invitation.id}`}
-                          >
-                            {invitation.firstName} {invitation.lastName}
-                          </TableCell>
-                          <TableCell data-testid={`text-invitation-email-${invitation.id}`}>
-                            {invitation.email}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={getRoleBadgeVariant(invitation.role)}
-                              data-testid={`badge-invitation-role-${invitation.id}`}
-                            >
-                              {invitation.role.replace('_', ' ')}
-                            </Badge>
-                          </TableCell>
-                          <TableCell
-                            className="text-muted-foreground text-sm"
-                            data-testid={`text-invitation-company-${invitation.id}`}
-                          >
-                            {invitation.companyName || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={invitation.status === 'sent' ? 'default' : 'secondary'}
-                              data-testid={`badge-invitation-status-${invitation.id}`}
-                            >
-                              {invitation.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell
-                            className="text-muted-foreground text-sm"
-                            data-testid={`text-invitation-sent-${invitation.id}`}
-                          >
-                            {invitation.lastSentAt
-                              ? new Date(invitation.lastSentAt).toLocaleDateString()
-                              : '-'}
-                          </TableCell>
-                          {isOwner && (
-                            <TableCell>
-                              {/* For security we no longer return plaintext temporary passwords from the API.
-                                  Show a short explanatory message instead and suggest using the
-                                  "Resend invite" action or checking email logs (MailDev) to retrieve
-                                  the temporary password if needed. */}
-                              <span
-                                className="text-muted-foreground text-sm"
-                                data-testid={`text-temp-password-info-${invitation.id}`}
-                              >
-                                {invitation.status === 'sent' ? 'Sent via email' : '-'}
-                              </span>
                             </TableCell>
-                          )}
-                          <TableCell>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  data-testid={`button-delete-invitation-${invitation.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Invitation</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete the invitation for{' '}
-                                    {invitation.email}? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel
-                                    data-testid={`button-cancel-delete-${invitation.id}`}
-                                  >
-                                    Cancel
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => deleteInvitationMutation.mutate(invitation.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    data-testid={`button-confirm-delete-invitation-${invitation.id}`}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="invite" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invite New User</CardTitle>
-              <CardDescription>Send an invitation to join the platform</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Email <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="user@example.com"
-                            {...field}
-                            data-testid="input-email"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John" {...field} data-testid="input-firstName" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Doe" {...field} data-testid="input-lastName" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                  <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+          <TabsContent value="invite" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite New User</CardTitle>
+                <CardDescription>Send an invitation to join the platform</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Email <span className="text-destructive">*</span>
+                          </FormLabel>
                           <FormControl>
-                            <SelectTrigger data-testid="select-role">
-                              <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
+                            <Input
+                              type="email"
+                              placeholder="user@example.com"
+                              {...field}
+                              data-testid="input-email"
+                            />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin (Platform Admin)</SelectItem>
-                            <SelectItem value="client_admin">Client Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  {selectedRole === 'client_admin' && (
-                    <>
-                      <div className="border-t pt-4 mt-4">
-                        <h3 className="text-sm font-medium mb-3">Client Onboarding Details</h3>
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="companyName"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>
-                                    Company Name <span className="text-destructive">*</span>
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Acme Corporation"
-                                      {...field}
-                                      data-testid="input-companyName"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John" {...field} data-testid="input-firstName" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                            <FormField
-                              control={form.control}
-                              name="companyPhone"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Company Phone (Optional)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="tel"
-                                      placeholder="+1 (555) 123-4567"
-                                      {...field}
-                                      data-testid="input-companyPhone"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Doe" {...field} data-testid="input-lastName" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Role</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-role">
+                                <SelectValue placeholder="Select a role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin (Platform Admin)</SelectItem>
+                              <SelectItem value="client_admin">Client Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {selectedRole === 'client_admin' && (
+                      <>
+                        <div className="border-t pt-4 mt-4">
+                          <h3 className="text-sm font-medium mb-3">Client Onboarding Details</h3>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="companyName"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      Company Name <span className="text-destructive">*</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="Acme Corporation"
+                                        {...field}
+                                        data-testid="input-companyName"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="companyPhone"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Company Phone (Optional)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="tel"
+                                        placeholder="+1 (555) 123-4567"
+                                        {...field}
+                                        data-testid="input-companyPhone"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </>
-                  )}
-
-                  <Button
-                    type="submit"
-                    disabled={inviteUserMutation.isPending}
-                    data-testid="button-invite"
-                    className="w-full"
-                  >
-                    {inviteUserMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending Invitation...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Send Invitation
                       </>
                     )}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
 
-      {/* Edit Retell API Key Dialog */}
-      <Dialog
-        open={editApiKeyDialog.open}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditApiKeyDialog({ open: false, tenant: null });
-            setApiKeyInput('');
-            setSelectedAgentId('');
-          }
-        }}
-      >
-        <DialogContent data-testid="dialog-edit-api-key">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5" />
-              Assign Retell AI Configuration
-            </DialogTitle>
-            <DialogDescription>
-              Set or update the Retell AI API key and chat agent for {editApiKeyDialog.tenant?.name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="retell-api-key">Retell AI API Key</Label>
-              {editApiKeyDialog.tenant?.hasRetellApiKey && (
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
-                  <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span className="font-mono text-sm font-medium text-purple-900 dark:text-purple-100">
-                    {editApiKeyDialog.tenant.maskedRetellApiKey || 'Configured (hidden)'}
-                  </span>
-                  <Badge
-                    variant="secondary"
-                    className="ml-auto bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-                  >
-                    Current
-                  </Badge>
-                </div>
-              )}
-              <Input
-                id="retell-api-key"
-                type="text"
-                placeholder={
-                  editApiKeyDialog.tenant?.hasRetellApiKey
-                    ? 'Enter new key to update'
-                    : 'Enter Retell AI API key'
-                }
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                data-testid="input-retell-api-key"
-                className="font-mono"
-              />
-              <p className="text-xs text-muted-foreground">
-                {editApiKeyDialog.tenant?.hasRetellApiKey
-                  ? 'Enter a new key to update, or leave empty to keep existing.'
-                  : 'This key will be encrypted and stored securely. It will be used for analytics and chat functionality.'}
-              </p>
-            </div>
+                    <Button
+                      type="submit"
+                      disabled={inviteUserMutation.isPending}
+                      data-testid="button-invite"
+                      className="w-full"
+                    >
+                      {inviteUserMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending Invitation...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Send Invitation
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-            <div className="space-y-2">
-              <Label htmlFor="retell-agent-id">Retell Chat Agent ID</Label>
-              {editApiKeyDialog.tenant?.hasRetellAgentId && (
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
-                  <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span className="font-mono text-sm font-medium text-purple-900 dark:text-purple-100">
-                    {editApiKeyDialog.tenant.maskedAgentId || 'Configured (hidden)'}
-                  </span>
-                  <Badge
-                    variant="secondary"
-                    className="ml-auto bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-                  >
-                    Current
-                  </Badge>
-                </div>
-              )}
-              <Input
-                id="retell-agent-id"
-                type="text"
-                placeholder={
-                  editApiKeyDialog.tenant?.hasRetellAgentId
-                    ? 'Enter new agent ID to update'
-                    : 'Enter Retell Chat Agent ID (optional)'
-                }
-                value={selectedAgentId}
-                onChange={(e) => setSelectedAgentId(e.target.value)}
-                data-testid="input-retell-agent-id"
-                className="font-mono"
-              />
-              <p className="text-xs text-muted-foreground">
-                {editApiKeyDialog.tenant?.hasRetellAgentId
-                  ? 'Enter a new agent ID to update, or leave empty to keep existing.'
-                  : "The agent ID to use for this tenant's chat widget. This will be used for end-user chat interactions."}
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditApiKeyDialog({ open: false, tenant: null });
-                setApiKeyInput('');
-                setSelectedAgentId('');
-              }}
-              data-testid="button-cancel-api-key"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (editApiKeyDialog.tenant) {
-                  const payload: any = {
-                    tenantId: editApiKeyDialog.tenant.id,
-                  };
-
-                  // If user entered a new API key, send it
-                  if (apiKeyInput.trim()) {
-                    payload.retellApiKey = apiKeyInput.trim();
-                  } else if (editApiKeyDialog.tenant.hasRetellApiKey) {
-                    // If API key exists but user didn't enter a new one, send sentinel value
-                    payload.retellApiKey = '__KEEP_EXISTING__';
+        {/* Edit Retell API Key Dialog */}
+        <Dialog
+          open={editApiKeyDialog.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditApiKeyDialog({ open: false, tenant: null });
+              setApiKeyInput('');
+              setSelectedAgentId('');
+            }
+          }}
+        >
+          <DialogContent data-testid="dialog-edit-api-key">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Key className="w-5 h-5" />
+                Assign Retell AI Configuration
+              </DialogTitle>
+              <DialogDescription>
+                Set or update the Retell AI API key and chat agent for{' '}
+                {editApiKeyDialog.tenant?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="retell-api-key">Retell AI API Key</Label>
+                {editApiKeyDialog.tenant?.hasRetellApiKey && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
+                    <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span className="font-mono text-sm font-medium text-purple-900 dark:text-purple-100">
+                      {editApiKeyDialog.tenant.maskedRetellApiKey || 'Configured (hidden)'}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                    >
+                      Current
+                    </Badge>
+                  </div>
+                )}
+                <Input
+                  id="retell-api-key"
+                  type="text"
+                  placeholder={
+                    editApiKeyDialog.tenant?.hasRetellApiKey
+                      ? 'Enter new key to update'
+                      : 'Enter Retell AI API key'
                   }
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  data-testid="input-retell-api-key"
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {editApiKeyDialog.tenant?.hasRetellApiKey
+                    ? 'Enter a new key to update, or leave empty to keep existing.'
+                    : 'This key will be encrypted and stored securely. It will be used for analytics and chat functionality.'}
+                </p>
+              </div>
 
-                  // Send agent ID if user entered a value
-                  if (selectedAgentId.trim()) {
-                    payload.retellAgentId = selectedAgentId.trim();
+              <div className="space-y-2">
+                <Label htmlFor="retell-agent-id">Retell Chat Agent ID</Label>
+                {editApiKeyDialog.tenant?.hasRetellAgentId && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
+                    <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span className="font-mono text-sm font-medium text-purple-900 dark:text-purple-100">
+                      {editApiKeyDialog.tenant.maskedAgentId || 'Configured (hidden)'}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                    >
+                      Current
+                    </Badge>
+                  </div>
+                )}
+                <Input
+                  id="retell-agent-id"
+                  type="text"
+                  placeholder={
+                    editApiKeyDialog.tenant?.hasRetellAgentId
+                      ? 'Enter new agent ID to update'
+                      : 'Enter Retell Chat Agent ID (optional)'
                   }
+                  value={selectedAgentId}
+                  onChange={(e) => setSelectedAgentId(e.target.value)}
+                  data-testid="input-retell-agent-id"
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {editApiKeyDialog.tenant?.hasRetellAgentId
+                    ? 'Enter a new agent ID to update, or leave empty to keep existing.'
+                    : "The agent ID to use for this tenant's chat widget. This will be used for end-user chat interactions."}
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditApiKeyDialog({ open: false, tenant: null });
+                  setApiKeyInput('');
+                  setSelectedAgentId('');
+                }}
+                data-testid="button-cancel-api-key"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (editApiKeyDialog.tenant) {
+                    const payload: any = {
+                      tenantId: editApiKeyDialog.tenant.id,
+                    };
 
-                  updateRetellApiKeyMutation.mutate(payload);
+                    // If user entered a new API key, send it
+                    if (apiKeyInput.trim()) {
+                      payload.retellApiKey = apiKeyInput.trim();
+                    } else if (editApiKeyDialog.tenant.hasRetellApiKey) {
+                      // If API key exists but user didn't enter a new one, send sentinel value
+                      payload.retellApiKey = '__KEEP_EXISTING__';
+                    }
+
+                    // Send agent ID if user entered a value
+                    if (selectedAgentId.trim()) {
+                      payload.retellAgentId = selectedAgentId.trim();
+                    }
+
+                    updateRetellApiKeyMutation.mutate(payload);
+                  }
+                }}
+                disabled={
+                  // Enable if user typed anything in either field, or if saving
+                  (!apiKeyInput.trim() && !selectedAgentId.trim()) ||
+                  updateRetellApiKeyMutation.isPending
                 }
-              }}
-              disabled={
-                // Enable if user typed anything in either field, or if saving
-                (!apiKeyInput.trim() && !selectedAgentId.trim()) ||
-                updateRetellApiKeyMutation.isPending
-              }
-              data-testid="button-save-api-key"
-            >
-              {updateRetellApiKeyMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Key className="w-4 h-4 mr-2" />
-                  Save Configuration
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                data-testid="button-save-api-key"
+              >
+                {updateRetellApiKeyMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-4 h-4 mr-2" />
+                    Save Configuration
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }

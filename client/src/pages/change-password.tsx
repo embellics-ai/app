@@ -89,113 +89,115 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="container max-w-2xl py-8">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Lock className="w-5 h-5" />
-            <CardTitle>Change Password</CardTitle>
-          </div>
-          <CardDescription>Update your password to keep your account secure</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="currentPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Current Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your current password"
-                        {...field}
-                        data-testid="input-current-password"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your new password (min 8 characters)"
-                        {...field}
-                        data-testid="input-new-password"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm New Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Confirm your new password"
-                        {...field}
-                        data-testid="input-confirm-password"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex gap-4 pt-4">
-                <Button
-                  type="submit"
-                  disabled={changePasswordMutation.isPending}
-                  data-testid="button-change-password"
-                  className="flex-1"
-                >
-                  {changePasswordMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Changing Password...
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-4 h-4 mr-2" />
-                      Change Password
-                    </>
+    <div className="h-full bg-background">
+      <div className="container max-w-3xl mx-auto px-6 py-8">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5" />
+              <CardTitle>Change Password</CardTitle>
+            </div>
+            <CardDescription>Update your password to keep your account secure</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="currentPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Enter your current password"
+                          {...field}
+                          data-testid="input-current-password"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (user?.isPlatformAdmin) {
-                      setLocation('/platform-admin');
-                    } else {
-                      setLocation('/analytics');
-                    }
-                  }}
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                />
+
+                <FormField
+                  control={form.control}
+                  name="newPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Enter your new password (min 8 characters)"
+                          {...field}
+                          data-testid="input-new-password"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm New Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Confirm your new password"
+                          {...field}
+                          data-testid="input-confirm-password"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex gap-4 pt-4">
+                  <Button
+                    type="submit"
+                    disabled={changePasswordMutation.isPending}
+                    data-testid="button-change-password"
+                    className="flex-1"
+                  >
+                    {changePasswordMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Changing Password...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4 mr-2" />
+                        Change Password
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (user?.isPlatformAdmin) {
+                        setLocation('/platform-admin');
+                      } else {
+                        setLocation('/analytics');
+                      }
+                    }}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -203,326 +203,328 @@ export default function OnboardingPage() {
     : '';
 
   return (
-    <div className="container mx-auto py-8 max-w-5xl">
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Sparkles className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">Welcome to Embellics!</h1>
-            <p className="text-muted-foreground">Get started with your AI chat widget</p>
+    <div className="h-full bg-background">
+      <div className="container max-w-6xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">Welcome to Embellics!</h1>
+              <p className="text-muted-foreground">Get started with your AI chat widget</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <Tabs defaultValue="customize" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="customize" data-testid="tab-customize">
-            <Palette className="h-4 w-4 mr-2" />
-            Customize
-          </TabsTrigger>
-          <TabsTrigger value="api-key" data-testid="tab-api-key">
-            <Key className="h-4 w-4 mr-2" />
-            API Key
-          </TabsTrigger>
-          <TabsTrigger value="install" data-testid="tab-install">
-            <Code className="h-4 w-4 mr-2" />
-            Install
-          </TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="customize" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="customize" data-testid="tab-customize">
+              <Palette className="h-4 w-4 mr-2" />
+              Customize
+            </TabsTrigger>
+            <TabsTrigger value="api-key" data-testid="tab-api-key">
+              <Key className="h-4 w-4 mr-2" />
+              API Key
+            </TabsTrigger>
+            <TabsTrigger value="install" data-testid="tab-install">
+              <Code className="h-4 w-4 mr-2" />
+              Install
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Customize Widget Tab */}
-        <TabsContent value="customize">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Customize Your Chat Widget
-              </CardTitle>
-              <CardDescription>Make the widget match your brand's look and feel</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="primaryColor">Primary Color</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    id="primaryColor"
-                    type="color"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="w-24 h-12 cursor-pointer"
-                    data-testid="input-primary-color"
-                  />
-                  <span
-                    className="text-sm text-muted-foreground font-mono"
-                    data-testid="text-color-value"
-                  >
-                    {primaryColor}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="position">Widget Position</Label>
-                <Select value={position} onValueChange={(val: any) => setPosition(val)}>
-                  <SelectTrigger id="position" data-testid="select-widget-position">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                    <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="greeting">Greeting Message</Label>
-                <Input
-                  id="greeting"
-                  value={greeting}
-                  onChange={(e) => setGreeting(e.target.value)}
-                  placeholder="Hi! How can I help you today?"
-                  data-testid="input-greeting"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="placeholder">Input Placeholder</Label>
-                <Input
-                  id="placeholder"
-                  value={placeholder}
-                  onChange={(e) => setPlaceholder(e.target.value)}
-                  placeholder="Type your message..."
-                  data-testid="input-placeholder"
-                />
-              </div>
-
-              <div className="mt-4 p-4 border rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground mb-2">Preview:</p>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-12 w-12 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    <MessageSquare className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium">{greeting}</p>
-                    <p className="text-muted-foreground text-xs">{placeholder}</p>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                onClick={() => createWidgetConfig.mutate()}
-                disabled={createWidgetConfig.isPending}
-                className="w-full"
-                data-testid="button-save-widget-config"
-              >
-                {createWidgetConfig.isPending ? 'Saving...' : 'Save Configuration'}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* API Key Tab */}
-        <TabsContent value="api-key">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5" />
-                Get Your API Key
-              </CardTitle>
-              <CardDescription>
-                Generate or view your API key for embedding the widget
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {displayApiKey ? (
-                <div className="space-y-4">
-                  <Alert>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <AlertDescription>
-                      <p className="font-medium mb-3">Your API Key:</p>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Input
-                          value={
-                            generatedApiKey
-                              ? showApiKey
-                                ? generatedApiKey
-                                : generatedApiKey.substring(0, 12) + '••••••••••••••••'
-                              : existingApiKeys && existingApiKeys.length > 0
-                                ? existingApiKeys[0].keyPrefix + '••••••••••••••••'
-                                : ''
-                          }
-                          readOnly
-                          className="font-mono text-sm flex-1"
-                          data-testid="input-api-key"
-                        />
-                        {generatedApiKey && (
-                          <>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => setShowApiKey(!showApiKey)}
-                              data-testid="button-toggle-api-key-visibility"
-                              title={showApiKey ? 'Hide full key' : 'Show full key'}
-                            >
-                              {showApiKey ? (
-                                <EyeOff className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => copyToClipboard(generatedApiKey)}
-                              data-testid="button-copy-api-key"
-                              title="Copy full API key"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      {generatedApiKey && (
-                        <p className="text-xs text-muted-foreground">
-                          Make sure to save this key securely. You won't be able to see the full key
-                          again after you leave this page.
-                        </p>
-                      )}
-                      {!generatedApiKey && (
-                        <div className="mt-2 p-2 bg-muted/50 rounded">
-                          <p className="text-xs text-muted-foreground">
-                            <strong>Security Notice:</strong> Full API keys are only shown once at
-                            creation time and are not stored in our database. Only the prefix is
-                            kept for identification. If you need the full key, you must delete this
-                            key and create a new one.
-                          </p>
-                        </div>
-                      )}
-                    </AlertDescription>
-                  </Alert>
-
-                  {existingApiKeys && existingApiKeys.length > 0 && !generatedApiKey && (
-                    <div className="flex gap-2">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            className="flex-1"
-                            data-testid="button-delete-api-key"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete & Regenerate
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete and Create New API Key?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete your current API key. Any websites using
-                              this key will stop working until you update them with the new key. A
-                              new key will be generated and shown to you after deletion.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => {
-                                deleteApiKey.mutate(existingApiKeys[0].id);
-                                // After deletion, generate a new key
-                                setTimeout(() => {
-                                  generateApiKey.mutate();
-                                }, 500);
-                              }}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Delete & Regenerate
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Generate an API key to embed your chat widget on your website.
-                  </p>
-                  <Button
-                    onClick={() => generateApiKey.mutate()}
-                    disabled={generateApiKey.isPending}
-                    className="w-full"
-                    data-testid="button-generate-api-key"
-                  >
-                    {generateApiKey.isPending ? 'Generating...' : 'Generate API Key'}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Install Tab */}
-        <TabsContent value="install">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Code className="h-5 w-5" />
-                Add to Your Website
-              </CardTitle>
-              <CardDescription>
-                Copy and paste this code before the closing &lt;/body&gt; tag
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {embedCode ? (
-                <>
-                  <div className="relative">
-                    <Textarea
-                      value={embedCode}
-                      readOnly
-                      className="font-mono text-sm"
-                      rows={7}
-                      data-testid="textarea-embed-code"
+          {/* Customize Widget Tab */}
+          <TabsContent value="customize">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Customize Your Chat Widget
+                </CardTitle>
+                <CardDescription>Make the widget match your brand's look and feel</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="primaryColor">Primary Color</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="primaryColor"
+                      type="color"
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      className="w-24 h-12 cursor-pointer"
+                      data-testid="input-primary-color"
                     />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="absolute top-2 right-2"
-                      onClick={() => copyToClipboard(embedCode)}
-                      data-testid="button-copy-embed-code"
+                    <span
+                      className="text-sm text-muted-foreground font-mono"
+                      data-testid="text-color-value"
                     >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy
+                      {primaryColor}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="position">Widget Position</Label>
+                  <Select value={position} onValueChange={(val: any) => setPosition(val)}>
+                    <SelectTrigger id="position" data-testid="select-widget-position">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                      <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="greeting">Greeting Message</Label>
+                  <Input
+                    id="greeting"
+                    value={greeting}
+                    onChange={(e) => setGreeting(e.target.value)}
+                    placeholder="Hi! How can I help you today?"
+                    data-testid="input-greeting"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="placeholder">Input Placeholder</Label>
+                  <Input
+                    id="placeholder"
+                    value={placeholder}
+                    onChange={(e) => setPlaceholder(e.target.value)}
+                    placeholder="Type your message..."
+                    data-testid="input-placeholder"
+                  />
+                </div>
+
+                <div className="mt-4 p-4 border rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-2">Preview:</p>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-12 w-12 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      <MessageSquare className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="text-sm">
+                      <p className="font-medium">{greeting}</p>
+                      <p className="text-muted-foreground text-xs">{placeholder}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => createWidgetConfig.mutate()}
+                  disabled={createWidgetConfig.isPending}
+                  className="w-full"
+                  data-testid="button-save-widget-config"
+                >
+                  {createWidgetConfig.isPending ? 'Saving...' : 'Save Configuration'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* API Key Tab */}
+          <TabsContent value="api-key">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5" />
+                  Get Your API Key
+                </CardTitle>
+                <CardDescription>
+                  Generate or view your API key for embedding the widget
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {displayApiKey ? (
+                  <div className="space-y-4">
+                    <Alert>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <AlertDescription>
+                        <p className="font-medium mb-3">Your API Key:</p>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Input
+                            value={
+                              generatedApiKey
+                                ? showApiKey
+                                  ? generatedApiKey
+                                  : generatedApiKey.substring(0, 12) + '••••••••••••••••'
+                                : existingApiKeys && existingApiKeys.length > 0
+                                  ? existingApiKeys[0].keyPrefix + '••••••••••••••••'
+                                  : ''
+                            }
+                            readOnly
+                            className="font-mono text-sm flex-1"
+                            data-testid="input-api-key"
+                          />
+                          {generatedApiKey && (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => setShowApiKey(!showApiKey)}
+                                data-testid="button-toggle-api-key-visibility"
+                                title={showApiKey ? 'Hide full key' : 'Show full key'}
+                              >
+                                {showApiKey ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => copyToClipboard(generatedApiKey)}
+                                data-testid="button-copy-api-key"
+                                title="Copy full API key"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        {generatedApiKey && (
+                          <p className="text-xs text-muted-foreground">
+                            Make sure to save this key securely. You won't be able to see the full
+                            key again after you leave this page.
+                          </p>
+                        )}
+                        {!generatedApiKey && (
+                          <div className="mt-2 p-2 bg-muted/50 rounded">
+                            <p className="text-xs text-muted-foreground">
+                              <strong>Security Notice:</strong> Full API keys are only shown once at
+                              creation time and are not stored in our database. Only the prefix is
+                              kept for identification. If you need the full key, you must delete
+                              this key and create a new one.
+                            </p>
+                          </div>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+
+                    {existingApiKeys && existingApiKeys.length > 0 && !generatedApiKey && (
+                      <div className="flex gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="destructive"
+                              className="flex-1"
+                              data-testid="button-delete-api-key"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete & Regenerate
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete and Create New API Key?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete your current API key. Any websites
+                                using this key will stop working until you update them with the new
+                                key. A new key will be generated and shown to you after deletion.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  deleteApiKey.mutate(existingApiKeys[0].id);
+                                  // After deletion, generate a new key
+                                  setTimeout(() => {
+                                    generateApiKey.mutate();
+                                  }, 500);
+                                }}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete & Regenerate
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Generate an API key to embed your chat widget on your website.
+                    </p>
+                    <Button
+                      onClick={() => generateApiKey.mutate()}
+                      disabled={generateApiKey.isPending}
+                      className="w-full"
+                      data-testid="button-generate-api-key"
+                    >
+                      {generateApiKey.isPending ? 'Generating...' : 'Generate API Key'}
                     </Button>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Install Tab */}
+          <TabsContent value="install">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Code className="h-5 w-5" />
+                  Add to Your Website
+                </CardTitle>
+                <CardDescription>
+                  Copy and paste this code before the closing &lt;/body&gt; tag
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {embedCode ? (
+                  <>
+                    <div className="relative">
+                      <Textarea
+                        value={embedCode}
+                        readOnly
+                        className="font-mono text-sm"
+                        rows={7}
+                        data-testid="textarea-embed-code"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="absolute top-2 right-2"
+                        onClick={() => copyToClipboard(embedCode)}
+                        data-testid="button-copy-embed-code"
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy
+                      </Button>
+                    </div>
+                    <Alert>
+                      <AlertDescription className="text-sm">
+                        <p className="font-medium mb-1">Installation Steps:</p>
+                        <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                          <li>Copy the code above</li>
+                          <li>Paste it before the closing &lt;/body&gt; tag in your HTML</li>
+                          <li>Reload your website to see the widget</li>
+                        </ol>
+                      </AlertDescription>
+                    </Alert>
+                  </>
+                ) : (
                   <Alert>
-                    <AlertDescription className="text-sm">
-                      <p className="font-medium mb-1">Installation Steps:</p>
-                      <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                        <li>Copy the code above</li>
-                        <li>Paste it before the closing &lt;/body&gt; tag in your HTML</li>
-                        <li>Reload your website to see the widget</li>
-                      </ol>
+                    <AlertDescription>
+                      Please generate an API key first in the "API Key" tab.
                     </AlertDescription>
                   </Alert>
-                </>
-              ) : (
-                <Alert>
-                  <AlertDescription>
-                    Please generate an API key first in the "API Key" tab.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
