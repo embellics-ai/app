@@ -172,9 +172,11 @@ export const widgetConfigs = pgTable('widget_configs', {
   retellApiKey: text('retell_api_key'), // Tenant's own Retell AI API key for account-wide analytics
   greeting: text('greeting').default('Hi! How can I help you today?'),
   allowedDomains: text('allowed_domains').array(), // Array of allowed domains
+  primaryColor: text('primary_color').default('#9b7ddd'), // Main theme color (buttons, header)
+  textColor: text('text_color').default('#ffffff'), // Text color on primary background
+  borderRadius: text('border_radius').default('12px'), // Border radius for widget elements
+  position: text('position').default('bottom-right'), // Widget position: top-left, top-center, top-right, middle-left, middle-right, bottom-left, bottom-center, bottom-right
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  // Note: Widget styling is now fixed in CSS following application design system
-  // ...existing code...
 });
 
 // Widget Chat Messages (Store all chat messages for history persistence)

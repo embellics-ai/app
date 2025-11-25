@@ -23,6 +23,7 @@ import {
   Lock,
   Sparkles,
   ClipboardList,
+  Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +79,11 @@ export function AppSidebar() {
           title: 'API Keys',
           url: '/api-keys',
           icon: Key,
+        },
+        {
+          title: 'Widget Config',
+          url: '/widget-config',
+          icon: Palette,
         },
       ];
     }

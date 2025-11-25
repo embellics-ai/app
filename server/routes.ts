@@ -3895,6 +3895,29 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Helper function to validate domain restrictions for widget endpoints
+  function validateWidgetDomain(widgetConfig: any, referrer: string | undefined): boolean {
+    // If no domains configured, allow all
+    if (!widgetConfig.allowedDomains || widgetConfig.allowedDomains.length === 0) {
+      return true;
+    }
+
+    // If no referrer provided, block (should always have referrer from widget)
+    if (!referrer) {
+      return false;
+    }
+
+    // Check if referrer matches any allowed domain
+    return widgetConfig.allowedDomains.some((domain: string) => {
+      // Support wildcard subdomains (*.example.com)
+      if (domain.startsWith('*.')) {
+        const baseDomain = domain.slice(2);
+        return referrer.endsWith(baseDomain) || referrer === baseDomain.replace('*.', '');
+      }
+      return referrer === domain || referrer.endsWith('.' + domain);
+    });
+  }
+
   // Widget initialization endpoint - validates API key and returns configuration
   app.post('/api/widget/init', async (req, res) => {
     try {
@@ -3956,10 +3979,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       // Return safe configuration (exclude sensitive data)
-      // Widget styling is now fixed in CSS - no customization options
       res.json({
         tenantId: apiKeyRecord.tenantId,
         greeting: widgetConfig.greeting,
+        primaryColor: widgetConfig.primaryColor || '#9b7ddd',
+        textColor: widgetConfig.textColor || '#ffffff',
+        borderRadius: widgetConfig.borderRadius || '12px',
+        position: widgetConfig.position || 'bottom-right',
       });
     } catch (error) {
       console.error('Error initializing widget:', error);
@@ -3981,11 +4007,12 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Widget chat endpoint for text-based conversations
   app.post('/api/widget/chat', async (req, res) => {
     try {
-      const { apiKey, message, chatId } = z
+      const { apiKey, message, chatId, referrer } = z
         .object({
           apiKey: z.string(),
           message: z.string().min(1),
           chatId: z.string().nullable().optional(),
+          referrer: z.string().optional(),
         })
         .parse(req.body);
 
@@ -4017,6 +4044,14 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({
           error: 'Widget not configured',
           message: 'Please configure Retell AI credentials in the admin panel',
+        });
+      }
+
+      // Check domain restrictions
+      if (!validateWidgetDomain(widgetConfig, referrer)) {
+        return res.status(403).json({
+          error: 'Domain not allowed',
+          message: `This widget is restricted to: ${widgetConfig?.allowedDomains?.join(', ')}`,
         });
       }
 
@@ -4077,18 +4112,22 @@ export async function registerRoutes(app: Express): Promise<void> {
         throw lastError || new Error('Failed to get completion from Retell');
       }
 
-      // Extract the agent's response
+      // Extract ALL agent responses from this interaction
       const messages = completion.messages || [];
-      const lastAssistantMessage = messages
-        .reverse()
-        .find((msg: any) => msg.role === 'agent' || msg.role === 'assistant');
+      const assistantMessages = messages.filter(
+        (msg: any) =>
+          (msg.role === 'agent' || msg.role === 'assistant') &&
+          typeof msg.content === 'string' &&
+          msg.content.trim().length > 0,
+      );
 
-      let response = "I'm processing your request...";
-      if (lastAssistantMessage && typeof (lastAssistantMessage as any).content === 'string') {
-        response = (lastAssistantMessage as any).content;
+      // Return all messages as an array for client-side display with delays
+      let responseMessages = ["I'm processing your request..."];
+      if (assistantMessages.length > 0) {
+        responseMessages = assistantMessages.map((msg: any) => msg.content);
       }
 
-      console.log('[Widget Chat] Response:', response.slice(0, 100));
+      console.log('[Widget Chat] Total assistant messages:', assistantMessages.length);
 
       // Save messages to database for history persistence
       try {
@@ -4100,12 +4139,13 @@ export async function registerRoutes(app: Express): Promise<void> {
           content: message,
         });
 
-        // Save assistant response
+        // Save combined assistant response
+        const combinedResponse = responseMessages.join('\n\n');
         await storage.createWidgetChatMessage({
           tenantId: apiKeyRecord.tenantId,
           chatId: retellChatId,
           role: 'assistant',
-          content: response,
+          content: combinedResponse,
         });
 
         console.log('[Widget Chat] Messages saved to database');
@@ -4114,9 +4154,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Don't fail the request if database save fails
       }
 
-      // Return response and chatId for continuation
+      // Return all messages for client-side sequential display
       res.json({
-        response,
+        messages: responseMessages,
         chatId: retellChatId,
       });
     } catch (error: any) {
@@ -4154,10 +4194,11 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get('/api/widget/session/:chatId/history', async (req, res) => {
     try {
       const { chatId } = req.params;
-      const { apiKey, handoffId } = z
+      const { apiKey, handoffId, referrer } = z
         .object({
           apiKey: z.string(),
           handoffId: z.string().optional(),
+          referrer: z.string().optional(),
         })
         .parse(req.query);
 
@@ -4180,6 +4221,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Get widget configuration for domain validation
+      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      if (!widgetConfig) {
+        return res.status(500).json({ error: 'Widget configuration not found' });
+      }
+
+      // Validate domain restriction
+      if (!validateWidgetDomain(widgetConfig, referrer)) {
+        return res.status(403).json({
+          error: 'Domain not allowed',
+          message: `This widget is restricted to: ${widgetConfig.allowedDomains?.join(', ')}`,
+        });
       }
 
       // Get chat messages from database
@@ -4246,7 +4301,15 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Request human agent handoff
   app.post('/api/widget/handoff', async (req, res) => {
     try {
-      const { apiKey, chatId, conversationHistory, lastUserMessage, userEmail, userMessage } = z
+      const {
+        apiKey,
+        chatId,
+        conversationHistory,
+        lastUserMessage,
+        userEmail,
+        userMessage,
+        referrer,
+      } = z
         .object({
           apiKey: z.string(),
           chatId: z.string(),
@@ -4254,6 +4317,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           lastUserMessage: z.string().optional(),
           userEmail: z.string().email().optional(),
           userMessage: z.string().optional(),
+          referrer: z.string().optional(),
         })
         .parse(req.body);
 
@@ -4276,6 +4340,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Get widget configuration for domain validation
+      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      if (!widgetConfig) {
+        return res.status(500).json({ error: 'Widget configuration not found' });
+      }
+
+      // Validate domain restriction
+      if (!validateWidgetDomain(widgetConfig, referrer)) {
+        return res.status(403).json({
+          error: 'Domain not allowed',
+          message: `This widget is restricted to: ${widgetConfig.allowedDomains?.join(', ')}`,
+        });
       }
 
       // Check if agents are available
@@ -4342,9 +4420,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get('/api/widget/handoff/:handoffId/status', async (req, res) => {
     try {
       const { handoffId } = req.params;
-      const { apiKey } = z
+      const { apiKey, referrer } = z
         .object({
           apiKey: z.string(),
+          referrer: z.string().optional(),
         })
         .parse(req.query);
 
@@ -4367,6 +4446,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Get widget configuration for domain validation
+      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      if (!widgetConfig) {
+        return res.status(500).json({ error: 'Widget configuration not found' });
+      }
+
+      // Validate domain restriction
+      if (!validateWidgetDomain(widgetConfig, referrer)) {
+        return res.status(403).json({
+          error: 'Domain not allowed',
+          message: `This widget is restricted to: ${widgetConfig.allowedDomains?.join(', ')}`,
+        });
       }
 
       const handoff = await storage.getWidgetHandoff(handoffId);
@@ -4397,10 +4490,11 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.post('/api/widget/handoff/:handoffId/message', async (req, res) => {
     try {
       const { handoffId } = req.params;
-      const { apiKey, message } = z
+      const { apiKey, message, referrer } = z
         .object({
           apiKey: z.string(),
           message: z.string().min(1),
+          referrer: z.string().optional(),
         })
         .parse(req.body);
 
@@ -4423,6 +4517,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Get widget configuration for domain validation
+      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      if (!widgetConfig) {
+        return res.status(500).json({ error: 'Widget configuration not found' });
+      }
+
+      // Validate domain restriction
+      if (!validateWidgetDomain(widgetConfig, referrer)) {
+        return res.status(403).json({
+          error: 'Domain not allowed',
+          message: `This widget is restricted to: ${widgetConfig.allowedDomains?.join(', ')}`,
+        });
       }
 
       const handoff = await storage.getWidgetHandoff(handoffId);
@@ -4481,10 +4589,11 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get('/api/widget/handoff/:handoffId/messages', async (req, res) => {
     try {
       const { handoffId } = req.params;
-      const { apiKey, since } = z
+      const { apiKey, since, referrer } = z
         .object({
           apiKey: z.string(),
           since: z.string().optional(),
+          referrer: z.string().optional(),
         })
         .parse(req.query);
 
@@ -4507,6 +4616,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!apiKeyRecord) {
         return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      // Get widget configuration for domain validation
+      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      if (!widgetConfig) {
+        return res.status(500).json({ error: 'Widget configuration not found' });
+      }
+
+      // Validate domain restriction
+      if (!validateWidgetDomain(widgetConfig, referrer)) {
+        return res.status(403).json({
+          error: 'Domain not allowed',
+          message: `This widget is restricted to: ${widgetConfig.allowedDomains?.join(', ')}`,
+        });
       }
 
       const handoff = await storage.getWidgetHandoff(handoffId);
@@ -4562,11 +4685,12 @@ export async function registerRoutes(app: Express): Promise<void> {
   // End chat (user-initiated) - Resolves active handoff if exists
   app.post('/api/widget/end-chat', async (req, res) => {
     try {
-      const { apiKey, chatId, handoffId } = z
+      const { apiKey, chatId, handoffId, referrer } = z
         .object({
           apiKey: z.string(),
           chatId: z.string(),
           handoffId: z.string().optional(),
+          referrer: z.string().optional(),
         })
         .parse(req.body);
 
@@ -4592,6 +4716,20 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       const tenantId = apiKeyRecord.tenantId;
+
+      // Get widget configuration for domain validation
+      const widgetConfig = await storage.getWidgetConfig(tenantId);
+      if (!widgetConfig) {
+        return res.status(500).json({ error: 'Widget configuration not found' });
+      }
+
+      // Validate domain restriction
+      if (!validateWidgetDomain(widgetConfig, referrer)) {
+        return res.status(403).json({
+          error: 'Domain not allowed',
+          message: `This widget is restricted to: ${widgetConfig.allowedDomains?.join(', ')}`,
+        });
+      }
 
       // If there's an active handoff, resolve it
       if (handoffId) {
