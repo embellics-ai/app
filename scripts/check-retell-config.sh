@@ -1,0 +1,56 @@
+#!/bin/bash
+
+echo "=== Retell Chat Agent Configuration Diagnostic ==="
+echo ""
+
+# Database URL from .env.local
+DATABASE_URL='postgresql://neondb_owner:npg_unhR1evq9Wza@ep-empty-violet-agoe0tmd.c-2.eu-central-1.aws.neon.tech:5432/neondb?sslmode=require'
+
+echo "1. Checking your tenant information..."
+psql "$DATABASE_URL" -c "SELECT id, name, email FROM tenants LIMIT 5;"
+
+echo ""
+echo "2. Checking widget configuration (this shows your Retell Agent ID)..."
+psql "$DATABASE_URL" -c "SELECT tenant_id, retell_agent_id, retell_api_key IS NOT NULL as has_api_key FROM widget_configs;"
+
+echo ""
+echo "3. Checking for any chat analytics data..."
+psql "$DATABASE_URL" -c "SELECT COUNT(*) as total_chats, MIN(created_at) as oldest, MAX(created_at) as newest FROM chat_analytics;"
+
+echo ""
+echo "4. Checking recent chat analytics (if any)..."
+psql "$DATABASE_URL" -c "SELECT chat_id, agent_id, tenant_id, user_sentiment, chat_successful, created_at FROM chat_analytics ORDER BY created_at DESC LIMIT 5;"
+
+echo ""
+echo "=== How to Find Your Retell Agent ID ==="
+echo ""
+echo "Option 1: From Retell AI Dashboard"
+echo "  1. Go to https://app.retellai.com"
+echo "  2. Navigate to Agents section"
+echo "  3. Click on your WhatsApp agent"
+echo "  4. Copy the Agent ID (starts with 'agent_')"
+echo ""
+echo "Option 2: From your WhatsApp integration"
+echo "  1. Check your Retell WhatsApp configuration"
+echo "  2. The agent ID should be visible there"
+echo ""
+echo "=== How to Configure Agent ID ==="
+echo ""
+echo "1. Log in as platform admin to your app"
+echo "2. Go to Platform Admin page"
+echo "3. Click 'Tenants' tab"
+echo "4. Find your tenant and click 'Edit API Key'"
+echo "5. Enter your Retell Agent ID (e.g., agent_xxxxxxxxxxxxx)"
+echo "6. Also enter your Retell API Key if you have one"
+echo "7. Click Save"
+echo ""
+echo "=== Check Webhook Configuration ==="
+echo ""
+echo "Make sure in Retell AI dashboard:"
+echo "- Webhook URL: http://localhost:5000/api/retell/chat-analyzed (for local)"
+echo "- Webhook URL: https://yourdomain.com/api/retell/chat-analyzed (for production)"
+echo "- Event subscribed: chat_analyzed"
+echo ""
+echo "Note: For local testing, use ngrok to expose your localhost"
+echo "  ngrok http 5000"
+echo "  Then use the ngrok URL in Retell webhook config"
