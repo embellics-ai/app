@@ -618,6 +618,121 @@ export const insertWebhookAnalyticsSchema = createInsertSchema(webhookAnalytics)
 export type InsertWebhookAnalytics = z.infer<typeof insertWebhookAnalyticsSchema>;
 export type WebhookAnalytics = typeof webhookAnalytics.$inferSelect;
 
+// ============================================
+// RETELL AI CHAT ANALYTICS
+// ============================================
+
+// Chat Analytics (Track chat sessions from Retell AI chat_analyzed webhook)
+export const chatAnalytics = pgTable(
+  'chat_analytics',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Retell Chat Metadata
+    chatId: text('chat_id').notNull().unique(), // Retell's chat ID
+    agentId: text('agent_id').notNull(), // Retell agent ID
+    agentName: text('agent_name'), // Agent display name
+    agentVersion: text('agent_version'), // Agent version number
+    chatType: text('chat_type'), // e.g., "web_chat", "mobile_chat"
+    chatStatus: text('chat_status'), // e.g., "completed", "abandoned"
+
+    // Timestamps
+    startTimestamp: timestamp('start_timestamp'), // When chat started
+    endTimestamp: timestamp('end_timestamp'), // When chat ended
+    duration: integer('duration'), // Duration in seconds
+
+    // Conversation Data
+    transcript: text('transcript'), // Full conversation transcript
+    messageCount: integer('message_count'), // Total messages exchanged
+    toolCallsCount: integer('tool_calls_count'), // Number of tool/function calls
+    dynamicVariables: jsonb('dynamic_variables'), // Collected variables (booking_uid, user_intention, etc.)
+
+    // Chat Analysis (AI-generated)
+    chatSummary: text('chat_summary'), // AI-generated summary
+    userSentiment: text('user_sentiment'), // positive, negative, neutral, frustrated, satisfied
+    chatSuccessful: boolean('chat_successful'), // Whether chat achieved its goal
+
+    // Cost Tracking
+    combinedCost: integer('combined_cost'), // Total cost in cents
+    productCosts: jsonb('product_costs'), // Breakdown by model (gpt-4o, etc.)
+
+    // Metadata
+    metadata: jsonb('metadata'), // Additional data (whatsapp_user, etc.)
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Indexes for fast lookups
+    tenantChatIdx: uniqueIndex('chat_analytics_tenant_chat_idx').on(
+      table.tenantId,
+      table.chatId,
+    ),
+    tenantAgentIdx: uniqueIndex('chat_analytics_tenant_agent_idx').on(
+      table.tenantId,
+      table.agentId,
+      table.startTimestamp,
+    ),
+    sentimentIdx: uniqueIndex('chat_analytics_sentiment_idx').on(
+      table.tenantId,
+      table.userSentiment,
+      table.startTimestamp,
+    ),
+  }),
+);
+
+export const insertChatAnalyticsSchema = createInsertSchema(chatAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatAnalytics = z.infer<typeof insertChatAnalyticsSchema>;
+export type ChatAnalytics = typeof chatAnalytics.$inferSelect;
+
+// Chat Messages (Individual messages from chat sessions - optional detailed storage)
+export const chatMessages = pgTable(
+  'chat_messages',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    chatAnalyticsId: varchar('chat_analytics_id')
+      .notNull()
+      .references(() => chatAnalytics.id, { onDelete: 'cascade' }),
+
+    // Message Details
+    messageId: text('message_id'), // Retell's message ID
+    role: text('role').notNull(), // 'agent' or 'user'
+    content: text('content').notNull(), // Message content
+    timestamp: timestamp('timestamp').notNull(), // When message was sent
+
+    // Function/Tool Calls
+    toolCallId: text('tool_call_id'), // If this message triggered a tool
+    nodeTransition: text('node_transition'), // Which node this led to
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for fast lookups by chat
+    chatMessagesIdx: uniqueIndex('chat_messages_chat_idx').on(
+      table.chatAnalyticsId,
+      table.timestamp,
+    ),
+  }),
+);
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
 // Settings Schema (keeping for backward compatibility)
 export const settingsSchema = z.object({
   apiKey: z.string().optional(),

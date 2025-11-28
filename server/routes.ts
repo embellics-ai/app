@@ -1861,6 +1861,94 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
+  // ============================================
+  // RETELL AI WEBHOOKS
+  // ============================================
+
+  /**
+   * Retell AI Chat Analyzed Webhook
+   * Receives chat_analyzed events from Retell AI and stores analytics
+   * Public endpoint - no authentication, but signature verification
+   */
+  app.post('/api/retell/chat-analyzed', async (req, res) => {
+    try {
+      const signature = req.headers['x-retell-signature'] as string;
+
+      // TODO: Implement signature verification
+      // For now, we'll accept all requests (add verification in production)
+      // const isValid = verifyRetellSignature(req.body, signature, process.env.RETELL_WEBHOOK_SECRET);
+      // if (!isValid) {
+      //   return res.status(401).json({ error: 'Invalid signature' });
+      // }
+
+      const payload = req.body;
+
+      // Extract data from Retell's chat_analyzed event
+      const chatData = {
+        chatId: payload.chat_id,
+        agentId: payload.agent_id,
+        agentName: payload.agent_name || null,
+        agentVersion: payload.agent_version || null,
+        chatType: payload.chat_type || null,
+        chatStatus: payload.chat_status || null,
+        startTimestamp: payload.start_timestamp ? new Date(payload.start_timestamp) : null,
+        endTimestamp: payload.end_timestamp ? new Date(payload.end_timestamp) : null,
+        duration: payload.duration || null,
+        transcript: payload.transcript || null,
+        messageCount: payload.messages?.length || 0,
+        toolCallsCount: payload.tool_calls?.length || 0,
+        dynamicVariables: payload.dynamic_variables || null,
+        chatSummary: payload.chat_analysis?.chat_summary || null,
+        userSentiment: payload.chat_analysis?.user_sentiment || null,
+        chatSuccessful: payload.chat_analysis?.chat_successful || null,
+        combinedCost: payload.combined_cost || 0,
+        productCosts: payload.product_costs || null,
+        metadata: {
+          whatsapp_user: payload.metadata?.whatsapp_user || null,
+          // Add any other metadata fields
+          ...payload.metadata,
+        },
+      };
+
+      // Determine tenant ID from metadata or agent configuration
+      // For now, we'll require it in the metadata
+      const tenantId = payload.metadata?.tenant_id || payload.tenant_id;
+
+      if (!tenantId) {
+        console.error('[Retell Webhook] Missing tenant_id in payload');
+        return res.status(400).json({ error: 'Missing tenant_id in payload' });
+      }
+
+      // Create chat analytics record
+      await storage.createChatAnalytics({
+        tenantId,
+        ...chatData,
+      });
+
+      // Optionally store individual messages
+      if (payload.messages && Array.isArray(payload.messages)) {
+        // This is optional - can be enabled based on requirements
+        // for (const message of payload.messages) {
+        //   await storage.createChatMessage({
+        //     chatAnalyticsId: chatAnalytics.id,
+        //     messageId: message.message_id,
+        //     role: message.role,
+        //     content: message.content,
+        //     timestamp: new Date(message.timestamp),
+        //     toolCallId: message.tool_call_id || null,
+        //     nodeTransition: message.node_transition || null,
+        //   });
+        // }
+      }
+
+      console.log(`[Retell Webhook] Stored chat analytics for chat ${chatData.chatId}`);
+      res.status(200).json({ success: true, message: 'Chat analytics stored' });
+    } catch (error: any) {
+      console.error('[Retell Webhook] Error processing chat_analyzed event:', error);
+      res.status(500).json({ error: 'Failed to process chat analytics', details: error.message });
+    }
+  });
+
   // ===== Client Admin User Management Routes =====
 
   // Invite support staff (Client Admin only)

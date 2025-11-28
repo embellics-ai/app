@@ -35,6 +35,10 @@ import {
   type InsertN8nWebhook,
   type WebhookAnalytics,
   type InsertWebhookAnalytics,
+  type ChatAnalytics,
+  type InsertChatAnalytics,
+  type ChatMessage,
+  type InsertChatMessage,
   users,
   messages,
   conversations,
@@ -53,6 +57,8 @@ import {
   tenantIntegrations,
   n8nWebhooks,
   webhookAnalytics,
+  chatAnalytics,
+  chatMessages,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -244,6 +250,44 @@ export interface IStorage {
     averageResponseTime: number;
   }>;
   deleteOldWebhookAnalytics(olderThanDays: number): Promise<void>;
+
+  // Chat Analytics Methods
+  createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics>;
+  getChatAnalytics(id: string): Promise<ChatAnalytics | undefined>;
+  getChatAnalyticsByChatId(chatId: string): Promise<ChatAnalytics | undefined>;
+  getChatAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      chatStatus?: string;
+      limit?: number;
+    },
+  ): Promise<ChatAnalytics[]>;
+  getChatAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalChats: number;
+    successfulChats: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }>;
+  deleteOldChatAnalytics(olderThanDays: number): Promise<void>;
+
+  // Chat Messages Methods (optional - for detailed message storage)
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]>;
+  deleteChatMessages(chatAnalyticsId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -1250,6 +1294,87 @@ export class MemStorage implements IStorage {
   }
 
   async deleteOldWebhookAnalytics(olderThanDays: number): Promise<void> {
+    // Stub
+  }
+
+  // Chat Analytics stubs
+  async createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics> {
+    const id = randomUUID();
+    return {
+      id,
+      ...analytics,
+      createdAt: new Date(),
+    } as ChatAnalytics;
+  }
+
+  async getChatAnalytics(id: string): Promise<ChatAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getChatAnalyticsByChatId(chatId: string): Promise<ChatAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getChatAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      chatStatus?: string;
+      limit?: number;
+    },
+  ): Promise<ChatAnalytics[]> {
+    return []; // Stub
+  }
+
+  async getChatAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalChats: number;
+    successfulChats: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    return {
+      totalChats: 0,
+      successfulChats: 0,
+      totalDuration: 0,
+      averageDuration: 0,
+      totalCost: 0,
+      averageCost: 0,
+      sentimentBreakdown: {},
+    }; // Stub
+  }
+
+  async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
+    // Stub
+  }
+
+  // Chat Messages stubs
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const id = randomUUID();
+    return {
+      id,
+      ...message,
+      createdAt: new Date(),
+    } as ChatMessage;
+  }
+
+  async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
+    return []; // Stub
+  }
+
+  async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
     // Stub
   }
 }
@@ -2368,6 +2493,190 @@ export class DbStorage implements IStorage {
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
     await this.db.delete(webhookAnalytics).where(lte(webhookAnalytics.timestamp, cutoffDate));
+  }
+
+  // ============================================
+  // CHAT ANALYTICS METHODS
+  // ============================================
+
+  /**
+   * Create a new chat analytics record
+   */
+  async createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics> {
+    const [created] = await this.db.insert(chatAnalytics).values(analytics).returning();
+    return created!;
+  }
+
+  /**
+   * Get chat analytics by ID
+   */
+  async getChatAnalytics(id: string): Promise<ChatAnalytics | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(eq(chatAnalytics.id, id))
+      .limit(1);
+    return result;
+  }
+
+  /**
+   * Get chat analytics by Retell chat ID
+   */
+  async getChatAnalyticsByChatId(chatId: string): Promise<ChatAnalytics | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(eq(chatAnalytics.chatId, chatId))
+      .limit(1);
+    return result;
+  }
+
+  /**
+   * Get chat analytics for a tenant with filters
+   */
+  async getChatAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      chatStatus?: string;
+      limit?: number;
+    },
+  ): Promise<ChatAnalytics[]> {
+    const conditions = [eq(chatAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(chatAnalytics.endTimestamp, filters.endDate));
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(chatAnalytics.agentId, filters.agentId));
+    }
+    if (filters?.sentiment) {
+      conditions.push(eq(chatAnalytics.userSentiment, filters.sentiment));
+    }
+    if (filters?.chatStatus) {
+      conditions.push(eq(chatAnalytics.chatStatus, filters.chatStatus));
+    }
+
+    let query = this.db
+      .select()
+      .from(chatAnalytics)
+      .where(and(...conditions))
+      .orderBy(desc(chatAnalytics.startTimestamp));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+
+    return await query;
+  }
+
+  /**
+   * Get chat analytics summary for a tenant
+   */
+  async getChatAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalChats: number;
+    successfulChats: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    const conditions = [eq(chatAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(chatAnalytics.endTimestamp, filters.endDate));
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(chatAnalytics.agentId, filters.agentId));
+    }
+
+    const chats = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(and(...conditions));
+
+    const totalChats = chats.length;
+    const successfulChats = chats.filter((c) => c.chatSuccessful).length;
+    const totalDuration = chats.reduce((sum, c) => sum + (c.duration || 0), 0);
+    const averageDuration = totalChats > 0 ? totalDuration / totalChats : 0;
+    const totalCost = chats.reduce((sum, c) => sum + (c.combinedCost || 0), 0);
+    const averageCost = totalChats > 0 ? totalCost / totalChats : 0;
+
+    // Sentiment breakdown
+    const sentimentBreakdown: Record<string, number> = {};
+    chats.forEach((chat) => {
+      const sentiment = chat.userSentiment || 'unknown';
+      sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
+    });
+
+    return {
+      totalChats,
+      successfulChats,
+      totalDuration,
+      averageDuration,
+      totalCost,
+      averageCost,
+      sentimentBreakdown,
+    };
+  }
+
+  /**
+   * Delete old chat analytics (for cleanup/archiving)
+   */
+  async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+    await this.db.delete(chatAnalytics).where(lte(chatAnalytics.createdAt, cutoffDate));
+  }
+
+  // ============================================
+  // CHAT MESSAGES METHODS
+  // ============================================
+
+  /**
+   * Create a new chat message
+   */
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [created] = await this.db.insert(chatMessages).values(message).returning();
+    return created!;
+  }
+
+  /**
+   * Get all messages for a chat
+   */
+  async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
+    return await this.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId))
+      .orderBy(chatMessages.timestamp);
+  }
+
+  /**
+   * Delete all messages for a chat
+   */
+  async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
+    await this.db
+      .delete(chatMessages)
+      .where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId));
   }
 }
 
