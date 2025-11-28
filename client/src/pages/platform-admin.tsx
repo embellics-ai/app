@@ -47,7 +47,9 @@ import {
   Eye,
   EyeOff,
   Copy,
+  Webhook,
 } from 'lucide-react';
+import IntegrationManagement from '@/components/IntegrationManagement';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -110,6 +112,10 @@ export default function PlatformAdminPage() {
   });
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [selectedIntegrationTenant, setSelectedIntegrationTenant] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Access control: Only platform admins can view this page
   useEffect(() => {
@@ -360,6 +366,10 @@ export default function PlatformAdminPage() {
             <TabsTrigger value="invite" data-testid="tab-invite">
               <UserPlus className="w-4 h-4 mr-2" />
               Invite User
+            </TabsTrigger>
+            <TabsTrigger value="integrations" data-testid="tab-integrations">
+              <Webhook className="w-4 h-4 mr-2" />
+              Integrations
             </TabsTrigger>
           </TabsList>
 
@@ -907,6 +917,69 @@ export default function PlatformAdminPage() {
                     </Button>
                   </form>
                 </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tenant Integrations</CardTitle>
+                <CardDescription>
+                  Manage WhatsApp, SMS, and N8N integrations for each tenant
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Tenant Selector */}
+                <div className="space-y-2">
+                  <Label htmlFor="integration-tenant-select">Select Tenant</Label>
+                  <Select
+                    value={selectedIntegrationTenant?.id || ''}
+                    onValueChange={(value) => {
+                      const tenant = tenants.find((t: any) => t.id === value);
+                      if (tenant) {
+                        setSelectedIntegrationTenant({
+                          id: tenant.id,
+                          name: tenant.name,
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="integration-tenant-select" className="w-full">
+                      <SelectValue placeholder="Select a tenant to manage integrations" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenantsLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        </div>
+                      ) : tenants.length === 0 ? (
+                        <div className="text-center py-4 text-sm text-muted-foreground">
+                          No tenants available
+                        </div>
+                      ) : (
+                        tenants.map((tenant: any) => (
+                          <SelectItem key={tenant.id} value={tenant.id}>
+                            {tenant.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Integration Management Component */}
+                {selectedIntegrationTenant ? (
+                  <IntegrationManagement
+                    tenantId={selectedIntegrationTenant.id}
+                    tenantName={selectedIntegrationTenant.name}
+                  />
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Webhook className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Select a tenant to view and manage their integrations</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

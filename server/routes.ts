@@ -15,6 +15,19 @@ import Retell from 'retell-sdk';
 import { randomBytes, createHash } from 'crypto';
 import { sendInvitationEmail, sendPasswordResetEmail } from './email';
 import {
+  encrypt,
+  decrypt,
+  encryptWhatsAppConfig,
+  decryptWhatsAppConfig,
+  encryptSMSConfig,
+  decryptSMSConfig,
+  maskWhatsAppConfig,
+  maskSMSConfig,
+  maskToken,
+  type WhatsAppConfig,
+  type SMSConfig,
+} from './encryption';
+import {
   hashPassword,
   verifyPassword,
   generateToken,
@@ -1286,6 +1299,564 @@ export async function registerRoutes(app: Express): Promise<void> {
         } else {
           res.status(500).json({ error: 'Failed to update user role' });
         }
+      }
+    },
+  );
+
+  // ===== Platform Admin - Tenant Integrations Management =====
+
+  // Get integration configuration for a tenant
+  app.get(
+    '/api/platform/tenants/:tenantId/integrations',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Verify tenant exists
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        // Get integration config
+        const integration = await storage.getTenantIntegration(tenantId);
+
+        if (!integration) {
+          // Return empty/default config if not yet configured
+          return res.json({
+            tenantId,
+            whatsappEnabled: false,
+            whatsappConfig: null,
+            smsEnabled: false,
+            smsConfig: null,
+            n8nBaseUrl: null,
+          });
+        }
+
+        // Decrypt and mask sensitive fields before sending to frontend
+        const maskedIntegration = {
+          id: integration.id,
+          tenantId: integration.tenantId,
+          n8nBaseUrl: integration.n8nBaseUrl,
+          n8nApiKey: integration.n8nApiKey ? maskToken(integration.n8nApiKey) : null,
+          whatsappEnabled: integration.whatsappEnabled,
+          whatsappConfig: integration.whatsappConfig
+            ? maskWhatsAppConfig(decryptWhatsAppConfig(integration.whatsappConfig as any))
+            : null,
+          smsEnabled: integration.smsEnabled,
+          smsConfig: integration.smsConfig
+            ? maskSMSConfig(decryptSMSConfig(integration.smsConfig as any))
+            : null,
+          updatedAt: integration.updatedAt,
+          createdAt: integration.createdAt,
+        };
+
+        res.json(maskedIntegration);
+      } catch (error) {
+        console.error('Error fetching tenant integrations:', error);
+        res.status(500).json({ error: 'Failed to fetch integration configuration' });
+      }
+    },
+  );
+
+  // Update WhatsApp configuration for a tenant
+  app.put(
+    '/api/platform/tenants/:tenantId/integrations/whatsapp',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Verify tenant exists
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        // Validate WhatsApp config
+        const whatsappConfigSchema = z.object({
+          enabled: z.boolean(),
+          phoneNumberId: z.string().min(1).optional(),
+          businessAccountId: z.string().min(1).optional(),
+          accessToken: z.string().min(1).optional(),
+          webhookVerifyToken: z.string().min(1).optional(),
+          phoneNumber: z.string().optional(),
+        });
+
+        const data = whatsappConfigSchema.parse(req.body);
+
+        // Get or create integration config
+        let integration = await storage.getTenantIntegration(tenantId);
+
+        if (!data.enabled) {
+          // Disable WhatsApp
+          if (integration) {
+            await storage.updateTenantIntegration(tenantId, {
+              whatsappEnabled: false,
+              whatsappConfig: null,
+              updatedBy: req.user!.userId,
+            });
+          } else {
+            await storage.createTenantIntegration({
+              tenantId,
+              whatsappEnabled: false,
+              whatsappConfig: null,
+              createdBy: req.user!.userId,
+              updatedBy: req.user!.userId,
+            });
+          }
+          return res.json({ success: true, message: 'WhatsApp integration disabled' });
+        }
+
+        // Validate required fields when enabling
+        if (
+          !data.phoneNumberId ||
+          !data.businessAccountId ||
+          !data.accessToken ||
+          !data.webhookVerifyToken
+        ) {
+          return res.status(400).json({
+            error: 'All WhatsApp fields are required when enabling integration',
+          });
+        }
+
+        // Create WhatsApp config object
+        const whatsappConfig: WhatsAppConfig = {
+          phoneNumberId: data.phoneNumberId,
+          businessAccountId: data.businessAccountId,
+          accessToken: data.accessToken,
+          webhookVerifyToken: data.webhookVerifyToken,
+          phoneNumber: data.phoneNumber,
+        };
+
+        // Encrypt sensitive fields
+        const encryptedConfig = encryptWhatsAppConfig(whatsappConfig);
+
+        if (integration) {
+          // Update existing
+          await storage.updateTenantIntegration(tenantId, {
+            whatsappEnabled: true,
+            whatsappConfig: encryptedConfig as any,
+            updatedBy: req.user!.userId,
+          });
+        } else {
+          // Create new
+          await storage.createTenantIntegration({
+            tenantId,
+            whatsappEnabled: true,
+            whatsappConfig: encryptedConfig as any,
+            createdBy: req.user!.userId,
+            updatedBy: req.user!.userId,
+          });
+        }
+
+        res.json({ success: true, message: 'WhatsApp integration configured successfully' });
+      } catch (error) {
+        console.error('Error configuring WhatsApp integration:', error);
+        if (error instanceof z.ZodError) {
+          res.status(400).json({ error: error.errors });
+        } else {
+          res.status(500).json({ error: 'Failed to configure WhatsApp integration' });
+        }
+      }
+    },
+  );
+
+  // Update SMS configuration for a tenant
+  app.put(
+    '/api/platform/tenants/:tenantId/integrations/sms',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Verify tenant exists
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        // Validate SMS config
+        const smsConfigSchema = z.object({
+          enabled: z.boolean(),
+          provider: z.enum(['twilio', 'vonage', 'aws_sns']).optional(),
+          accountSid: z.string().min(1).optional(),
+          authToken: z.string().min(1).optional(),
+          phoneNumber: z.string().min(1).optional(),
+          messagingServiceSid: z.string().optional(),
+        });
+
+        const data = smsConfigSchema.parse(req.body);
+
+        // Get or create integration config
+        let integration = await storage.getTenantIntegration(tenantId);
+
+        if (!data.enabled) {
+          // Disable SMS
+          if (integration) {
+            await storage.updateTenantIntegration(tenantId, {
+              smsEnabled: false,
+              smsConfig: null,
+              updatedBy: req.user!.userId,
+            });
+          } else {
+            await storage.createTenantIntegration({
+              tenantId,
+              smsEnabled: false,
+              smsConfig: null,
+              createdBy: req.user!.userId,
+              updatedBy: req.user!.userId,
+            });
+          }
+          return res.json({ success: true, message: 'SMS integration disabled' });
+        }
+
+        // Validate required fields when enabling
+        if (!data.provider || !data.accountSid || !data.authToken || !data.phoneNumber) {
+          return res.status(400).json({
+            error:
+              'Provider, accountSid, authToken, and phoneNumber are required when enabling SMS',
+          });
+        }
+
+        // Create SMS config object
+        const smsConfig: SMSConfig = {
+          provider: data.provider,
+          accountSid: data.accountSid,
+          authToken: data.authToken,
+          phoneNumber: data.phoneNumber,
+          messagingServiceSid: data.messagingServiceSid,
+        };
+
+        // Encrypt sensitive fields
+        const encryptedConfig = encryptSMSConfig(smsConfig);
+
+        if (integration) {
+          // Update existing
+          await storage.updateTenantIntegration(tenantId, {
+            smsEnabled: true,
+            smsConfig: encryptedConfig as any,
+            updatedBy: req.user!.userId,
+          });
+        } else {
+          // Create new
+          await storage.createTenantIntegration({
+            tenantId,
+            smsEnabled: true,
+            smsConfig: encryptedConfig as any,
+            createdBy: req.user!.userId,
+            updatedBy: req.user!.userId,
+          });
+        }
+
+        res.json({ success: true, message: 'SMS integration configured successfully' });
+      } catch (error) {
+        console.error('Error configuring SMS integration:', error);
+        if (error instanceof z.ZodError) {
+          res.status(400).json({ error: error.errors });
+        } else {
+          res.status(500).json({ error: 'Failed to configure SMS integration' });
+        }
+      }
+    },
+  );
+
+  // Update N8N base URL for a tenant
+  app.put(
+    '/api/platform/tenants/:tenantId/integrations/n8n',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Verify tenant exists
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        // Validate N8N config
+        const n8nConfigSchema = z.object({
+          baseUrl: z.string().url().optional().nullable(),
+          apiKey: z.string().optional().nullable(),
+        });
+
+        const data = n8nConfigSchema.parse(req.body);
+
+        // Get or create integration config
+        let integration = await storage.getTenantIntegration(tenantId);
+
+        const updates: any = {
+          n8nBaseUrl: data.baseUrl || null,
+          updatedBy: req.user!.userId,
+        };
+
+        // Encrypt API key if provided
+        if (data.apiKey) {
+          updates.n8nApiKey = encrypt(data.apiKey);
+        } else if (data.apiKey === null) {
+          updates.n8nApiKey = null;
+        }
+
+        if (integration) {
+          await storage.updateTenantIntegration(tenantId, updates);
+        } else {
+          await storage.createTenantIntegration({
+            tenantId,
+            ...updates,
+            createdBy: req.user!.userId,
+          });
+        }
+
+        res.json({ success: true, message: 'N8N configuration updated successfully' });
+      } catch (error) {
+        console.error('Error configuring N8N integration:', error);
+        if (error instanceof z.ZodError) {
+          res.status(400).json({ error: error.errors });
+        } else {
+          res.status(500).json({ error: 'Failed to configure N8N integration' });
+        }
+      }
+    },
+  );
+
+  // Get all N8N webhooks for a tenant
+  app.get(
+    '/api/platform/tenants/:tenantId/webhooks',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Verify tenant exists
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        const webhooks = await storage.getN8nWebhooksByTenant(tenantId);
+
+        // Mask auth tokens
+        const maskedWebhooks = webhooks.map((webhook) => ({
+          ...webhook,
+          authToken: webhook.authToken ? maskToken(webhook.authToken) : null,
+        }));
+
+        res.json(maskedWebhooks);
+      } catch (error) {
+        console.error('Error fetching webhooks:', error);
+        res.status(500).json({ error: 'Failed to fetch webhooks' });
+      }
+    },
+  );
+
+  // Create a new N8N webhook
+  app.post(
+    '/api/platform/tenants/:tenantId/webhooks',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Verify tenant exists
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        // Validate webhook data
+        const webhookSchema = z.object({
+          workflowName: z.string().min(1),
+          webhookUrl: z.string().url(),
+          description: z.string().optional(),
+          isActive: z.boolean().default(true),
+          authToken: z.string().optional(),
+        });
+
+        const data = webhookSchema.parse(req.body);
+
+        // Check for duplicate workflow name
+        const existing = await storage.getN8nWebhookByName(tenantId, data.workflowName);
+        if (existing) {
+          return res.status(400).json({
+            error: `Webhook with workflow name "${data.workflowName}" already exists for this tenant`,
+          });
+        }
+
+        // Encrypt auth token if provided
+        const webhookData: any = {
+          tenantId,
+          workflowName: data.workflowName,
+          webhookUrl: data.webhookUrl,
+          description: data.description || null,
+          isActive: data.isActive,
+          authToken: data.authToken ? encrypt(data.authToken) : null,
+          createdBy: req.user!.userId,
+        };
+
+        const webhook = await storage.createN8nWebhook(webhookData);
+
+        res.status(201).json({
+          ...webhook,
+          authToken: webhook.authToken ? maskToken(webhook.authToken) : null,
+        });
+      } catch (error) {
+        console.error('Error creating webhook:', error);
+        if (error instanceof z.ZodError) {
+          res.status(400).json({ error: error.errors });
+        } else {
+          res.status(500).json({ error: 'Failed to create webhook' });
+        }
+      }
+    },
+  );
+
+  // Update an N8N webhook
+  app.put(
+    '/api/platform/tenants/:tenantId/webhooks/:webhookId',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId, webhookId } = req.params;
+
+        // Verify webhook exists and belongs to tenant
+        const webhook = await storage.getN8nWebhook(webhookId);
+        if (!webhook || webhook.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Webhook not found' });
+        }
+
+        // Validate update data
+        const webhookUpdateSchema = z.object({
+          workflowName: z.string().min(1).optional(),
+          webhookUrl: z.string().url().optional(),
+          description: z.string().optional().nullable(),
+          isActive: z.boolean().optional(),
+          authToken: z.string().optional().nullable(),
+        });
+
+        const data = webhookUpdateSchema.parse(req.body);
+
+        // Check for duplicate workflow name if changing
+        if (data.workflowName && data.workflowName !== webhook.workflowName) {
+          const existing = await storage.getN8nWebhookByName(tenantId, data.workflowName);
+          if (existing) {
+            return res.status(400).json({
+              error: `Webhook with workflow name "${data.workflowName}" already exists for this tenant`,
+            });
+          }
+        }
+
+        const updates: any = { ...data };
+
+        // Encrypt auth token if provided
+        if (data.authToken !== undefined) {
+          updates.authToken = data.authToken ? encrypt(data.authToken) : null;
+        }
+
+        const updated = await storage.updateN8nWebhook(webhookId, updates);
+
+        res.json({
+          ...updated,
+          authToken: updated?.authToken ? maskToken(updated.authToken) : null,
+        });
+      } catch (error) {
+        console.error('Error updating webhook:', error);
+        if (error instanceof z.ZodError) {
+          res.status(400).json({ error: error.errors });
+        } else {
+          res.status(500).json({ error: 'Failed to update webhook' });
+        }
+      }
+    },
+  );
+
+  // Delete an N8N webhook
+  app.delete(
+    '/api/platform/tenants/:tenantId/webhooks/:webhookId',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId, webhookId } = req.params;
+
+        // Verify webhook exists and belongs to tenant
+        const webhook = await storage.getN8nWebhook(webhookId);
+        if (!webhook || webhook.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Webhook not found' });
+        }
+
+        await storage.deleteN8nWebhook(webhookId, tenantId);
+
+        res.json({ success: true, message: 'Webhook deleted successfully' });
+      } catch (error) {
+        console.error('Error deleting webhook:', error);
+        res.status(500).json({ error: 'Failed to delete webhook' });
+      }
+    },
+  );
+
+  // Get webhook analytics summary for a tenant
+  app.get(
+    '/api/platform/tenants/:tenantId/webhooks/analytics/summary',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate } = req.query;
+
+        // Verify tenant exists
+        const tenant = await storage.getTenant(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+
+        const start = startDate ? new Date(startDate as string) : undefined;
+        const end = endDate ? new Date(endDate as string) : undefined;
+
+        const summary = await storage.getWebhookAnalyticsSummary(tenantId, start, end);
+
+        res.json(summary);
+      } catch (error) {
+        console.error('Error fetching webhook analytics summary:', error);
+        res.status(500).json({ error: 'Failed to fetch analytics summary' });
+      }
+    },
+  );
+
+  // Get detailed analytics for a specific webhook
+  app.get(
+    '/api/platform/tenants/:tenantId/webhooks/:webhookId/analytics',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId, webhookId } = req.params;
+        const { limit } = req.query;
+
+        // Verify webhook exists and belongs to tenant
+        const webhook = await storage.getN8nWebhook(webhookId);
+        if (!webhook || webhook.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Webhook not found' });
+        }
+
+        const analytics = await storage.getWebhookAnalytics(
+          webhookId,
+          limit ? parseInt(limit as string) : undefined,
+        );
+
+        res.json(analytics);
+      } catch (error) {
+        console.error('Error fetching webhook analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch webhook analytics' });
       }
     },
   );
