@@ -102,6 +102,7 @@ export interface IStorage {
 
   // Widget Config methods
   getWidgetConfig(tenantId: string): Promise<WidgetConfig | undefined>;
+  getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined>;
   createWidgetConfig(config: InsertWidgetConfig): Promise<WidgetConfig>;
   updateWidgetConfig(
     tenantId: string,
@@ -492,6 +493,26 @@ export class MemStorage implements IStorage {
   // Widget Config methods
   async getWidgetConfig(tenantId: string): Promise<WidgetConfig | undefined> {
     const config = Array.from(this.widgetConfigs.values()).find((c) => c.tenantId === tenantId);
+    if (!config) return undefined;
+
+    // Decrypt the Retell API key if it exists
+    if (config.retellApiKey) {
+      try {
+        return {
+          ...config,
+          retellApiKey: decryptApiKey(config.retellApiKey),
+        };
+      } catch (error) {
+        console.error('Error decrypting Retell API key:', error);
+        return config;
+      }
+    }
+
+    return config;
+  }
+
+  async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
+    const config = Array.from(this.widgetConfigs.values()).find((c) => c.retellAgentId === agentId);
     if (!config) return undefined;
 
     // Decrypt the Retell API key if it exists
@@ -1536,6 +1557,31 @@ export class DbStorage implements IStorage {
       .select()
       .from(widgetConfigs)
       .where(eq(widgetConfigs.tenantId, tenantId));
+
+    const config = result[0];
+    if (!config) return undefined;
+
+    // Decrypt the Retell API key if it exists
+    if (config.retellApiKey) {
+      try {
+        return {
+          ...config,
+          retellApiKey: decryptApiKey(config.retellApiKey),
+        };
+      } catch (error) {
+        console.error('Error decrypting Retell API key:', error);
+        return config;
+      }
+    }
+
+    return config;
+  }
+
+  async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
+    const result = await this.db
+      .select()
+      .from(widgetConfigs)
+      .where(eq(widgetConfigs.retellAgentId, agentId));
 
     const config = result[0];
     if (!config) return undefined;
@@ -2674,9 +2720,7 @@ export class DbStorage implements IStorage {
    * Delete all messages for a chat
    */
   async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
-    await this.db
-      .delete(chatMessages)
-      .where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId));
+    await this.db.delete(chatMessages).where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId));
   }
 }
 

@@ -668,10 +668,7 @@ export const chatAnalytics = pgTable(
   },
   (table) => ({
     // Indexes for fast lookups
-    tenantChatIdx: uniqueIndex('chat_analytics_tenant_chat_idx').on(
-      table.tenantId,
-      table.chatId,
-    ),
+    tenantChatIdx: uniqueIndex('chat_analytics_tenant_chat_idx').on(table.tenantId, table.chatId),
     tenantAgentIdx: uniqueIndex('chat_analytics_tenant_agent_idx').on(
       table.tenantId,
       table.agentId,

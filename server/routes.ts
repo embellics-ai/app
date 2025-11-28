@@ -1910,14 +1910,29 @@ export async function registerRoutes(app: Express): Promise<void> {
         },
       };
 
-      // Determine tenant ID from metadata or agent configuration
-      // For now, we'll require it in the metadata
-      const tenantId = payload.metadata?.tenant_id || payload.tenant_id;
+      // Determine tenant ID from metadata or by looking up the agent configuration
+      let tenantId = payload.metadata?.tenant_id || payload.tenant_id;
+
+      if (!tenantId && chatData.agentId) {
+        // Try to find tenant by agent ID (useful for WhatsApp and other integrations)
+        console.log('[Retell Webhook] No tenant_id in metadata, looking up by agent ID:', chatData.agentId);
+        const widgetConfig = await storage.getWidgetConfigByAgentId(chatData.agentId);
+        if (widgetConfig) {
+          tenantId = widgetConfig.tenantId;
+          console.log('[Retell Webhook] Found tenant from agent ID:', tenantId);
+        }
+      }
 
       if (!tenantId) {
-        console.error('[Retell Webhook] Missing tenant_id in payload');
-        return res.status(400).json({ error: 'Missing tenant_id in payload' });
+        console.error('[Retell Webhook] Could not determine tenant_id from payload or agent configuration');
+        console.error('[Retell Webhook] Payload metadata:', payload.metadata);
+        console.error('[Retell Webhook] Agent ID:', chatData.agentId);
+        return res.status(400).json({ 
+          error: 'Could not determine tenant_id. Include tenant_id in metadata or configure agent in system.' 
+        });
       }
+
+      console.log(`[Retell Webhook] Processing chat analytics for tenant ${tenantId}, chat ${chatData.chatId}`);
 
       // Create chat analytics record
       await storage.createChatAnalytics({
@@ -2078,9 +2093,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         res.json({
           sentimentBreakdown: summary.sentimentBreakdown,
           totalChats: summary.totalChats,
-          successRate: summary.totalChats > 0 
-            ? (summary.successfulChats / summary.totalChats) * 100 
-            : 0,
+          successRate:
+            summary.totalChats > 0 ? (summary.successfulChats / summary.totalChats) * 100 : 0,
         });
       } catch (error) {
         console.error('Error fetching sentiment analytics:', error);

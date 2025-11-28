@@ -7,11 +7,13 @@ The Chat Analytics feature provides comprehensive analytics for Retell AI chat a
 ## Features
 
 ### 1. Analytics Dashboard
+
 The analytics dashboard is accessible from the Platform Admin page under the "Analytics" tab.
 
 #### Dashboard Tabs
 
 **Overview Tab**
+
 - **Summary Cards**: Display key metrics at a glance
   - Total Chats: Total number of chat sessions in selected time range
   - Success Rate: Percentage of successful chat completions
@@ -21,6 +23,7 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
 - **Recent Chat Sessions**: Table showing the 10 most recent chats
 
 **Chat Sessions Tab**
+
 - Comprehensive table of all chat sessions with:
   - Timestamp
   - Agent Name
@@ -32,6 +35,7 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
 - Shows up to 50 most recent sessions
 
 **Sentiment Analysis Tab**
+
 - Detailed sentiment breakdown with:
   - Count and percentage for each sentiment type
   - Visual progress bars
@@ -39,6 +43,7 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
   - Color-coded indicators (Green: Positive, Blue: Neutral, Yellow: Negative, Gray: Unknown)
 
 **Cost Tracking Tab**
+
 - Financial analytics including:
   - Total Cost: Cumulative cost for selected period
   - Average Cost per Chat: Mean cost calculation
@@ -47,16 +52,19 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
 ### 2. Filtering Options
 
 **Time Range Filter**
+
 - Last 24 Hours
 - Last 7 Days
 - Last 30 Days
 - Last 90 Days
 
 **Agent Filter**
+
 - Filter by specific agent
 - "All Agents" option to view combined data
 
 **Auto-Refresh**
+
 - Dashboard automatically refreshes every 60 seconds
 - Ensures real-time data visibility
 
@@ -65,6 +73,7 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
 ### Database Schema
 
 **chat_analytics Table**
+
 ```typescript
 {
   id: string (UUID)
@@ -90,6 +99,7 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
 ```
 
 **chat_messages Table**
+
 ```typescript
 {
   id: string (UUID)
@@ -103,6 +113,7 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
 ```
 
 **Indexes**
+
 - `tenant_chat_idx`: (tenantId, chatStartTimestamp) - Optimizes tenant queries
 - `tenant_agent_idx`: (tenantId, agentId) - Optimizes agent filtering
 - `sentiment_idx`: (userSentiment) - Optimizes sentiment queries
@@ -113,14 +124,17 @@ The analytics dashboard is accessible from the Platform Admin page under the "An
 All endpoints require platform admin authentication.
 
 #### GET /api/platform/tenants/:id/analytics/overview
+
 Returns combined voice and chat analytics overview.
 
 **Query Parameters:**
+
 - `startDate` (optional): ISO timestamp for date range start
 - `endDate` (optional): ISO timestamp for date range end
 - `agentId` (optional): Filter by specific agent
 
 **Response:**
+
 ```json
 {
   "voice": {
@@ -145,9 +159,11 @@ Returns combined voice and chat analytics overview.
 ```
 
 #### GET /api/platform/tenants/:id/analytics/chats
+
 Returns list of chat sessions with filtering.
 
 **Query Parameters:**
+
 - `startDate` (optional): ISO timestamp
 - `endDate` (optional): ISO timestamp
 - `agentId` (optional): Filter by agent ID
@@ -156,6 +172,7 @@ Returns list of chat sessions with filtering.
 - `limit` (optional): Max results (default: 50)
 
 **Response:**
+
 ```json
 {
   "chats": [
@@ -177,9 +194,11 @@ Returns list of chat sessions with filtering.
 ```
 
 #### GET /api/platform/tenants/:id/analytics/chats/:chatId
+
 Returns detailed chat information including full transcript and messages.
 
 **Response:**
+
 ```json
 {
   "chat": {
@@ -196,14 +215,17 @@ Returns detailed chat information including full transcript and messages.
 ```
 
 #### GET /api/platform/tenants/:id/analytics/sentiment
+
 Returns sentiment distribution analytics.
 
 **Query Parameters:**
+
 - `startDate` (optional)
 - `endDate` (optional)
 - `agentId` (optional)
 
 **Response:**
+
 ```json
 {
   "sentimentBreakdown": {
@@ -218,14 +240,17 @@ Returns sentiment distribution analytics.
 ```
 
 #### GET /api/platform/tenants/:id/analytics/costs
+
 Returns cost tracking data.
 
 **Query Parameters:**
+
 - `startDate` (optional)
 - `endDate` (optional)
 - `agentId` (optional)
 
 **Response:**
+
 ```json
 {
   "totalCost": number,
@@ -242,13 +267,16 @@ Returns cost tracking data.
 ### Webhook Endpoint
 
 #### POST /api/retell/chat-analyzed
+
 Receives `chat_analyzed` events from Retell AI.
 
-**Authentication:** 
+**Authentication:**
+
 - Public endpoint (no JWT required)
 - Uses Retell signature verification (to be implemented)
 
 **Expected Payload:**
+
 ```json
 {
   "event": "chat_analyzed",
@@ -283,6 +311,7 @@ Receives `chat_analyzed` events from Retell AI.
 ```
 
 **Process Flow:**
+
 1. Receive webhook event
 2. Extract tenant_id from metadata
 3. Verify tenant exists
@@ -302,6 +331,7 @@ npm run db:push
 ```
 
 This will create:
+
 - `chat_analytics` table
 - `chat_messages` table
 - Required indexes
@@ -365,11 +395,13 @@ Expected response: `200 OK` with `{ "success": true }`
 ## Metrics Explained
 
 ### Success Rate
+
 Percentage of chats marked as `chatSuccessful: true` by Retell AI's analysis.
 
 **Calculation:** `(successful chats / total chats) × 100`
 
 ### Average Duration
+
 Mean duration of all chat sessions in the selected time range.
 
 **Calculation:** `sum(chatDuration) / total chats`
@@ -377,7 +409,9 @@ Mean duration of all chat sessions in the selected time range.
 Displayed in format: `XXm YYs`
 
 ### Combined Cost
+
 Total cost across all chats, including:
+
 - LLM costs (Retell AI's language model usage)
 - TTS costs (text-to-speech if applicable)
 - STT costs (speech-to-text if applicable)
@@ -386,7 +420,9 @@ Total cost across all chats, including:
 Displayed in format: `$X.XX`
 
 ### Sentiment Distribution
+
 Breakdown of user sentiment as analyzed by Retell AI:
+
 - **Positive**: User expressed satisfaction or positive feedback
 - **Neutral**: User was neutral or matter-of-fact
 - **Negative**: User expressed dissatisfaction or frustration
@@ -397,6 +433,7 @@ Breakdown of user sentiment as analyzed by Retell AI:
 ### Chat Analytics Not Showing
 
 **Symptoms:**
+
 - Analytics dashboard shows "No data available"
 - Chat count is 0 despite having chat sessions
 
@@ -432,6 +469,7 @@ Breakdown of user sentiment as analyzed by Retell AI:
 ### Data Not Updating in Real-Time
 
 **Symptoms:**
+
 - New chats not appearing immediately
 - Data seems stale
 
@@ -454,6 +492,7 @@ Breakdown of user sentiment as analyzed by Retell AI:
 ### Costs Not Tracked Correctly
 
 **Symptoms:**
+
 - Cost shows as $0.00
 - Cost missing from some chats
 
@@ -471,6 +510,7 @@ Breakdown of user sentiment as analyzed by Retell AI:
 ### Sentiment Always Shows "Unknown"
 
 **Symptoms:**
+
 - All chats show "Unknown" sentiment
 - Sentiment breakdown shows 100% unknown
 
@@ -497,6 +537,7 @@ pm2 logs
 ```
 
 Common errors:
+
 - Database connection timeout → Check database credentials
 - Missing required fields → Check webhook payload structure
 - Type errors → Check data types match schema
@@ -504,6 +545,7 @@ Common errors:
 ### Empty State Despite Having Data
 
 **Symptoms:**
+
 - Analytics dashboard shows empty state
 - But database has chat_analytics records
 
@@ -615,28 +657,20 @@ ngrok http 5000
 **Current Status:** Placeholder implementation
 
 **To Implement:**
+
 1. Get signing secret from Retell AI dashboard
 2. Store in environment variable: `RETELL_WEBHOOK_SECRET`
 3. Implement HMAC signature verification in webhook handler
 4. Reject requests with invalid signatures
 
 **Implementation Reference:**
+
 ```typescript
 import crypto from 'crypto';
 
-function verifyRetellSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
+function verifyRetellSignature(payload: string, signature: string, secret: string): boolean {
+  const expectedSignature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
 }
 ```
 
@@ -664,12 +698,14 @@ function verifyRetellSignature(
 ### Database Indexes
 
 Current indexes optimize:
+
 - Tenant-based queries
 - Date range filtering
 - Agent filtering
 - Sentiment filtering
 
 **Add additional indexes if:**
+
 - Queries are slow (>1 second)
 - Filtering by new fields frequently
 - Large dataset (>100k records)
@@ -677,6 +713,7 @@ Current indexes optimize:
 ### Caching Strategy
 
 Consider implementing caching for:
+
 - Summary statistics (cache for 5 minutes)
 - Sentiment distribution (cache for 10 minutes)
 - Daily cost breakdown (cache for 1 hour)
@@ -693,6 +730,7 @@ storage.deleteOldChatAnalytics(90);
 ```
 
 Schedule via cron job:
+
 ```bash
 # Add to crontab
 0 2 * * * node scripts/cleanup-old-analytics.js
@@ -701,6 +739,7 @@ Schedule via cron job:
 ## Future Enhancements
 
 ### Planned Features
+
 - [ ] Advanced filtering (multiple agents, date presets)
 - [ ] Export to CSV/PDF
 - [ ] Scheduled reports via email
@@ -711,6 +750,7 @@ Schedule via cron job:
 - [ ] Integration with business intelligence tools
 
 ### API Enhancements
+
 - [ ] GraphQL API for flexible queries
 - [ ] Batch webhook processing
 - [ ] Webhook retry mechanism
@@ -718,6 +758,7 @@ Schedule via cron job:
 - [ ] API versioning
 
 ### UI Improvements
+
 - [ ] Dark mode support
 - [ ] Customizable dashboards
 - [ ] Drill-down capabilities
@@ -728,6 +769,7 @@ Schedule via cron job:
 ## Support
 
 For issues or questions:
+
 1. Check this guide's troubleshooting section
 2. Review server logs for errors
 3. Check Retell AI documentation: https://docs.retellai.com

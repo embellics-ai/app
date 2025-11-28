@@ -102,7 +102,7 @@ export default function AgentAnalyticsDashboard({
   const getDateRange = () => {
     const endDate = new Date();
     const startDate = new Date();
-    
+
     switch (timeRange) {
       case '24h':
         startDate.setHours(startDate.getHours() - 24);
@@ -499,7 +499,9 @@ export default function AgentAnalyticsDashboard({
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">{formatCost(chat.combinedCost)}</TableCell>
+                          <TableCell className="text-right">
+                            {formatCost(chat.combinedCost)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -560,7 +562,9 @@ export default function AgentAnalyticsDashboard({
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-muted-foreground">{count}</span>
-                                  <span className="text-sm font-medium">{percentage.toFixed(1)}%</span>
+                                  <span className="text-sm font-medium">
+                                    {percentage.toFixed(1)}%
+                                  </span>
                                 </div>
                               </div>
                               <div className="w-full bg-secondary rounded-full h-2">
@@ -597,7 +601,9 @@ export default function AgentAnalyticsDashboard({
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="text-center p-4 border rounded-lg">
-                        <div className="text-4xl font-bold">{formatCost(costs?.totalCost || 0)}</div>
+                        <div className="text-4xl font-bold">
+                          {formatCost(costs?.totalCost || 0)}
+                        </div>
                         <div className="text-sm text-muted-foreground mt-2">Total Cost</div>
                       </div>
                       <div className="text-center p-4 border rounded-lg">
@@ -620,7 +626,10 @@ export default function AgentAnalyticsDashboard({
                           .sort(([a], [b]) => b.localeCompare(a))
                           .slice(0, 10)
                           .map(([day, cost]) => (
-                            <div key={day} className="flex items-center justify-between p-2 border rounded">
+                            <div
+                              key={day}
+                              className="flex items-center justify-between p-2 border rounded"
+                            >
                               <span className="text-sm">
                                 {new Date(day).toLocaleDateString('en-US', {
                                   month: 'short',
