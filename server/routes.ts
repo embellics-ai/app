@@ -1949,6 +1949,191 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ============================================
+  // CHAT ANALYTICS API ENDPOINTS (Platform Admin)
+  // ============================================
+
+  /**
+   * Get combined analytics overview (voice + chat)
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/overview',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId } = req.query;
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+        };
+
+        // Get chat analytics summary
+        const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
+
+        // TODO: Add voice call analytics when available
+        // const voiceSummary = await storage.getVoiceCallSummary(tenantId, filters);
+
+        res.json({
+          chat: chatSummary,
+          // voice: voiceSummary,
+          combined: {
+            totalInteractions: chatSummary.totalChats, // + voiceSummary.totalCalls
+            totalCost: chatSummary.totalCost, // + voiceSummary.totalCost
+            averageCost: chatSummary.averageCost,
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching analytics overview:', error);
+        res.status(500).json({ error: 'Failed to fetch analytics overview' });
+      }
+    },
+  );
+
+  /**
+   * Get list of chat sessions with filters
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/chats',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId, sentiment, chatStatus, limit } = req.query;
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+          sentiment: sentiment as string | undefined,
+          chatStatus: chatStatus as string | undefined,
+          limit: limit ? parseInt(limit as string) : 100,
+        };
+
+        const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
+
+        res.json(chats);
+      } catch (error) {
+        console.error('Error fetching chat analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch chat analytics' });
+      }
+    },
+  );
+
+  /**
+   * Get detailed analytics for a specific chat session
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/chats/:chatId',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId, chatId } = req.params;
+
+        const chat = await storage.getChatAnalytics(chatId);
+
+        if (!chat || chat.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Chat not found' });
+        }
+
+        // Optionally get individual messages
+        const messages = await storage.getChatMessages(chatId);
+
+        res.json({
+          ...chat,
+          messages,
+        });
+      } catch (error) {
+        console.error('Error fetching chat details:', error);
+        res.status(500).json({ error: 'Failed to fetch chat details' });
+      }
+    },
+  );
+
+  /**
+   * Get sentiment analysis breakdown
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/sentiment',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId } = req.query;
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+        };
+
+        const summary = await storage.getChatAnalyticsSummary(tenantId, filters);
+
+        res.json({
+          sentimentBreakdown: summary.sentimentBreakdown,
+          totalChats: summary.totalChats,
+          successRate: summary.totalChats > 0 
+            ? (summary.successfulChats / summary.totalChats) * 100 
+            : 0,
+        });
+      } catch (error) {
+        console.error('Error fetching sentiment analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch sentiment analytics' });
+      }
+    },
+  );
+
+  /**
+   * Get cost tracking analytics
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/costs',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId } = req.query;
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+        };
+
+        const summary = await storage.getChatAnalyticsSummary(tenantId, filters);
+
+        // Get individual chats for cost breakdown by day
+        const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
+
+        // Group costs by day
+        const costsByDay: Record<string, number> = {};
+        chats.forEach((chat) => {
+          if (chat.startTimestamp) {
+            const day = chat.startTimestamp.toISOString().split('T')[0];
+            costsByDay[day] = (costsByDay[day] || 0) + (chat.combinedCost || 0);
+          }
+        });
+
+        res.json({
+          totalCost: summary.totalCost,
+          averageCost: summary.averageCost,
+          totalChats: summary.totalChats,
+          costsByDay,
+        });
+      } catch (error) {
+        console.error('Error fetching cost analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch cost analytics' });
+      }
+    },
+  );
+
   // ===== Client Admin User Management Routes =====
 
   // Invite support staff (Client Admin only)
