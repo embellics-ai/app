@@ -53,9 +53,7 @@ function Router() {
       </Route>
       <Route path="/analytics">
         <ProtectedRoute path="/analytics">
-          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
-            <UnifiedAnalytics />
-          </RoleProtectedRoute>
+          <UnifiedAnalytics />
         </ProtectedRoute>
       </Route>
       <Route path="/platform-analytics">
