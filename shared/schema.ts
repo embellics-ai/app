@@ -8,6 +8,7 @@ import {
   integer,
   boolean,
   uniqueIndex,
+  real,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
@@ -658,7 +659,7 @@ export const chatAnalytics = pgTable(
     chatSuccessful: boolean('chat_successful'), // Whether chat achieved its goal
 
     // Cost Tracking
-    combinedCost: integer('combined_cost'), // Total cost in cents
+    combinedCost: real('combined_cost'), // Total cost (supports decimals)
     productCosts: jsonb('product_costs'), // Breakdown by model (gpt-4o, etc.)
 
     // Metadata
