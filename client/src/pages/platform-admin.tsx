@@ -296,15 +296,15 @@ export default function PlatformAdminPage() {
       retellAgentId,
     }: {
       tenantId: string;
-      retellApiKey: string;
+      retellApiKey?: string;
       retellAgentId?: string;
     }) => {
       const response = await apiRequest(
         'PATCH',
         `/api/platform/tenants/${tenantId}/retell-api-key`,
         {
-          retellApiKey,
-          retellAgentId,
+          retellApiKey: retellApiKey || undefined,
+          retellAgentId: retellAgentId || undefined,
         },
       );
       return await response.json();

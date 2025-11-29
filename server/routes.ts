@@ -915,7 +915,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { retellApiKey, retellAgentId } = req.body;
 
         // Validate Retell API key format if provided
-        if (retellApiKey) {
+        if (retellApiKey && retellApiKey !== '__KEEP_EXISTING__') {
           if (typeof retellApiKey !== 'string') {
             return res.status(400).json({ error: 'Retell API key must be a string' });
           }
@@ -942,7 +942,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         }
 
         console.log(
-          `[Update Retell API Key] Platform admin updating API key for tenant: ${tenantId}`,
+          `[Update Retell API Key] Platform admin updating configuration for tenant: ${tenantId}`,
         );
 
         // Check if tenant exists
@@ -956,14 +956,21 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         const updateData: any = {};
 
-        // Only update API key if it's not the sentinel value
-        if (retellApiKey.trim() !== '__KEEP_EXISTING__') {
+        // Only update API key if provided and not the sentinel value
+        if (retellApiKey && retellApiKey.trim() !== '__KEEP_EXISTING__') {
           updateData.retellApiKey = retellApiKey.trim();
         }
 
         // Include retellAgentId if provided
         if (retellAgentId) {
           updateData.retellAgentId = retellAgentId.trim();
+        }
+
+        // Check if we have anything to update
+        if (Object.keys(updateData).length === 0) {
+          return res.status(400).json({
+            error: 'No updates provided. Please provide either API key or Agent ID.',
+          });
         }
 
         if (!widgetConfig) {
