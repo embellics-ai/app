@@ -205,100 +205,199 @@ export default function TeamManagementPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Team Management</h1>
-        <p className="text-muted-foreground">
-          Invite and manage your team members (client admins and support staff)
-        </p>
-      </div>
+    <div className="h-full bg-background">
+      <div className="container max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Team Management</h1>
+          <p className="text-muted-foreground">
+            Invite and manage your team members (client admins and support staff)
+          </p>
+        </div>
 
-      <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users" data-testid="tab-users">
-            <Users className="w-4 h-4 mr-2" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="team" data-testid="tab-team-members">
-            <Headphones className="w-4 h-4 mr-2" />
-            Team Members
-          </TabsTrigger>
-          <TabsTrigger value="invited" data-testid="tab-invited">
-            <Mail className="w-4 h-4 mr-2" />
-            Invited
-          </TabsTrigger>
-          <TabsTrigger value="invite" data-testid="tab-invite-member">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Invite Member
-          </TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="users" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="users" data-testid="tab-users">
+              <Users className="w-4 h-4 mr-2" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="team" data-testid="tab-team-members">
+              <Headphones className="w-4 h-4 mr-2" />
+              Team Members
+            </TabsTrigger>
+            <TabsTrigger value="invited" data-testid="tab-invited">
+              <Mail className="w-4 h-4 mr-2" />
+              Invited
+            </TabsTrigger>
+            <TabsTrigger value="invite" data-testid="tab-invite-member">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Invite Member
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Users Tab - Client Admins */}
-        <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Client Admins</CardTitle>
-              <CardDescription>
-                All client administrator accounts for your organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {teamLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : clientAdmins.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No client admin users found.
-                </div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {clientAdmins.map((member: any) => (
-                        <TableRow key={member.id} data-testid={`row-user-${member.id}`}>
-                          <TableCell className="font-medium">
-                            {member.firstName} {member.lastName}
-                          </TableCell>
-                          <TableCell>{member.email}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{member.role.replace('_', ' ')}</Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {member.phoneNumber || 'Not provided'}
-                          </TableCell>
-                          <TableCell>
-                            {member.onboardingCompleted ? (
-                              <Badge variant="secondary">Active</Badge>
-                            ) : (
-                              <Badge variant="outline">Pending</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {user?.id !== member.id && (
+          {/* Users Tab - Client Admins */}
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Client Admins</CardTitle>
+                <CardDescription>
+                  All client administrator accounts for your organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {teamLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : clientAdmins.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No client admin users found.
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clientAdmins.map((member: any) => (
+                          <TableRow key={member.id} data-testid={`row-user-${member.id}`}>
+                            <TableCell className="font-medium">
+                              {member.firstName} {member.lastName}
+                            </TableCell>
+                            <TableCell>{member.email}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{member.role.replace('_', ' ')}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {member.phoneNumber || 'Not provided'}
+                            </TableCell>
+                            <TableCell>
+                              {member.onboardingCompleted ? (
+                                <Badge variant="secondary">Active</Badge>
+                              ) : (
+                                <Badge variant="outline">Pending</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {user?.id !== member.id && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      data-testid={`button-delete-user-${member.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Client Admin</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete {member.firstName}{' '}
+                                        {member.lastName}? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel
+                                        data-testid={`button-cancel-delete-${member.id}`}
+                                      >
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteMemberMutation.mutate(member.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        data-testid={`button-confirm-delete-${member.id}`}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Team Members Tab - Support Staff */}
+          <TabsContent value="team" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Support Staff</CardTitle>
+                <CardDescription>
+                  All support staff members who handle live chat handoffs
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {teamLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : supportStaff.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No support staff members yet. Invite your first support staff member!
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {supportStaff.map((member: any) => (
+                          <TableRow key={member.id} data-testid={`row-member-${member.id}`}>
+                            <TableCell className="font-medium">
+                              {member.firstName} {member.lastName}
+                            </TableCell>
+                            <TableCell>{member.email}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{member.role.replace('_', ' ')}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {member.phoneNumber || 'Not provided'}
+                            </TableCell>
+                            <TableCell>
+                              {member.onboardingCompleted ? (
+                                <Badge variant="secondary">Active</Badge>
+                              ) : (
+                                <Badge variant="outline">Pending</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    data-testid={`button-delete-user-${member.id}`}
+                                    data-testid={`button-delete-member-${member.id}`}
                                   >
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Client Admin</AlertDialogTitle>
+                                    <AlertDialogTitle>Delete Support Staff</AlertDialogTitle>
                                     <AlertDialogDescription>
                                       Are you sure you want to delete {member.firstName}{' '}
                                       {member.lastName}? This action cannot be undone.
@@ -320,237 +419,177 @@ export default function TeamManagementPage() {
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Team Members Tab - Support Staff */}
-        <TabsContent value="team" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Support Staff</CardTitle>
-              <CardDescription>
-                All support staff members who handle live chat handoffs
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {teamLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : supportStaff.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No support staff members yet. Invite your first support staff member!
-                </div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {supportStaff.map((member: any) => (
-                        <TableRow key={member.id} data-testid={`row-member-${member.id}`}>
-                          <TableCell className="font-medium">
-                            {member.firstName} {member.lastName}
-                          </TableCell>
-                          <TableCell>{member.email}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{member.role.replace('_', ' ')}</Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {member.phoneNumber || 'Not provided'}
-                          </TableCell>
-                          <TableCell>
-                            {member.onboardingCompleted ? (
-                              <Badge variant="secondary">Active</Badge>
-                            ) : (
-                              <Badge variant="outline">Pending</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  data-testid={`button-delete-member-${member.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Support Staff</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete {member.firstName}{' '}
-                                    {member.lastName}? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel
-                                    data-testid={`button-cancel-delete-${member.id}`}
-                                  >
-                                    Cancel
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => deleteMemberMutation.mutate(member.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    data-testid={`button-confirm-delete-${member.id}`}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
+          {/* Invited Tab - Pending Invitations */}
+          <TabsContent value="invited" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Invitations</CardTitle>
+                <CardDescription>
+                  Team members who have been invited but haven't logged in yet
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {invitationsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : invitations.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No pending invitations
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Sent</TableHead>
+                          <TableHead>Temp Password</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Invited Tab - Pending Invitations */}
-        <TabsContent value="invited" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Invitations</CardTitle>
-              <CardDescription>
-                Team members who have been invited but haven't logged in yet
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {invitationsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : invitations.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No pending invitations</div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Sent</TableHead>
-                        <TableHead>Temp Password</TableHead>
-                        <TableHead className="w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {invitations.map((invitation: any) => (
-                        <TableRow
-                          key={invitation.id}
-                          data-testid={`row-invitation-${invitation.id}`}
-                        >
-                          <TableCell className="font-medium">
-                            {invitation.firstName} {invitation.lastName}
-                          </TableCell>
-                          <TableCell>{invitation.email}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{invitation.role.replace('_', ' ')}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={invitation.status === 'sent' ? 'default' : 'secondary'}>
-                              {invitation.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {invitation.lastSentAt
-                              ? new Date(invitation.lastSentAt).toLocaleDateString()
-                              : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {/* Plaintext temporary passwords are not returned by the API.
+                      </TableHeader>
+                      <TableBody>
+                        {invitations.map((invitation: any) => (
+                          <TableRow
+                            key={invitation.id}
+                            data-testid={`row-invitation-${invitation.id}`}
+                          >
+                            <TableCell className="font-medium">
+                              {invitation.firstName} {invitation.lastName}
+                            </TableCell>
+                            <TableCell>{invitation.email}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{invitation.role.replace('_', ' ')}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={invitation.status === 'sent' ? 'default' : 'secondary'}
+                              >
+                                {invitation.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {invitation.lastSentAt
+                                ? new Date(invitation.lastSentAt).toLocaleDateString()
+                                : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {/* Plaintext temporary passwords are not returned by the API.
                                 Show a friendly status instead. */}
-                            <span className="text-muted-foreground text-sm">
-                              {invitation.status === 'sent' ? 'Sent via email' : '-'}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  data-testid={`button-delete-invitation-${invitation.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Invitation</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this invitation? This action
-                                    cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => deleteInvitationMutation.mutate(invitation.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              <span className="text-muted-foreground text-sm">
+                                {invitation.status === 'sent' ? 'Sent via email' : '-'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    data-testid={`button-delete-invitation-${invitation.id}`}
                                   >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Invitation</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this invitation? This action
+                                      cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteInvitationMutation.mutate(invitation.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Invite Member Tab */}
-        <TabsContent value="invite" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invite Team Member</CardTitle>
-              <CardDescription>
-                Send an invitation to a new client admin or support staff member
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Invite Member Tab */}
+          <TabsContent value="invite" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite Team Member</CardTitle>
+                <CardDescription>
+                  Send an invitation to a new client admin or support staff member
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Jane" {...field} data-testid="input-firstName" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Smith" {...field} data-testid="input-lastName" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     <FormField
                       control={form.control}
-                      name="firstName"
+                      name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>First Name</FormLabel>
+                          <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input placeholder="Jane" {...field} data-testid="input-firstName" />
+                            <Input
+                              type="email"
+                              placeholder="jane@example.com"
+                              {...field}
+                              data-testid="input-email"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -559,98 +598,65 @@ export default function TeamManagementPage() {
 
                     <FormField
                       control={form.control}
-                      name="lastName"
+                      name="role"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Smith" {...field} data-testid="input-lastName" />
-                          </FormControl>
+                          <FormLabel>Role</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-role">
+                                <SelectValue placeholder="Select a role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="client_admin">Client Admin</SelectItem>
+                              <SelectItem value="support_staff">Support Staff</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="jane@example.com"
-                            {...field}
-                            data-testid="input-email"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    {/* Display company name (read-only) */}
+                    <div className="space-y-2">
+                      <FormLabel>Company</FormLabel>
+                      <Input
+                        value={tenantInfo?.name || 'Loading...'}
+                        disabled
+                        className="bg-muted cursor-not-allowed"
+                        data-testid="input-company-name-readonly"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        New team members will be added to your company
+                      </p>
+                    </div>
 
-                  <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-role">
-                              <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="client_admin">Client Admin</SelectItem>
-                            <SelectItem value="support_staff">Support Staff</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Display company name (read-only) */}
-                  <div className="space-y-2">
-                    <FormLabel>Company</FormLabel>
-                    <Input
-                      value={tenantInfo?.name || 'Loading...'}
-                      disabled
-                      className="bg-muted cursor-not-allowed"
-                      data-testid="input-company-name-readonly"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      New team members will be added to your company
-                    </p>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={inviteMemberMutation.isPending}
-                    data-testid="button-invite-member"
-                    className="w-full"
-                  >
-                    {inviteMemberMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending Invitation...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Send Invitation
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    <Button
+                      type="submit"
+                      disabled={inviteMemberMutation.isPending}
+                      data-testid="button-invite-member"
+                      className="w-full"
+                    >
+                      {inviteMemberMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending Invitation...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Send Invitation
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

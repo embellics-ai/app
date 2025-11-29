@@ -166,213 +166,220 @@ export default function WidgetConfigPage() {
   }
 
   return (
-    <div className="container max-w-4xl py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Widget Configuration</h1>
-        <p className="text-muted-foreground mt-2">
-          Customize the appearance and behavior of your chat widget
-        </p>
-      </div>
+    <div className="h-full bg-background">
+      <div className="container max-w-5xl mx-auto px-6 py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Widget Configuration</h1>
+          <p className="text-muted-foreground mt-2">
+            Customize the appearance and behavior of your chat widget
+          </p>
+        </div>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Appearance Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Appearance
-              </CardTitle>
-              <CardDescription>Customize the visual style of your chat widget</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="primaryColor"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Primary Color</FormLabel>
-                    <FormControl>
-                      <div className="flex items-center gap-3">
-                        <Input
-                          {...field}
-                          type="color"
-                          className="w-24 h-12 cursor-pointer"
-                          data-testid="input-primary-color"
-                        />
-                        <span
-                          className="text-sm text-muted-foreground font-mono"
-                          key={field.value}
-                          data-testid="text-color-value"
-                        >
-                          {field.value}
-                        </span>
-                      </div>
-                    </FormControl>
-                    <FormDescription>
-                      Main theme color for buttons, header, and accents
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="textColor"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Text Color</FormLabel>
-                    <FormControl>
-                      <div className="flex items-center gap-3">
-                        <Input
-                          {...field}
-                          type="color"
-                          className="w-24 h-12 cursor-pointer"
-                          data-testid="input-text-color"
-                        />
-                        <span className="text-sm text-muted-foreground font-mono" key={field.value}>
-                          {field.value}
-                        </span>
-                      </div>
-                    </FormControl>
-                    <FormDescription>Text color on primary colored backgrounds</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="borderRadius"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Border Radius</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="12px" data-testid="input-border-radius" />
-                    </FormControl>
-                    <FormDescription>
-                      Corner roundness for widget elements (e.g., 12px, 1rem)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="position"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Widget Position</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || 'bottom-right'}>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Appearance Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Appearance
+                </CardTitle>
+                <CardDescription>Customize the visual style of your chat widget</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="primaryColor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Primary Color</FormLabel>
                       <FormControl>
-                        <SelectTrigger data-testid="select-position">
-                          <SelectValue placeholder="Select position" />
-                        </SelectTrigger>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            {...field}
+                            type="color"
+                            className="w-24 h-12 cursor-pointer"
+                            data-testid="input-primary-color"
+                          />
+                          <span
+                            className="text-sm text-muted-foreground font-mono"
+                            key={field.value}
+                            data-testid="text-color-value"
+                          >
+                            {field.value}
+                          </span>
+                        </div>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="top-left">Top Left</SelectItem>
-                        <SelectItem value="top-center">Top Center</SelectItem>
-                        <SelectItem value="top-right">Top Right</SelectItem>
-                        <SelectItem value="middle-left">Middle Left</SelectItem>
-                        <SelectItem value="middle-right">Middle Right</SelectItem>
-                        <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                        <SelectItem value="bottom-center">Bottom Center</SelectItem>
-                        <SelectItem value="bottom-right">Bottom Right (Default)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>Where the chat widget appears on your website</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                      <FormDescription>
+                        Main theme color for buttons, header, and accents
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          {/* Content Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Content
-              </CardTitle>
-              <CardDescription>Set the default messages for your chat widget</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="greeting"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Greeting Message (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Hi! How can I help you today?"
-                        data-testid="input-greeting"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Used as the widget title. Leave empty to show "Let's Chat"
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                <FormField
+                  control={form.control}
+                  name="textColor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Text Color</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            {...field}
+                            type="color"
+                            className="w-24 h-12 cursor-pointer"
+                            data-testid="input-text-color"
+                          />
+                          <span
+                            className="text-sm text-muted-foreground font-mono"
+                            key={field.value}
+                          >
+                            {field.value}
+                          </span>
+                        </div>
+                      </FormControl>
+                      <FormDescription>Text color on primary colored backgrounds</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          {/* Security Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Security
-              </CardTitle>
-              <CardDescription>Configure domain restrictions for your widget</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="allowedDomains"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Allowed Domains</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="example.com, *.yourdomain.com"
-                        data-testid="input-allowed-domains"
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Comma-separated list of domains (with ports) where the widget can be embedded.
-                      Examples: localhost:3000, app.example.com, *.example.com (wildcard). Leave
-                      empty to allow all domains.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                <FormField
+                  control={form.control}
+                  name="borderRadius"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Border Radius</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="12px" data-testid="input-border-radius" />
+                      </FormControl>
+                      <FormDescription>
+                        Corner roundness for widget elements (e.g., 12px, 1rem)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => form.reset()}
-              data-testid="button-reset"
-            >
-              Reset
-            </Button>
-            <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save">
-              {updateConfig.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </Form>
+                <FormField
+                  control={form.control}
+                  name="position"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Widget Position</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || 'bottom-right'}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-position">
+                            <SelectValue placeholder="Select position" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="top-left">Top Left</SelectItem>
+                          <SelectItem value="top-center">Top Center</SelectItem>
+                          <SelectItem value="top-right">Top Right</SelectItem>
+                          <SelectItem value="middle-left">Middle Left</SelectItem>
+                          <SelectItem value="middle-right">Middle Right</SelectItem>
+                          <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                          <SelectItem value="bottom-center">Bottom Center</SelectItem>
+                          <SelectItem value="bottom-right">Bottom Right (Default)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Where the chat widget appears on your website
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Content Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Content
+                </CardTitle>
+                <CardDescription>Set the default messages for your chat widget</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="greeting"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Greeting Message (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Hi! How can I help you today?"
+                          data-testid="input-greeting"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Used as the widget title. Leave empty to show "Let's Chat"
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Security Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Security
+                </CardTitle>
+                <CardDescription>Configure domain restrictions for your widget</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="allowedDomains"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Allowed Domains</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="example.com, *.yourdomain.com"
+                          data-testid="input-allowed-domains"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Comma-separated list of domains (with ports) where the widget can be
+                        embedded. Examples: localhost:3000, app.example.com, *.example.com
+                        (wildcard). Leave empty to allow all domains.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => form.reset()}
+                data-testid="button-reset"
+              >
+                Reset
+              </Button>
+              <Button type="submit" disabled={updateConfig.isPending} data-testid="button-save">
+                {updateConfig.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </div>
     </div>
   );
 }

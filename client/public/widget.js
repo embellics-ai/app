@@ -45,10 +45,13 @@
   function createWidgetHTML() {
     const widgetContainer = document.createElement('div');
     widgetContainer.id = 'embellics-widget-container';
+    // Hide widget until fully loaded with styles and positioning
+    widgetContainer.style.opacity = '0';
+    widgetContainer.style.visibility = 'hidden';
     widgetContainer.innerHTML = `
       <style>
         /* Using application's design system - matching Tailwind config and index.css */
-        #embellics-widget-container { position: fixed; z-index: 999999; font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        #embellics-widget-container { position: fixed; z-index: 999999; font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: opacity 0.3s ease, visibility 0.3s ease; }
         #embellics-widget-button { width: 60px; height: 60px; border-radius: 50%; background: hsl(262, 75%, 65%); border: none; cursor: pointer; box-shadow: 0 8px 24px hsla(262, 75%, 65%, 0.4); display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.3s; }
         #embellics-widget-button:hover { transform: scale(1.08); box-shadow: 0 12px 32px hsla(262, 75%, 65%, 0.5); }
         #embellics-widget-button svg { width: 28px; height: 28px; fill: white; }
@@ -433,6 +436,13 @@
 
     // Apply panel positioning
     Object.assign(panel.style, config.panel);
+
+    // Show widget now that positioning is applied
+    // Use requestAnimationFrame to ensure styles are applied before showing
+    requestAnimationFrame(() => {
+      container.style.opacity = '1';
+      container.style.visibility = 'visible';
+    });
   }
 
   // Apply widget title from greeting
@@ -1062,14 +1072,14 @@
     formContainer.innerHTML = `
       <div class="embellics-contact-form-title">Please provide your contact details:</div>
       <div class="embellics-contact-form-row">
-        <input type="text" id="embellics-form-firstname" placeholder="First Name *" required autocomplete="given-name" ${isHistorical ? 'disabled' : ''}>
-        <input type="text" id="embellics-form-lastname" placeholder="Last Name *" required autocomplete="family-name" ${isHistorical ? 'disabled' : ''}>
+        <input type="text" id="embellics-form-firstname" placeholder="First Name *" required autocomplete="given-name" maxlength="50" ${isHistorical ? 'disabled' : ''}>
+        <input type="text" id="embellics-form-lastname" placeholder="Last Name *" required autocomplete="family-name" maxlength="50" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-row">
-        <input type="email" id="embellics-form-email" class="embellics-contact-form-full" placeholder="Email *" required autocomplete="email" ${isHistorical ? 'disabled' : ''}>
+        <input type="email" id="embellics-form-email" class="embellics-contact-form-full" placeholder="Email *" required autocomplete="email" maxlength="100" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-row">
-        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-full" placeholder="Phone Number *" required autocomplete="tel" ${isHistorical ? 'disabled' : ''}>
+        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-full" placeholder="Phone Number (10 digits) *" required autocomplete="tel" maxlength="15" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-error" id="embellics-form-error"></div>
       <button type="button" id="embellics-form-submit" ${isHistorical ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>Submit Details</button>
@@ -1124,20 +1134,31 @@
         document.getElementById('embellics-form-email').classList.remove('error');
       }
 
-      // Phone validation (basic - at least 10 digits)
+      // Phone validation (exactly 10 digits)
       const phoneDigits = phone.replace(/\D/g, '');
-      if (!phone || phoneDigits.length < 10) {
+      if (!phone || phoneDigits.length !== 10) {
         document.getElementById('embellics-form-phone').classList.add('error');
         isValid = false;
+        if (phoneDigits.length > 0 && phoneDigits.length < 10) {
+          errorDiv.textContent = 'Phone number must be exactly 10 digits';
+        } else if (phoneDigits.length > 10) {
+          errorDiv.textContent = 'Phone number must be exactly 10 digits';
+        }
       } else {
         document.getElementById('embellics-form-phone').classList.remove('error');
       }
 
       if (!isValid) {
-        errorDiv.textContent = 'Please fill in all fields correctly';
+        if (!errorDiv.textContent) {
+          errorDiv.textContent = 'Please fill in all fields correctly';
+        }
         errorDiv.classList.add('show');
         return;
       }
+
+      // Clear any previous errors
+      errorDiv.textContent = '';
+      errorDiv.classList.remove('show');
 
       // Disable form
       submitBtn.disabled = true;

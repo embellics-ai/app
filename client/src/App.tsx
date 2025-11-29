@@ -125,9 +125,9 @@ function AuthenticatedApp({ user, style }: { user: any; style: any }) {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
+      <div className="flex h-screen w-full bg-background">
         <AppSidebar />
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0">
           <AppHeader />
           <main className="flex-1 overflow-auto">
             <Router />
@@ -140,7 +140,7 @@ function AuthenticatedApp({ user, style }: { user: any; style: any }) {
 
 function AppHeader() {
   return (
-    <header className="flex items-center justify-between px-4 py-2 border-b gap-3">
+    <header className="flex items-center justify-between px-6 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
       <SidebarTrigger data-testid="button-sidebar-toggle" />
       <div className="flex items-center gap-3">
         <ThemeToggle />

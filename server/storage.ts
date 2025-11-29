@@ -29,6 +29,16 @@ import {
   type InsertWidgetHandoffMessage,
   type WidgetChatMessage,
   type InsertWidgetChatMessage,
+  type TenantIntegration,
+  type InsertTenantIntegration,
+  type N8nWebhook,
+  type InsertN8nWebhook,
+  type WebhookAnalytics,
+  type InsertWebhookAnalytics,
+  type ChatAnalytics,
+  type InsertChatAnalytics,
+  type ChatMessage,
+  type InsertChatMessage,
   users,
   messages,
   conversations,
@@ -44,6 +54,11 @@ import {
   widgetHandoffs,
   widgetHandoffMessages,
   widgetChatMessages,
+  tenantIntegrations,
+  n8nWebhooks,
+  webhookAnalytics,
+  chatAnalytics,
+  chatMessages,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -87,6 +102,7 @@ export interface IStorage {
 
   // Widget Config methods
   getWidgetConfig(tenantId: string): Promise<WidgetConfig | undefined>;
+  getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined>;
   createWidgetConfig(config: InsertWidgetConfig): Promise<WidgetConfig>;
   updateWidgetConfig(
     tenantId: string,
@@ -196,6 +212,83 @@ export interface IStorage {
   // Widget Chat Message methods (for history persistence)
   createWidgetChatMessage(message: InsertWidgetChatMessage): Promise<WidgetChatMessage>;
   getWidgetChatMessages(chatId: string): Promise<WidgetChatMessage[]>;
+
+  // Tenant Integrations methods
+  getTenantIntegration(tenantId: string): Promise<TenantIntegration | undefined>;
+  createTenantIntegration(integration: InsertTenantIntegration): Promise<TenantIntegration>;
+  updateTenantIntegration(
+    tenantId: string,
+    updates: Partial<InsertTenantIntegration>,
+  ): Promise<TenantIntegration | undefined>;
+  deleteTenantIntegration(tenantId: string): Promise<void>;
+
+  // N8N Webhooks methods
+  getN8nWebhook(id: string): Promise<N8nWebhook | undefined>;
+  getN8nWebhooksByTenant(tenantId: string): Promise<N8nWebhook[]>;
+  getN8nWebhookByName(tenantId: string, workflowName: string): Promise<N8nWebhook | undefined>;
+  getActiveN8nWebhooks(tenantId: string): Promise<N8nWebhook[]>;
+  createN8nWebhook(webhook: InsertN8nWebhook): Promise<N8nWebhook>;
+  updateN8nWebhook(id: string, updates: Partial<InsertN8nWebhook>): Promise<N8nWebhook | undefined>;
+  incrementWebhookStats(id: string, success: boolean): Promise<void>;
+  deleteN8nWebhook(id: string, tenantId: string): Promise<void>;
+
+  // Webhook Analytics methods
+  createWebhookAnalytics(analytics: InsertWebhookAnalytics): Promise<WebhookAnalytics>;
+  getWebhookAnalytics(webhookId: string, limit?: number): Promise<WebhookAnalytics[]>;
+  getWebhookAnalyticsByTenant(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<WebhookAnalytics[]>;
+  getWebhookAnalyticsSummary(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    failedCalls: number;
+    averageResponseTime: number;
+  }>;
+  deleteOldWebhookAnalytics(olderThanDays: number): Promise<void>;
+
+  // Chat Analytics Methods
+  createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics>;
+  getChatAnalytics(id: string): Promise<ChatAnalytics | undefined>;
+  getChatAnalyticsByChatId(chatId: string): Promise<ChatAnalytics | undefined>;
+  getChatAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      chatStatus?: string;
+      limit?: number;
+    },
+  ): Promise<ChatAnalytics[]>;
+  getChatAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalChats: number;
+    successfulChats: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }>;
+  deleteOldChatAnalytics(olderThanDays: number): Promise<void>;
+
+  // Chat Messages Methods (optional - for detailed message storage)
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]>;
+  deleteChatMessages(chatAnalyticsId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -400,6 +493,26 @@ export class MemStorage implements IStorage {
   // Widget Config methods
   async getWidgetConfig(tenantId: string): Promise<WidgetConfig | undefined> {
     const config = Array.from(this.widgetConfigs.values()).find((c) => c.tenantId === tenantId);
+    if (!config) return undefined;
+
+    // Decrypt the Retell API key if it exists
+    if (config.retellApiKey) {
+      try {
+        return {
+          ...config,
+          retellApiKey: decryptApiKey(config.retellApiKey),
+        };
+      } catch (error) {
+        console.error('Error decrypting Retell API key:', error);
+        return config;
+      }
+    }
+
+    return config;
+  }
+
+  async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
+    const config = Array.from(this.widgetConfigs.values()).find((c) => c.retellAgentId === agentId);
     if (!config) return undefined;
 
     // Decrypt the Retell API key if it exists
@@ -1085,6 +1198,206 @@ export class MemStorage implements IStorage {
   async getWidgetChatMessages(chatId: string): Promise<WidgetChatMessage[]> {
     return []; // Stub
   }
+
+  // Tenant Integrations stubs
+  async getTenantIntegration(tenantId: string): Promise<TenantIntegration | undefined> {
+    return undefined; // Stub
+  }
+
+  async createTenantIntegration(integration: InsertTenantIntegration): Promise<TenantIntegration> {
+    const id = randomUUID();
+    return {
+      id,
+      ...integration,
+      updatedAt: new Date(),
+      createdAt: new Date(),
+    } as TenantIntegration;
+  }
+
+  async updateTenantIntegration(
+    tenantId: string,
+    updates: Partial<InsertTenantIntegration>,
+  ): Promise<TenantIntegration | undefined> {
+    return undefined; // Stub
+  }
+
+  async deleteTenantIntegration(tenantId: string): Promise<void> {
+    // Stub
+  }
+
+  // N8N Webhooks stubs
+  async getN8nWebhook(id: string): Promise<N8nWebhook | undefined> {
+    return undefined; // Stub
+  }
+
+  async getN8nWebhooksByTenant(tenantId: string): Promise<N8nWebhook[]> {
+    return []; // Stub
+  }
+
+  async getN8nWebhookByName(
+    tenantId: string,
+    workflowName: string,
+  ): Promise<N8nWebhook | undefined> {
+    return undefined; // Stub
+  }
+
+  async getActiveN8nWebhooks(tenantId: string): Promise<N8nWebhook[]> {
+    return []; // Stub
+  }
+
+  async createN8nWebhook(webhook: InsertN8nWebhook): Promise<N8nWebhook> {
+    const id = randomUUID();
+    return {
+      id,
+      ...webhook,
+      lastCalledAt: null,
+      totalCalls: 0,
+      successfulCalls: 0,
+      failedCalls: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as N8nWebhook;
+  }
+
+  async updateN8nWebhook(
+    id: string,
+    updates: Partial<InsertN8nWebhook>,
+  ): Promise<N8nWebhook | undefined> {
+    return undefined; // Stub
+  }
+
+  async incrementWebhookStats(id: string, success: boolean): Promise<void> {
+    // Stub
+  }
+
+  async deleteN8nWebhook(id: string, tenantId: string): Promise<void> {
+    // Stub
+  }
+
+  // Webhook Analytics stubs
+  async createWebhookAnalytics(analytics: InsertWebhookAnalytics): Promise<WebhookAnalytics> {
+    const id = randomUUID();
+    return {
+      id,
+      ...analytics,
+      timestamp: new Date(),
+    } as WebhookAnalytics;
+  }
+
+  async getWebhookAnalytics(webhookId: string, limit?: number): Promise<WebhookAnalytics[]> {
+    return []; // Stub
+  }
+
+  async getWebhookAnalyticsByTenant(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<WebhookAnalytics[]> {
+    return []; // Stub
+  }
+
+  async getWebhookAnalyticsSummary(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    failedCalls: number;
+    averageResponseTime: number;
+  }> {
+    return {
+      totalCalls: 0,
+      successfulCalls: 0,
+      failedCalls: 0,
+      averageResponseTime: 0,
+    }; // Stub
+  }
+
+  async deleteOldWebhookAnalytics(olderThanDays: number): Promise<void> {
+    // Stub
+  }
+
+  // Chat Analytics stubs
+  async createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics> {
+    const id = randomUUID();
+    return {
+      id,
+      ...analytics,
+      createdAt: new Date(),
+    } as ChatAnalytics;
+  }
+
+  async getChatAnalytics(id: string): Promise<ChatAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getChatAnalyticsByChatId(chatId: string): Promise<ChatAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getChatAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      chatStatus?: string;
+      limit?: number;
+    },
+  ): Promise<ChatAnalytics[]> {
+    return []; // Stub
+  }
+
+  async getChatAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalChats: number;
+    successfulChats: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    return {
+      totalChats: 0,
+      successfulChats: 0,
+      totalDuration: 0,
+      averageDuration: 0,
+      totalCost: 0,
+      averageCost: 0,
+      sentimentBreakdown: {},
+    }; // Stub
+  }
+
+  async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
+    // Stub
+  }
+
+  // Chat Messages stubs
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const id = randomUUID();
+    return {
+      id,
+      ...message,
+      createdAt: new Date(),
+    } as ChatMessage;
+  }
+
+  async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
+    return []; // Stub
+  }
+
+  async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
+    // Stub
+  }
 }
 
 // Database storage implementation using PostgreSQL
@@ -1244,6 +1557,31 @@ export class DbStorage implements IStorage {
       .select()
       .from(widgetConfigs)
       .where(eq(widgetConfigs.tenantId, tenantId));
+
+    const config = result[0];
+    if (!config) return undefined;
+
+    // Decrypt the Retell API key if it exists
+    if (config.retellApiKey) {
+      try {
+        return {
+          ...config,
+          retellApiKey: decryptApiKey(config.retellApiKey),
+        };
+      } catch (error) {
+        console.error('Error decrypting Retell API key:', error);
+        return config;
+      }
+    }
+
+    return config;
+  }
+
+  async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
+    const result = await this.db
+      .select()
+      .from(widgetConfigs)
+      .where(eq(widgetConfigs.retellAgentId, agentId));
 
     const config = result[0];
     if (!config) return undefined;
@@ -1963,6 +2301,426 @@ export class DbStorage implements IStorage {
       .from(widgetChatMessages)
       .where(eq(widgetChatMessages.chatId, chatId))
       .orderBy(widgetChatMessages.timestamp);
+  }
+
+  // ============================================
+  // TENANT INTEGRATIONS METHODS
+  // ============================================
+
+  /**
+   * Get integration configuration for a tenant
+   */
+  async getTenantIntegration(tenantId: string): Promise<TenantIntegration | undefined> {
+    const result = await this.db
+      .select()
+      .from(tenantIntegrations)
+      .where(eq(tenantIntegrations.tenantId, tenantId));
+    return result[0];
+  }
+
+  /**
+   * Create integration configuration for a tenant
+   */
+  async createTenantIntegration(integration: InsertTenantIntegration): Promise<TenantIntegration> {
+    const result = await this.db.insert(tenantIntegrations).values(integration).returning();
+    return result[0];
+  }
+
+  /**
+   * Update integration configuration for a tenant
+   */
+  async updateTenantIntegration(
+    tenantId: string,
+    updates: Partial<InsertTenantIntegration>,
+  ): Promise<TenantIntegration | undefined> {
+    const result = await this.db
+      .update(tenantIntegrations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tenantIntegrations.tenantId, tenantId))
+      .returning();
+    return result[0];
+  }
+
+  /**
+   * Delete integration configuration for a tenant
+   */
+  async deleteTenantIntegration(tenantId: string): Promise<void> {
+    await this.db.delete(tenantIntegrations).where(eq(tenantIntegrations.tenantId, tenantId));
+  }
+
+  // ============================================
+  // N8N WEBHOOKS METHODS
+  // ============================================
+
+  /**
+   * Get a specific webhook by ID
+   */
+  async getN8nWebhook(id: string): Promise<N8nWebhook | undefined> {
+    const result = await this.db.select().from(n8nWebhooks).where(eq(n8nWebhooks.id, id));
+    return result[0];
+  }
+
+  /**
+   * Get all webhooks for a tenant
+   */
+  async getN8nWebhooksByTenant(tenantId: string): Promise<N8nWebhook[]> {
+    return await this.db
+      .select()
+      .from(n8nWebhooks)
+      .where(eq(n8nWebhooks.tenantId, tenantId))
+      .orderBy(n8nWebhooks.workflowName);
+  }
+
+  /**
+   * Get a specific webhook by tenant and workflow name
+   */
+  async getN8nWebhookByName(
+    tenantId: string,
+    workflowName: string,
+  ): Promise<N8nWebhook | undefined> {
+    const result = await this.db
+      .select()
+      .from(n8nWebhooks)
+      .where(and(eq(n8nWebhooks.tenantId, tenantId), eq(n8nWebhooks.workflowName, workflowName)));
+    return result[0];
+  }
+
+  /**
+   * Get all active webhooks for a tenant
+   */
+  async getActiveN8nWebhooks(tenantId: string): Promise<N8nWebhook[]> {
+    return await this.db
+      .select()
+      .from(n8nWebhooks)
+      .where(and(eq(n8nWebhooks.tenantId, tenantId), eq(n8nWebhooks.isActive, true)))
+      .orderBy(n8nWebhooks.workflowName);
+  }
+
+  /**
+   * Create a new N8N webhook
+   */
+  async createN8nWebhook(webhook: InsertN8nWebhook): Promise<N8nWebhook> {
+    const result = await this.db.insert(n8nWebhooks).values(webhook).returning();
+    return result[0];
+  }
+
+  /**
+   * Update an N8N webhook
+   */
+  async updateN8nWebhook(
+    id: string,
+    updates: Partial<InsertN8nWebhook>,
+  ): Promise<N8nWebhook | undefined> {
+    const result = await this.db
+      .update(n8nWebhooks)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(n8nWebhooks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  /**
+   * Increment webhook call counters
+   */
+  async incrementWebhookStats(id: string, success: boolean): Promise<void> {
+    await this.db
+      .update(n8nWebhooks)
+      .set({
+        totalCalls: sql`${n8nWebhooks.totalCalls} + 1`,
+        successfulCalls: success ? sql`${n8nWebhooks.successfulCalls} + 1` : undefined,
+        failedCalls: !success ? sql`${n8nWebhooks.failedCalls} + 1` : undefined,
+        lastCalledAt: new Date(),
+      })
+      .where(eq(n8nWebhooks.id, id));
+  }
+
+  /**
+   * Delete an N8N webhook
+   */
+  async deleteN8nWebhook(id: string, tenantId: string): Promise<void> {
+    await this.db
+      .delete(n8nWebhooks)
+      .where(and(eq(n8nWebhooks.id, id), eq(n8nWebhooks.tenantId, tenantId)));
+  }
+
+  // ============================================
+  // WEBHOOK ANALYTICS METHODS
+  // ============================================
+
+  /**
+   * Create a webhook analytics record
+   */
+  async createWebhookAnalytics(analytics: InsertWebhookAnalytics): Promise<WebhookAnalytics> {
+    const result = await this.db.insert(webhookAnalytics).values(analytics).returning();
+    return result[0];
+  }
+
+  /**
+   * Get webhook analytics for a specific webhook
+   */
+  async getWebhookAnalytics(webhookId: string, limit = 100): Promise<WebhookAnalytics[]> {
+    return await this.db
+      .select()
+      .from(webhookAnalytics)
+      .where(eq(webhookAnalytics.webhookId, webhookId))
+      .orderBy(desc(webhookAnalytics.timestamp))
+      .limit(limit);
+  }
+
+  /**
+   * Get webhook analytics for a tenant within a date range
+   */
+  async getWebhookAnalyticsByTenant(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<WebhookAnalytics[]> {
+    const conditions = [eq(webhookAnalytics.tenantId, tenantId)];
+
+    if (startDate) {
+      conditions.push(gte(webhookAnalytics.timestamp, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(webhookAnalytics.timestamp, endDate));
+    }
+
+    return await this.db
+      .select()
+      .from(webhookAnalytics)
+      .where(and(...conditions))
+      .orderBy(desc(webhookAnalytics.timestamp));
+  }
+
+  /**
+   * Get webhook analytics summary for a tenant
+   */
+  async getWebhookAnalyticsSummary(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    failedCalls: number;
+    averageResponseTime: number;
+  }> {
+    const conditions = [eq(webhookAnalytics.tenantId, tenantId)];
+
+    if (startDate) {
+      conditions.push(gte(webhookAnalytics.timestamp, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(webhookAnalytics.timestamp, endDate));
+    }
+
+    const result = await this.db
+      .select({
+        totalCalls: sql<number>`COUNT(*)`,
+        successfulCalls: sql<number>`SUM(CASE WHEN ${webhookAnalytics.success} THEN 1 ELSE 0 END)`,
+        failedCalls: sql<number>`SUM(CASE WHEN NOT ${webhookAnalytics.success} THEN 1 ELSE 0 END)`,
+        averageResponseTime: sql<number>`AVG(${webhookAnalytics.responseTime})`,
+      })
+      .from(webhookAnalytics)
+      .where(and(...conditions));
+
+    return {
+      totalCalls: Number(result[0]?.totalCalls || 0),
+      successfulCalls: Number(result[0]?.successfulCalls || 0),
+      failedCalls: Number(result[0]?.failedCalls || 0),
+      averageResponseTime: Number(result[0]?.averageResponseTime || 0),
+    };
+  }
+
+  /**
+   * Delete old webhook analytics (for cleanup/archiving)
+   */
+  async deleteOldWebhookAnalytics(olderThanDays: number): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+    await this.db.delete(webhookAnalytics).where(lte(webhookAnalytics.timestamp, cutoffDate));
+  }
+
+  // ============================================
+  // CHAT ANALYTICS METHODS
+  // ============================================
+
+  /**
+   * Create a new chat analytics record
+   */
+  async createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics> {
+    const [created] = await this.db.insert(chatAnalytics).values(analytics).returning();
+    return created!;
+  }
+
+  /**
+   * Get chat analytics by ID
+   */
+  async getChatAnalytics(id: string): Promise<ChatAnalytics | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(eq(chatAnalytics.id, id))
+      .limit(1);
+    return result;
+  }
+
+  /**
+   * Get chat analytics by Retell chat ID
+   */
+  async getChatAnalyticsByChatId(chatId: string): Promise<ChatAnalytics | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(eq(chatAnalytics.chatId, chatId))
+      .limit(1);
+    return result;
+  }
+
+  /**
+   * Get chat analytics for a tenant with filters
+   */
+  async getChatAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      chatStatus?: string;
+      limit?: number;
+    },
+  ): Promise<ChatAnalytics[]> {
+    const conditions = [eq(chatAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(chatAnalytics.endTimestamp, filters.endDate));
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(chatAnalytics.agentId, filters.agentId));
+    }
+    if (filters?.sentiment) {
+      conditions.push(eq(chatAnalytics.userSentiment, filters.sentiment));
+    }
+    if (filters?.chatStatus) {
+      conditions.push(eq(chatAnalytics.chatStatus, filters.chatStatus));
+    }
+
+    let query = this.db
+      .select()
+      .from(chatAnalytics)
+      .where(and(...conditions))
+      .orderBy(desc(chatAnalytics.startTimestamp));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+
+    return await query;
+  }
+
+  /**
+   * Get chat analytics summary for a tenant
+   */
+  async getChatAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalChats: number;
+    successfulChats: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    const conditions = [eq(chatAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(chatAnalytics.endTimestamp, filters.endDate));
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(chatAnalytics.agentId, filters.agentId));
+    }
+
+    const chats = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(and(...conditions));
+
+    const totalChats = chats.length;
+    const successfulChats = chats.filter((c) => c.chatSuccessful).length;
+    const totalDuration = chats.reduce((sum, c) => sum + (c.duration || 0), 0);
+    const averageDuration = totalChats > 0 ? totalDuration / totalChats : 0;
+    const totalCost = chats.reduce((sum, c) => sum + (c.combinedCost || 0), 0);
+    const averageCost = totalChats > 0 ? totalCost / totalChats : 0;
+
+    // Sentiment breakdown
+    const sentimentBreakdown: Record<string, number> = {};
+    chats.forEach((chat) => {
+      const sentiment = chat.userSentiment || 'unknown';
+      sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
+    });
+
+    return {
+      totalChats,
+      successfulChats,
+      totalDuration,
+      averageDuration,
+      totalCost,
+      averageCost,
+      sentimentBreakdown,
+    };
+  }
+
+  /**
+   * Delete old chat analytics (for cleanup/archiving)
+   */
+  async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+    await this.db.delete(chatAnalytics).where(lte(chatAnalytics.createdAt, cutoffDate));
+  }
+
+  // ============================================
+  // CHAT MESSAGES METHODS
+  // ============================================
+
+  /**
+   * Create a new chat message
+   */
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [created] = await this.db.insert(chatMessages).values(message).returning();
+    return created!;
+  }
+
+  /**
+   * Get all messages for a chat
+   */
+  async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
+    return await this.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId))
+      .orderBy(chatMessages.timestamp);
+  }
+
+  /**
+   * Delete all messages for a chat
+   */
+  async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
+    await this.db.delete(chatMessages).where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId));
   }
 }
 

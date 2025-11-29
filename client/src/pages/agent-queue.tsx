@@ -234,136 +234,138 @@ export default function AgentQueue() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Agent Queue</h1>
-        <p className="text-gray-600">Manage customer handoff requests from the chat widget</p>
+    <div className="h-full bg-background">
+      <div className="container max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Agent Queue</h1>
+          <p className="text-gray-600">Manage customer handoff requests from the chat widget</p>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="border-amber-100 bg-gradient-to-br from-white to-amber-50/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-700">Waiting</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-3xl font-bold text-gray-900">{pendingHandoffs.length}</span>
+                <Clock className="h-8 w-8 text-amber-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-100 bg-gradient-to-br from-white to-emerald-50/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-700">Active Chats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-3xl font-bold text-gray-900">{activeHandoffs.length}</span>
+                <MessageSquare className="h-8 w-8 text-emerald-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-purple-100 bg-gradient-to-br from-white to-purple-50/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-700">Available Agents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-3xl font-bold text-gray-900">
+                  {agents.filter((a) => a.status === 'available').length}
+                </span>
+                <Users className="h-8 w-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Handoff Lists */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Handoff Requests</CardTitle>
+            <CardDescription>
+              Pick up pending chats or continue with your active conversations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="pending">Pending ({pendingHandoffs.length})</TabsTrigger>
+                <TabsTrigger value="active">Active ({activeHandoffs.length})</TabsTrigger>
+                <TabsTrigger value="history">History</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="pending" className="mt-4">
+                <ScrollArea className="h-[600px] pr-4">
+                  {pendingLoading ? (
+                    <div className="text-center py-8 text-gray-500">Loading...</div>
+                  ) : pendingHandoffs.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                      <p className="text-lg font-medium">No pending handoffs</p>
+                      <p className="text-sm">New handoff requests will appear here</p>
+                    </div>
+                  ) : (
+                    pendingHandoffs.map((handoff) => renderHandoffCard(handoff, true))
+                  )}
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="active" className="mt-4">
+                <ScrollArea className="h-[600px] pr-4">
+                  {activeLoading ? (
+                    <div className="text-center py-8 text-gray-500">Loading...</div>
+                  ) : activeHandoffs.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <MessageSquare className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                      <p className="text-lg font-medium">No active chats</p>
+                      <p className="text-sm">Pick up a pending handoff to start chatting</p>
+                    </div>
+                  ) : (
+                    activeHandoffs.map((handoff) => {
+                      const currentAgent = agents.find((a) => a.email === user?.email);
+                      const isMyConversation = handoff.assignedAgentId === currentAgent?.id;
+                      const assignedAgent = agents.find((a) => a.id === handoff.assignedAgentId);
+
+                      return (
+                        <div key={handoff.id}>
+                          {renderHandoffCard(handoff, false)}
+                          <Button
+                            variant={isMyConversation ? 'default' : 'outline'}
+                            size="sm"
+                            className="w-full mb-4"
+                            onClick={() => navigate(`/agent-chat/${handoff.id}`)}
+                          >
+                            {isMyConversation
+                              ? 'Continue Chat'
+                              : `View (Assigned to ${assignedAgent?.name || 'Another Agent'})`}
+                          </Button>
+                        </div>
+                      );
+                    })
+                  )}
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-4">
+                <ScrollArea className="h-[600px] pr-4">
+                  {allLoading ? (
+                    <div className="text-center py-8 text-gray-500">Loading...</div>
+                  ) : (
+                    allHandoffs
+                      .filter((h) => h.status === 'resolved')
+                      .slice(0, 50)
+                      .map((handoff) => renderHandoffCard(handoff, false))
+                  )}
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="border-amber-100 bg-gradient-to-br from-white to-amber-50/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Waiting</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-3xl font-bold text-gray-900">{pendingHandoffs.length}</span>
-              <Clock className="h-8 w-8 text-amber-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-emerald-100 bg-gradient-to-br from-white to-emerald-50/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Active Chats</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-3xl font-bold text-gray-900">{activeHandoffs.length}</span>
-              <MessageSquare className="h-8 w-8 text-emerald-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-100 bg-gradient-to-br from-white to-purple-50/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700">Available Agents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-3xl font-bold text-gray-900">
-                {agents.filter((a) => a.status === 'available').length}
-              </span>
-              <Users className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Handoff Lists */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Handoff Requests</CardTitle>
-          <CardDescription>
-            Pick up pending chats or continue with your active conversations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pending">Pending ({pendingHandoffs.length})</TabsTrigger>
-              <TabsTrigger value="active">Active ({activeHandoffs.length})</TabsTrigger>
-              <TabsTrigger value="history">History</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="pending" className="mt-4">
-              <ScrollArea className="h-[600px] pr-4">
-                {pendingLoading ? (
-                  <div className="text-center py-8 text-gray-500">Loading...</div>
-                ) : pendingHandoffs.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-lg font-medium">No pending handoffs</p>
-                    <p className="text-sm">New handoff requests will appear here</p>
-                  </div>
-                ) : (
-                  pendingHandoffs.map((handoff) => renderHandoffCard(handoff, true))
-                )}
-              </ScrollArea>
-            </TabsContent>
-
-            <TabsContent value="active" className="mt-4">
-              <ScrollArea className="h-[600px] pr-4">
-                {activeLoading ? (
-                  <div className="text-center py-8 text-gray-500">Loading...</div>
-                ) : activeHandoffs.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-lg font-medium">No active chats</p>
-                    <p className="text-sm">Pick up a pending handoff to start chatting</p>
-                  </div>
-                ) : (
-                  activeHandoffs.map((handoff) => {
-                    const currentAgent = agents.find((a) => a.email === user?.email);
-                    const isMyConversation = handoff.assignedAgentId === currentAgent?.id;
-                    const assignedAgent = agents.find((a) => a.id === handoff.assignedAgentId);
-
-                    return (
-                      <div key={handoff.id}>
-                        {renderHandoffCard(handoff, false)}
-                        <Button
-                          variant={isMyConversation ? 'default' : 'outline'}
-                          size="sm"
-                          className="w-full mb-4"
-                          onClick={() => navigate(`/agent-chat/${handoff.id}`)}
-                        >
-                          {isMyConversation
-                            ? 'Continue Chat'
-                            : `View (Assigned to ${assignedAgent?.name || 'Another Agent'})`}
-                        </Button>
-                      </div>
-                    );
-                  })
-                )}
-              </ScrollArea>
-            </TabsContent>
-
-            <TabsContent value="history" className="mt-4">
-              <ScrollArea className="h-[600px] pr-4">
-                {allLoading ? (
-                  <div className="text-center py-8 text-gray-500">Loading...</div>
-                ) : (
-                  allHandoffs
-                    .filter((h) => h.status === 'resolved')
-                    .slice(0, 50)
-                    .map((handoff) => renderHandoffCard(handoff, false))
-                )}
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
     </div>
   );
 }

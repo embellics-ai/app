@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "init-admin": "tsx init-admin.ts",
     "clean-db": "tsx scripts/clean-database.ts",
+    "clean-db:preserve-admin": "tsx scripts/clean-database-preserve-admin.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

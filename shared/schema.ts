@@ -451,6 +451,285 @@ export const insertWidgetHandoffMessageSchema = createInsertSchema(widgetHandoff
 export type InsertWidgetHandoffMessage = z.infer<typeof insertWidgetHandoffMessageSchema>;
 export type WidgetHandoffMessage = typeof widgetHandoffMessages.$inferSelect;
 
+// ============================================
+// TENANT INTEGRATIONS (Multi-Provider Support)
+// ============================================
+
+// Tenant Integrations (All third-party service configurations per tenant)
+// Platform admin only - stores encrypted credentials for WhatsApp, SMS, N8N, etc.
+export const tenantIntegrations = pgTable('tenant_integrations', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' })
+    .unique(), // One integration config per tenant
+
+  // N8N Configuration
+  n8nBaseUrl: text('n8n_base_url'), // e.g., "https://n8n.hostinger.com/webhook/tenant123"
+  n8nApiKey: text('n8n_api_key'), // ENCRYPTED - Optional API key if n8n requires auth
+
+  // WhatsApp Business API Configuration (Meta Cloud API)
+  whatsappEnabled: boolean('whatsapp_enabled').notNull().default(false),
+  whatsappConfig: jsonb('whatsapp_config'),
+  // Structure (sensitive fields encrypted within JSONB):
+  // {
+  //   "phoneNumberId": "915998021588678",
+  //   "businessAccountId": "1471345127284298",
+  //   "accessToken": "ENCRYPTED_EAA...",     <- Encrypted
+  //   "webhookVerifyToken": "ENCRYPTED_...",  <- Encrypted
+  //   "phoneNumber": "+91 599 8021 588"       <- Display only
+  // }
+
+  // SMS Provider Configuration (Twilio, Vonage, AWS SNS, etc.)
+  smsEnabled: boolean('sms_enabled').notNull().default(false),
+  smsConfig: jsonb('sms_config'),
+  // Structure (sensitive fields encrypted within JSONB):
+  // {
+  //   "provider": "twilio",                   <- "twilio" | "vonage" | "aws_sns"
+  //   "accountSid": "ENCRYPTED_AC...",        <- Encrypted
+  //   "authToken": "ENCRYPTED_...",           <- Encrypted
+  //   "phoneNumber": "+1234567890",
+  //   "messagingServiceSid": "MG..."          <- Optional (Twilio)
+  // }
+
+  // Audit Trail
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedBy: varchar('updated_by').references(() => clientUsers.id), // Platform admin who made changes
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdBy: varchar('created_by').references(() => clientUsers.id), // Platform admin who created
+});
+
+export const insertTenantIntegrationSchema = createInsertSchema(tenantIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTenantIntegration = z.infer<typeof insertTenantIntegrationSchema>;
+export type TenantIntegration = typeof tenantIntegrations.$inferSelect;
+
+// N8N Webhooks (Dynamic webhook URLs per tenant)
+// Separate table for better management of 20+ webhooks per tenant
+export const n8nWebhooks = pgTable(
+  'n8n_webhooks',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    workflowName: text('workflow_name').notNull(),
+    // e.g., "contact_form", "booking_request", "support_ticket"
+
+    webhookUrl: text('webhook_url').notNull(),
+    // e.g., "https://n8n.hostinger.com/webhook/tenant123/contact"
+
+    description: text('description'),
+    // Optional: "Handles contact form submissions from website"
+
+    isActive: boolean('is_active').notNull().default(true),
+
+    // Webhook-specific auth (optional - if different from tenant-level)
+    authToken: text('auth_token'), // ENCRYPTED - Optional per-webhook auth
+
+    // Usage tracking
+    lastCalledAt: timestamp('last_called_at'),
+    totalCalls: integer('total_calls').notNull().default(0),
+    successfulCalls: integer('successful_calls').notNull().default(0),
+    failedCalls: integer('failed_calls').notNull().default(0),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    createdBy: varchar('created_by').references(() => clientUsers.id), // Platform admin
+  },
+  (table) => ({
+    uniqueTenantWorkflow: uniqueIndex('unique_tenant_workflow_idx').on(
+      table.tenantId,
+      table.workflowName,
+    ),
+  }),
+);
+
+export const insertN8nWebhookSchema = createInsertSchema(n8nWebhooks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastCalledAt: true,
+  totalCalls: true,
+  successfulCalls: true,
+  failedCalls: true,
+});
+
+export type InsertN8nWebhook = z.infer<typeof insertN8nWebhookSchema>;
+export type N8nWebhook = typeof n8nWebhooks.$inferSelect;
+
+// Webhook Analytics (Track all webhook calls for monitoring and debugging)
+export const webhookAnalytics = pgTable(
+  'webhook_analytics',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    webhookId: varchar('webhook_id')
+      .notNull()
+      .references(() => n8nWebhooks.id, { onDelete: 'cascade' }),
+
+    // Request Details
+    requestPayload: jsonb('request_payload'), // What was sent to webhook
+    requestHeaders: jsonb('request_headers'), // Headers sent (sanitized - no auth tokens)
+
+    // Response Details
+    statusCode: integer('status_code'), // HTTP status code (200, 500, etc.)
+    responseBody: jsonb('response_body'), // Response from n8n
+    responseTime: integer('response_time'), // Milliseconds
+
+    // Status
+    success: boolean('success').notNull(), // True if status 2xx
+    errorMessage: text('error_message'), // Error details if failed
+
+    // Context
+    triggeredBy: text('triggered_by'), // What triggered this webhook (e.g., "widget_chat", "api_call")
+    metadata: jsonb('metadata'), // Additional context
+
+    timestamp: timestamp('timestamp').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for fast lookups by tenant and webhook
+    tenantWebhookIdx: uniqueIndex('webhook_analytics_tenant_webhook_idx').on(
+      table.tenantId,
+      table.webhookId,
+      table.timestamp,
+    ),
+  }),
+);
+
+export const insertWebhookAnalyticsSchema = createInsertSchema(webhookAnalytics).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertWebhookAnalytics = z.infer<typeof insertWebhookAnalyticsSchema>;
+export type WebhookAnalytics = typeof webhookAnalytics.$inferSelect;
+
+// ============================================
+// RETELL AI CHAT ANALYTICS
+// ============================================
+
+// Chat Analytics (Track chat sessions from Retell AI chat_analyzed webhook)
+export const chatAnalytics = pgTable(
+  'chat_analytics',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Retell Chat Metadata
+    chatId: text('chat_id').notNull().unique(), // Retell's chat ID
+    agentId: text('agent_id').notNull(), // Retell agent ID
+    agentName: text('agent_name'), // Agent display name
+    agentVersion: text('agent_version'), // Agent version number
+    chatType: text('chat_type'), // e.g., "web_chat", "mobile_chat"
+    chatStatus: text('chat_status'), // e.g., "completed", "abandoned"
+
+    // Timestamps
+    startTimestamp: timestamp('start_timestamp'), // When chat started
+    endTimestamp: timestamp('end_timestamp'), // When chat ended
+    duration: integer('duration'), // Duration in seconds
+
+    // Conversation Data
+    transcript: text('transcript'), // Full conversation transcript
+    messageCount: integer('message_count'), // Total messages exchanged
+    toolCallsCount: integer('tool_calls_count'), // Number of tool/function calls
+    dynamicVariables: jsonb('dynamic_variables'), // Collected variables (booking_uid, user_intention, etc.)
+
+    // Chat Analysis (AI-generated)
+    chatSummary: text('chat_summary'), // AI-generated summary
+    userSentiment: text('user_sentiment'), // positive, negative, neutral, frustrated, satisfied
+    chatSuccessful: boolean('chat_successful'), // Whether chat achieved its goal
+
+    // Cost Tracking
+    combinedCost: integer('combined_cost'), // Total cost in cents
+    productCosts: jsonb('product_costs'), // Breakdown by model (gpt-4o, etc.)
+
+    // Metadata
+    metadata: jsonb('metadata'), // Additional data (whatsapp_user, etc.)
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Indexes for fast lookups
+    tenantChatIdx: uniqueIndex('chat_analytics_tenant_chat_idx').on(table.tenantId, table.chatId),
+    tenantAgentIdx: uniqueIndex('chat_analytics_tenant_agent_idx').on(
+      table.tenantId,
+      table.agentId,
+      table.startTimestamp,
+    ),
+    sentimentIdx: uniqueIndex('chat_analytics_sentiment_idx').on(
+      table.tenantId,
+      table.userSentiment,
+      table.startTimestamp,
+    ),
+  }),
+);
+
+export const insertChatAnalyticsSchema = createInsertSchema(chatAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatAnalytics = z.infer<typeof insertChatAnalyticsSchema>;
+export type ChatAnalytics = typeof chatAnalytics.$inferSelect;
+
+// Chat Messages (Individual messages from chat sessions - optional detailed storage)
+export const chatMessages = pgTable(
+  'chat_messages',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    chatAnalyticsId: varchar('chat_analytics_id')
+      .notNull()
+      .references(() => chatAnalytics.id, { onDelete: 'cascade' }),
+
+    // Message Details
+    messageId: text('message_id'), // Retell's message ID
+    role: text('role').notNull(), // 'agent' or 'user'
+    content: text('content').notNull(), // Message content
+    timestamp: timestamp('timestamp').notNull(), // When message was sent
+
+    // Function/Tool Calls
+    toolCallId: text('tool_call_id'), // If this message triggered a tool
+    nodeTransition: text('node_transition'), // Which node this led to
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for fast lookups by chat
+    chatMessagesIdx: uniqueIndex('chat_messages_chat_idx').on(
+      table.chatAnalyticsId,
+      table.timestamp,
+    ),
+  }),
+);
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
 // Settings Schema (keeping for backward compatibility)
 export const settingsSchema = z.object({
   apiKey: z.string().optional(),
