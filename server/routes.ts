@@ -1897,35 +1897,38 @@ export async function registerRoutes(app: Express): Promise<void> {
       console.log(JSON.stringify(payload, null, 2));
       console.log('[Retell Webhook] === END PAYLOAD ===');
 
+      // Retell sends data nested under "chat" object
+      const chat = payload.chat || payload;
+
       // Extract data from Retell's chat_analyzed event
       const chatData = {
-        chatId: payload.chat_id,
-        agentId: payload.agent_id,
-        agentName: payload.agent_name || null,
-        agentVersion: payload.agent_version || null,
-        chatType: payload.chat_type || null,
-        chatStatus: payload.chat_status || null,
-        startTimestamp: payload.start_timestamp ? new Date(payload.start_timestamp) : null,
-        endTimestamp: payload.end_timestamp ? new Date(payload.end_timestamp) : null,
-        duration: payload.duration || null,
-        transcript: payload.transcript || null,
-        messageCount: payload.messages?.length || 0,
-        toolCallsCount: payload.tool_calls?.length || 0,
-        dynamicVariables: payload.dynamic_variables || null,
-        chatSummary: payload.chat_analysis?.chat_summary || null,
-        userSentiment: payload.chat_analysis?.user_sentiment || null,
-        chatSuccessful: payload.chat_analysis?.chat_successful || null,
-        combinedCost: payload.combined_cost || 0,
-        productCosts: payload.product_costs || null,
+        chatId: chat.chat_id,
+        agentId: chat.agent_id,
+        agentName: chat.agent_name || null,
+        agentVersion: chat.agent_version || null,
+        chatType: chat.chat_type || null,
+        chatStatus: chat.chat_status || null,
+        startTimestamp: chat.start_timestamp ? new Date(chat.start_timestamp) : null,
+        endTimestamp: chat.end_timestamp ? new Date(chat.end_timestamp) : null,
+        duration: chat.duration || null,
+        transcript: chat.transcript || null,
+        messageCount: chat.messages?.length || 0,
+        toolCallsCount: chat.tool_calls?.length || 0,
+        dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
+        chatSummary: chat.chat_analysis?.chat_summary || null,
+        userSentiment: chat.chat_analysis?.user_sentiment || null,
+        chatSuccessful: chat.chat_analysis?.chat_successful || null,
+        combinedCost: chat.chat_cost?.combined_cost || chat.combined_cost || 0,
+        productCosts: chat.chat_cost?.product_costs || chat.product_costs || null,
         metadata: {
-          whatsapp_user: payload.metadata?.whatsapp_user || null,
+          whatsapp_user: chat.metadata?.whatsapp_user || null,
           // Add any other metadata fields
-          ...payload.metadata,
+          ...chat.metadata,
         },
       };
 
       // Determine tenant ID from metadata or by looking up the agent configuration
-      let tenantId = payload.metadata?.tenant_id || payload.tenant_id;
+      let tenantId = chat.metadata?.tenant_id || payload.tenant_id;
 
       if (!tenantId && chatData.agentId) {
         // Try to find tenant by agent ID (useful for WhatsApp and other integrations)
