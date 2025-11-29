@@ -2626,10 +2626,7 @@ export class DbStorage implements IStorage {
     if (filters?.endDate) {
       // Include records where endTimestamp is within range OR is NULL (chat still in progress)
       conditions.push(
-        or(
-          lte(chatAnalytics.endTimestamp, filters.endDate),
-          isNull(chatAnalytics.endTimestamp)
-        )!
+        or(lte(chatAnalytics.endTimestamp, filters.endDate), isNull(chatAnalytics.endTimestamp))!,
       );
     }
     if (filters?.agentId) {
@@ -2680,7 +2677,13 @@ export class DbStorage implements IStorage {
       conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
     }
     if (filters?.endDate) {
-      conditions.push(lte(chatAnalytics.endTimestamp, filters.endDate));
+      // Include records where endTimestamp is within range OR is NULL (chat still in progress)
+      conditions.push(
+        or(
+          lte(chatAnalytics.endTimestamp, filters.endDate),
+          isNull(chatAnalytics.endTimestamp)
+        )!
+      );
     }
     if (filters?.agentId) {
       conditions.push(eq(chatAnalytics.agentId, filters.agentId));
