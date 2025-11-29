@@ -9,12 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Phone,
   MessageSquare,
@@ -112,11 +107,11 @@ export default function UnifiedAnalytics() {
   // Fetch all tenants (for platform admin)
   const { data: tenants = [] } = useQuery<Tenant[]>({
     queryKey: ['/api/platform/tenants'],
-    enabled: user?.role === 'owner',
+    enabled: user?.role === 'owner' || user?.isPlatformAdmin,
   });
 
   // Auto-select tenant for client admins
-  const tenantId = user?.role === 'owner' ? selectedTenantId : user?.tenantId;
+  const tenantId = (user?.role === 'owner' || user?.isPlatformAdmin) ? selectedTenantId : user?.tenantId;
 
   // Fetch voice analytics
   const { data: voiceData, isLoading: voiceLoading } = useQuery({
@@ -226,15 +221,13 @@ export default function UnifiedAnalytics() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">
-            Unified view of voice calls and chat interactions
-          </p>
+          <p className="text-muted-foreground">Unified view of voice calls and chat interactions</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="grid gap-4 md:grid-cols-3">
-        {user.role === 'owner' && (
+        {(user.role === 'owner' || user.isPlatformAdmin) && (
           <div className="space-y-2">
             <Label>Select Tenant</Label>
             <Select value={selectedTenantId || ''} onValueChange={setSelectedTenantId}>
@@ -421,9 +414,7 @@ export default function UnifiedAnalytics() {
                               Negative
                             </Badge>
                           )}
-                          {!chat.userSentiment && (
-                            <Badge variant="outline">Unknown</Badge>
-                          )}
+                          {!chat.userSentiment && <Badge variant="outline">Unknown</Badge>}
                         </TableCell>
                         <TableCell>{formatCurrency(chat.combinedCost)}</TableCell>
                         <TableCell>
@@ -454,8 +445,12 @@ export default function UnifiedAnalytics() {
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">Average Duration</div>
-                    <div className="text-2xl font-bold">{formatDuration(voiceData.averageDuration)}</div>
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Average Duration
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {formatDuration(voiceData.averageDuration)}
+                    </div>
                   </div>
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Total Calls</div>
