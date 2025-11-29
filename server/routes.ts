@@ -1974,6 +1974,35 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       console.log(`[Retell Webhook] Stored chat analytics for chat ${chatData.chatId}`);
+
+      // Forward webhook to n8n if configured
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+      if (n8nWebhookUrl) {
+        try {
+          console.log('[Retell Webhook] Forwarding to n8n:', n8nWebhookUrl);
+          const response = await fetch(n8nWebhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log('[Retell Webhook] Successfully forwarded to n8n');
+          } else {
+            console.error(
+              '[Retell Webhook] n8n forward failed:',
+              response.status,
+              await response.text(),
+            );
+          }
+        } catch (forwardError: any) {
+          console.error('[Retell Webhook] Error forwarding to n8n:', forwardError.message);
+          // Don't fail the main webhook - just log the error
+        }
+      }
+
       res.status(200).json({ success: true, message: 'Chat analytics stored' });
     } catch (error: any) {
       console.error('[Retell Webhook] Error processing chat_analyzed event:', error);
