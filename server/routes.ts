@@ -914,15 +914,17 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { retellApiKey, retellAgentId } = req.body;
 
-        if (!retellApiKey || typeof retellApiKey !== 'string') {
-          return res.status(400).json({ error: 'Retell API key is required' });
-        }
+        // Validate Retell API key format if provided
+        if (retellApiKey) {
+          if (typeof retellApiKey !== 'string') {
+            return res.status(400).json({ error: 'Retell API key must be a string' });
+          }
 
-        // Validate Retell API key format
-        if (!retellApiKey.trim().startsWith('key_')) {
-          return res.status(400).json({
-            error: 'Invalid Retell API key format. API keys must start with "key_"',
-          });
+          if (!retellApiKey.trim().startsWith('key_')) {
+            return res.status(400).json({
+              error: 'Invalid Retell API key format. API keys must start with "key_"',
+            });
+          }
         }
 
         // Validate Retell Agent ID format if provided
