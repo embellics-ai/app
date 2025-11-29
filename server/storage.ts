@@ -64,7 +64,7 @@ import { randomUUID } from 'crypto';
 import pg from 'pg';
 const { Pool } = pg;
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, desc, and, or, gte, lte, gt, sql } from 'drizzle-orm';
+import { eq, desc, and, or, gte, lte, gt, sql, isNull } from 'drizzle-orm';
 import { encryptApiKey, decryptApiKey } from './encryption';
 
 export interface IStorage {
@@ -2624,7 +2624,13 @@ export class DbStorage implements IStorage {
       conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
     }
     if (filters?.endDate) {
-      conditions.push(lte(chatAnalytics.endTimestamp, filters.endDate));
+      // Include records where endTimestamp is within range OR is NULL (chat still in progress)
+      conditions.push(
+        or(
+          lte(chatAnalytics.endTimestamp, filters.endDate),
+          isNull(chatAnalytics.endTimestamp)
+        )!
+      );
     }
     if (filters?.agentId) {
       conditions.push(eq(chatAnalytics.agentId, filters.agentId));
