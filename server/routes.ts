@@ -1915,7 +1915,10 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!tenantId && chatData.agentId) {
         // Try to find tenant by agent ID (useful for WhatsApp and other integrations)
-        console.log('[Retell Webhook] No tenant_id in metadata, looking up by agent ID:', chatData.agentId);
+        console.log(
+          '[Retell Webhook] No tenant_id in metadata, looking up by agent ID:',
+          chatData.agentId,
+        );
         const widgetConfig = await storage.getWidgetConfigByAgentId(chatData.agentId);
         if (widgetConfig) {
           tenantId = widgetConfig.tenantId;
@@ -1924,15 +1927,20 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       if (!tenantId) {
-        console.error('[Retell Webhook] Could not determine tenant_id from payload or agent configuration');
+        console.error(
+          '[Retell Webhook] Could not determine tenant_id from payload or agent configuration',
+        );
         console.error('[Retell Webhook] Payload metadata:', payload.metadata);
         console.error('[Retell Webhook] Agent ID:', chatData.agentId);
-        return res.status(400).json({ 
-          error: 'Could not determine tenant_id. Include tenant_id in metadata or configure agent in system.' 
+        return res.status(400).json({
+          error:
+            'Could not determine tenant_id. Include tenant_id in metadata or configure agent in system.',
         });
       }
 
-      console.log(`[Retell Webhook] Processing chat analytics for tenant ${tenantId}, chat ${chatData.chatId}`);
+      console.log(
+        `[Retell Webhook] Processing chat analytics for tenant ${tenantId}, chat ${chatData.chatId}`,
+      );
 
       // Create chat analytics record
       await storage.createChatAnalytics({

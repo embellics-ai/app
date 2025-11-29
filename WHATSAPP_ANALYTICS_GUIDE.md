@@ -33,6 +33,7 @@ WhatsApp User → Retell AI → Chat Processing → Webhook Event
 ### 1. Your Server Must Be Running
 
 **Local Development:**
+
 ```bash
 # Terminal 1: Start the server
 npm run dev
@@ -45,6 +46,7 @@ ngrok http 5000
 ```
 
 **Production:**
+
 ```bash
 # Your deployed server URL
 https://yourdomain.com/api/retell/chat-analyzed
@@ -111,16 +113,19 @@ Watch your server logs for webhook activity:
 ### Issue: "Could not determine tenant_id"
 
 **Error message:**
+
 ```
 [Retell Webhook] Could not determine tenant_id from payload or agent configuration
 ```
 
 **Solution:**
+
 1. Verify agent ID is configured in Platform Admin
 2. Check that the agent ID matches exactly (case-sensitive)
 3. Look at server logs to see what agent ID was received
 
 **Debug commands:**
+
 ```bash
 # Check widget configs
 psql $DATABASE_URL -c "SELECT * FROM widget_configs WHERE retell_agent_id = 'agent_YOUR_ID';"
@@ -132,6 +137,7 @@ tail -f logs/server.log | grep "Retell Webhook"
 ### Issue: No analytics appearing in dashboard
 
 **Checklist:**
+
 - [ ] Server is running and accessible
 - [ ] Webhook configured in Retell AI dashboard
 - [ ] Webhook subscribed to `chat_analyzed` event
@@ -139,6 +145,7 @@ tail -f logs/server.log | grep "Retell Webhook"
 - [ ] Chat actually completed (not just started)
 
 **Check webhook delivery:**
+
 1. In Retell AI dashboard, go to **Webhooks** → **Logs**
 2. Look for recent `chat_analyzed` events
 3. Check HTTP status code:
@@ -173,11 +180,12 @@ tail -f logs/server.log | grep "Retell Webhook"
 **Solution:** Each tenant should have a unique Retell AI agent configured.
 
 **Check for duplicates:**
+
 ```sql
-SELECT retell_agent_id, COUNT(*) 
-FROM widget_configs 
-WHERE retell_agent_id IS NOT NULL 
-GROUP BY retell_agent_id 
+SELECT retell_agent_id, COUNT(*)
+FROM widget_configs
+WHERE retell_agent_id IS NOT NULL
+GROUP BY retell_agent_id
 HAVING COUNT(*) > 1;
 ```
 
@@ -248,6 +256,7 @@ Here's what Retell sends when a WhatsApp chat completes:
 Once webhooks are working, you'll see:
 
 ### Overview Tab
+
 - Total WhatsApp chats
 - Success rate
 - Average duration
@@ -255,17 +264,20 @@ Once webhooks are working, you'll see:
 - Sentiment distribution
 
 ### Chat Sessions Tab
+
 - List of all WhatsApp conversations
 - Timestamp, duration, message count
 - Sentiment badges
 - Cost per chat
 
 ### Sentiment Analysis Tab
+
 - Breakdown of positive/neutral/negative
 - Percentage visualizations
 - Correlation with success rate
 
 ### Cost Tracking Tab
+
 - Daily cost breakdown
 - Total and average costs
 - WhatsApp-specific charges
@@ -279,8 +291,8 @@ Set up alerts for webhook failures:
 ```bash
 # Check for recent errors
 psql $DATABASE_URL -c "
-  SELECT created_at, metadata 
-  FROM chat_analytics 
+  SELECT created_at, metadata
+  FROM chat_analytics
   WHERE created_at > NOW() - INTERVAL '1 hour'
   ORDER BY created_at DESC;
 "
@@ -295,6 +307,7 @@ psql $DATABASE_URL -c "
 ### 3. Use Descriptive Agent Names
 
 Set clear agent names in Retell dashboard:
+
 - ✅ "Acme Corp Support Bot"
 - ❌ "Agent 1"
 
@@ -303,6 +316,7 @@ This makes analytics more readable.
 ### 4. Review Analytics Regularly
 
 Check the dashboard:
+
 - Daily: Overall metrics and recent chats
 - Weekly: Sentiment trends
 - Monthly: Cost analysis
@@ -315,8 +329,8 @@ Retell keeps webhook logs for 30 days. For longer retention:
 # Export to CSV monthly
 psql $DATABASE_URL -c "
   COPY (
-    SELECT * FROM chat_analytics 
-    WHERE created_at >= '2025-11-01' 
+    SELECT * FROM chat_analytics
+    WHERE created_at >= '2025-11-01'
     AND created_at < '2025-12-01'
   ) TO '/path/to/backup/november-2025.csv' CSV HEADER;
 "

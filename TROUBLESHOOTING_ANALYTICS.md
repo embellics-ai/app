@@ -95,16 +95,19 @@ Retell needs to send chat data to YOUR server when chats complete.
 ### For Local Development (Testing):
 
 1. **Start your server:**
+
    ```bash
    npm run dev
    ```
 
 2. **In a new terminal, start ngrok:**
+
    ```bash
    ngrok http 5000
    ```
 
 3. **Copy the ngrok URL** from the output:
+
    ```
    Forwarding  https://abc123.ngrok.io -> http://localhost:5000
    ```
@@ -114,6 +117,7 @@ Retell needs to send chat data to YOUR server when chats complete.
 5. **Click "Add Webhook"** or edit existing one
 
 6. **Enter webhook URL:**
+
    ```
    https://abc123.ngrok.io/api/retell/chat-analyzed
    ```
@@ -125,6 +129,7 @@ Retell needs to send chat data to YOUR server when chats complete.
 ### For Production:
 
 Same steps but use your actual domain:
+
 ```
 https://yourdomain.com/api/retell/chat-analyzed
 ```
@@ -149,10 +154,12 @@ Watch your terminal where the server is running. You should see:
 ```
 
 ✅ **Good signs:**
+
 - "Found tenant from agent ID" - Agent is configured correctly
 - "Stored chat analytics" - Data saved successfully
 
 ❌ **Bad signs:**
+
 - "Could not determine tenant_id" - Agent not configured
 - No webhook logs at all - Webhook not configured or not firing
 
@@ -173,6 +180,7 @@ Watch your terminal where the server is running. You should see:
 **Problem:** Agent ID not configured in your system
 
 **Solution:**
+
 1. Follow Step 2 above to configure agent ID
 2. Make sure the agent ID matches EXACTLY (case-sensitive)
 3. It should start with `agent_`
@@ -184,17 +192,20 @@ Watch your terminal where the server is running. You should see:
 **Possible causes:**
 
 **A) Webhook not configured in Retell**
+
 - Go to Retell dashboard → Webhooks
 - Verify webhook URL is correct
 - Verify `chat_analyzed` event is subscribed
 
 **B) Server not accessible**
+
 - For local: Is ngrok running?
 - For production: Is server deployed and accessible?
 - Test: `curl https://your-url/api/retell/chat-analyzed`
   - Should return 400 (not 404 or connection error)
 
 **C) Chat not completed**
+
 - Retell sends webhook ONLY when chat ends
 - Make sure to end the conversation
 - Try saying "goodbye" or wait for timeout
@@ -204,6 +215,7 @@ Watch your terminal where the server is running. You should see:
 **Problem:** Multiple tenants with same agent
 
 **Solution:**
+
 - Each tenant should have their own unique Retell agent
 - Don't share agent IDs between tenants
 - Create separate agents in Retell dashboard for each tenant
@@ -215,9 +227,11 @@ Watch your terminal where the server is running. You should see:
 **Check:**
 
 1. **Database connection working?**
+
    ```bash
    npm run db:push
    ```
+
    Should connect without errors
 
 2. **Tables exist?**
@@ -263,6 +277,7 @@ Look for `hasRetellAgentId: true` in the response.
 ### Enable Debug Mode:
 
 Add to your `.env.local`:
+
 ```bash
 DEBUG=retell:*
 LOG_LEVEL=debug
@@ -309,6 +324,7 @@ If you're still stuck, gather this information:
 5. **Error messages:** Any errors you see
 
 Then check the detailed guides:
+
 - `CHAT_ANALYTICS_GUIDE.md` - Complete analytics documentation
 - `WHATSAPP_ANALYTICS_GUIDE.md` - WhatsApp-specific setup
 - `CHAT_ANALYTICS_IMPLEMENTATION.md` - Technical implementation details
