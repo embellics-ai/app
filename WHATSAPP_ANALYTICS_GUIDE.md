@@ -38,11 +38,11 @@ WhatsApp User → Retell AI → Chat Processing → Webhook Event
 # Terminal 1: Start the server
 npm run dev
 
-# Terminal 2: Expose it with ngrok
-ngrok http 5000
+# Terminal 2: Expose it with LocalTunnel
+lt --port 5000
 
-# Use the ngrok URL in Retell webhook config
-# Example: https://abc123.ngrok.io/api/retell/chat-analyzed
+# Use the LocalTunnel URL in Retell webhook config
+# Example: https://your-url.loca.lt/api/retell/chat-analyzed
 ```
 
 **Production:**
@@ -165,8 +165,8 @@ tail -f logs/server.log | grep "Retell Webhook"
    - Check Retell dashboard for typos
    - Ensure it ends with `/api/retell/chat-analyzed`
 
-3. **ngrok tunnel expired** (local dev)
-   - Restart ngrok
+3. **LocalTunnel expired** (local dev)
+   - Restart LocalTunnel: `lt --port 5000`
    - Update webhook URL in Retell dashboard
 
 4. **Chat not completed**

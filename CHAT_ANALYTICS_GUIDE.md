@@ -589,17 +589,14 @@ To add new metrics to the dashboard:
 
 ### Testing Webhooks Locally
 
-Use ngrok to expose local server:
+Use LocalTunnel to expose local server:
 
 ```bash
-# Install ngrok
-brew install ngrok
+# Start LocalTunnel
+lt --port 5000
 
-# Expose local port
-ngrok http 5000
-
-# Use the ngrok URL in Retell AI webhook configuration
-# Example: https://abc123.ngrok.io/api/retell/chat-analyzed
+# Use the LocalTunnel URL in Retell AI webhook configuration
+# Example: https://your-url.loca.lt/api/retell/chat-analyzed
 ```
 
 ### Sample Webhook Payload for Testing

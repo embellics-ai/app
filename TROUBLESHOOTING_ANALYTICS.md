@@ -100,16 +100,16 @@ Retell needs to send chat data to YOUR server when chats complete.
    npm run dev
    ```
 
-2. **In a new terminal, start ngrok:**
+2. **In a new terminal, start LocalTunnel:**
 
    ```bash
-   ngrok http 5000
+   lt --port 5000
    ```
 
-3. **Copy the ngrok URL** from the output:
+3. **Copy the LocalTunnel URL** from the output:
 
    ```
-   Forwarding  https://abc123.ngrok.io -> http://localhost:5000
+   your url is: https://your-url.loca.lt
    ```
 
 4. **Go to Retell AI Dashboard** → [Webhooks Settings](https://app.retellai.com/dashboard/webhooks)
@@ -119,7 +119,7 @@ Retell needs to send chat data to YOUR server when chats complete.
 6. **Enter webhook URL:**
 
    ```
-   https://abc123.ngrok.io/api/retell/chat-analyzed
+   https://your-url.loca.lt/api/retell/chat-analyzed
    ```
 
 7. **Subscribe to event:** `chat_analyzed`
@@ -199,7 +199,7 @@ Watch your terminal where the server is running. You should see:
 
 **B) Server not accessible**
 
-- For local: Is ngrok running?
+- For local: Is LocalTunnel running?
 - For production: Is server deployed and accessible?
 - Test: `curl https://your-url/api/retell/chat-analyzed`
   - Should return 400 (not 404 or connection error)
@@ -250,7 +250,7 @@ Before sending a message, verify:
 - [ ] Webhook configured in Retell dashboard
 - [ ] Webhook URL is correct and accessible
 - [ ] Event `chat_analyzed` is subscribed
-- [ ] For local: ngrok is running and URL is current
+- [ ] For local: LocalTunnel is running and URL is current
 
 After sending a message:
 
