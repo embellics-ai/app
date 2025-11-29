@@ -1960,9 +1960,16 @@ export async function registerRoutes(app: Express): Promise<void> {
       );
 
       // Create chat analytics record
-      await storage.createChatAnalytics({
+      const createdAnalytics = await storage.createChatAnalytics({
         tenantId,
         ...chatData,
+      });
+      
+      console.log('[Retell Webhook] Chat analytics created successfully:', {
+        id: createdAnalytics.id,
+        tenantId: createdAnalytics.tenantId,
+        chatId: createdAnalytics.chatId,
+        agentId: createdAnalytics.agentId,
       });
 
       // Optionally store individual messages
@@ -2034,6 +2041,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId } = req.query;
 
+        console.log('[Analytics Overview] Querying for tenant:', tenantId);
+        console.log('[Analytics Overview] Filters:', { startDate, endDate, agentId });
+
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
           endDate: endDate ? new Date(endDate as string) : undefined,
@@ -2042,6 +2052,8 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Get chat analytics summary
         const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
+        
+        console.log('[Analytics Overview] Chat summary result:', chatSummary);
 
         // TODO: Add voice call analytics when available
         // const voiceSummary = await storage.getVoiceCallSummary(tenantId, filters);
@@ -2074,6 +2086,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId, sentiment, chatStatus, limit } = req.query;
 
+        console.log('[Analytics Chats] Querying for tenant:', tenantId);
+        console.log('[Analytics Chats] Filters:', { startDate, endDate, agentId, sentiment, chatStatus, limit });
+
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
           endDate: endDate ? new Date(endDate as string) : undefined,
@@ -2084,6 +2099,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         };
 
         const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
+        
+        console.log('[Analytics Chats] Found chats:', chats.length);
+        if (chats.length > 0) {
+          console.log('[Analytics Chats] First chat sample:', {
+            id: chats[0].id,
+            tenantId: chats[0].tenantId,
+            chatId: chats[0].chatId,
+            agentId: chats[0].agentId,
+          });
+        }
 
         res.json(chats);
       } catch (error) {
