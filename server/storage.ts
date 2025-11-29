@@ -2546,10 +2546,37 @@ export class DbStorage implements IStorage {
   // ============================================
 
   /**
-   * Create a new chat analytics record
+   * Create or update chat analytics (handles duplicate webhooks from Retell)
    */
   async createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics> {
-    const [created] = await this.db.insert(chatAnalytics).values(analytics).returning();
+    // Use UPSERT to handle duplicate webhooks gracefully
+    const [created] = await this.db
+      .insert(chatAnalytics)
+      .values(analytics)
+      .onConflictDoUpdate({
+        target: chatAnalytics.chatId,
+        set: {
+          // Update all fields except id and createdAt on duplicate
+          agentName: analytics.agentName,
+          agentVersion: analytics.agentVersion,
+          chatType: analytics.chatType,
+          chatStatus: analytics.chatStatus,
+          startTimestamp: analytics.startTimestamp,
+          endTimestamp: analytics.endTimestamp,
+          duration: analytics.duration,
+          transcript: analytics.transcript,
+          messageCount: analytics.messageCount,
+          toolCallsCount: analytics.toolCallsCount,
+          dynamicVariables: analytics.dynamicVariables,
+          chatSummary: analytics.chatSummary,
+          userSentiment: analytics.userSentiment,
+          chatSuccessful: analytics.chatSuccessful,
+          combinedCost: analytics.combinedCost,
+          productCosts: analytics.productCosts,
+          metadata: analytics.metadata,
+        },
+      })
+      .returning();
     return created!;
   }
 
