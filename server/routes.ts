@@ -1892,6 +1892,11 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const payload = req.body;
 
+      // DEBUG: Log full payload to understand what Retell sends
+      console.log('[Retell Webhook] === FULL PAYLOAD DEBUG ===');
+      console.log(JSON.stringify(payload, null, 2));
+      console.log('[Retell Webhook] === END PAYLOAD ===');
+
       // Extract data from Retell's chat_analyzed event
       const chatData = {
         chatId: payload.chat_id,
