@@ -668,7 +668,8 @@
     }
 
     const phoneNumber = widgetConfig.whatsappPhoneNumber.replace(/\s+/g, '');
-    const greeting = encodeURIComponent(widgetConfig.greeting || 'Hello! I would like to chat.');
+    // Use simple "Hi" greeting for WhatsApp
+    const greeting = encodeURIComponent('Hi');
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${greeting}`;
 
     window.open(whatsappUrl, '_blank');
