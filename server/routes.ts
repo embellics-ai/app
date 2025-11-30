@@ -1438,7 +1438,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         });
 
         // Inject tenant information and widget script into HTML
-        const widgetScriptUrl = `${req.protocol}://${req.get('host')}/widget.js`;
+        // Use X-Forwarded-Proto if available (for proxies/load balancers like Render)
+        const protocol = req.get('x-forwarded-proto') || req.protocol;
+        const widgetScriptUrl = `${protocol}://${req.get('host')}/widget.js`;
         const tenantInfo = `
           <script>
             // Tenant configuration
