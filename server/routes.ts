@@ -22,6 +22,17 @@ import { dirname } from 'path';
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+/**
+ * Escapes a string for safe insertion into a single-quoted JavaScript string literal.
+ * Prevents injection attacks by escaping both backslashes and single quotes.
+ * @param str - The string to escape
+ * @returns The escaped string safe for use in JavaScript code
+ */
+function escapeJsString(str: string): string {
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 import {
   encrypt,
   decrypt,
@@ -1433,7 +1444,7 @@ export async function registerRoutes(app: Express): Promise<void> {
             // Tenant configuration
             window.WIDGET_TEST_CONFIG = {
               tenantId: '${tenantId}',
-              tenantName: '${tenant.name.replace(/'/g, "\\'")}',
+              tenantName: '${escapeJsString(tenant.name)}',
               agentId: '${widgetConfig.retellAgentId}',
               testMode: true,
             };
@@ -1443,7 +1454,7 @@ export async function registerRoutes(app: Express): Promise<void> {
               const tenantNameEl = document.getElementById('tenant-name');
               const agentIdEl = document.getElementById('agent-id');
               
-              if (tenantNameEl) tenantNameEl.textContent = '${tenant.name.replace(/'/g, "\\'")}';
+              if (tenantNameEl) tenantNameEl.textContent = '${escapeJsString(tenant.name)}';
               if (agentIdEl) agentIdEl.textContent = '${widgetConfig.retellAgentId}';
               
               // Update status after widget loads
