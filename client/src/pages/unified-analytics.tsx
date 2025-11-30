@@ -17,7 +17,7 @@ import {
   Phone,
   MessageSquare,
   Activity,
-  DollarSign,
+  Euro,
   Clock,
   CheckCircle2,
   TrendingUp,
@@ -26,6 +26,7 @@ import {
   Meh,
   Loader2,
   CalendarIcon,
+  BarChart3,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import {
@@ -38,6 +39,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
+import EnhancedChatAnalytics from '@/components/EnhancedChatAnalytics';
 import {
   AreaChart,
   Area,
@@ -177,33 +179,6 @@ export default function UnifiedAnalytics() {
     enabled: !!tenantId && !!dateRange?.from && !!dateRange?.to,
   });
 
-  // Fetch voice analytics from Retell API (legacy - for detailed charts only)
-  const { data: voiceData, isLoading: voiceLoading } = useQuery({
-    queryKey: [
-      'voice-analytics',
-      tenantId,
-      dateRange?.from?.toISOString(),
-      dateRange?.to?.toISOString(),
-    ],
-    queryFn: async () => {
-      if (!tenantId || !dateRange?.from || !dateRange?.to) return null;
-      const params = new URLSearchParams({
-        start_date: dateRange.from.toISOString(),
-        end_date: dateRange.to.toISOString(),
-      });
-      const response = await apiRequest(
-        'GET',
-        `/api/platform/analytics/retell/${tenantId}?${params}`,
-      );
-      return await response.json();
-    },
-    enabled:
-      !!tenantId &&
-      !!dateRange?.from &&
-      !!dateRange?.to &&
-      (analyticsType === 'all' || analyticsType === 'voice'),
-  });
-
   // Fetch chat analytics - DEPRECATED, use analyticsOverview instead
   const chatOverview = analyticsOverview?.chat;
 
@@ -245,7 +220,7 @@ export default function UnifiedAnalytics() {
     enabled: !!tenantId && (analyticsType === 'all' || analyticsType === 'chat'),
   });
 
-  const isLoading = voiceLoading || overviewLoading || chatSessionsLoading;
+  const isLoading = overviewLoading || chatSessionsLoading;
 
   // Calculate combined metrics
   const getCombinedMetrics = () => {
@@ -300,9 +275,9 @@ export default function UnifiedAnalytics() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('de-DE', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EUR',
     }).format(amount);
   };
 
@@ -480,7 +455,7 @@ export default function UnifiedAnalytics() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <Euro className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(metrics.totalCost)}</div>
@@ -491,362 +466,29 @@ export default function UnifiedAnalytics() {
             </Card>
           </div>
 
-          {/* Voice Analytics Charts - Only show if we have voice data from our database */}
-          {(analyticsType === 'all' || analyticsType === 'voice') &&
-            analyticsOverview?.voice &&
-            analyticsOverview.voice.totalCalls > 0 &&
-            voiceData?.dailyMetrics &&
-            voiceData.dailyMetrics.length > 0 && (
-              <>
-                <div className="grid gap-4 md:grid-cols-3 mb-8">
-                  {/* Pickup Rate */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm font-medium">Call Picked Up Rate</CardTitle>
-                      <p className="text-xs text-muted-foreground">All agents</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[200px] cursor-pointer">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={voiceData.dailyMetrics.map((d: any) => ({
-                              date: format(new Date(d.date), 'MMM dd'),
-                              pickupRate: d.pickupRate || 0,
-                            }))}
-                          >
-                            <defs>
-                              <linearGradient id="pickupGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
-                            <Tooltip
-                              formatter={(value, name) => [value, formatLabel(String(name))]}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="pickupRate"
-                              stroke="#3b82f6"
-                              fill="url(#pickupGradient)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Success Rate */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm font-medium">Call Successful Rate</CardTitle>
-                      <p className="text-xs text-muted-foreground">All agents</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[200px] cursor-pointer">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={voiceData.dailyMetrics.map((d: any) => ({
-                              date: format(new Date(d.date), 'MMM dd'),
-                              successRate: d.successRate || 0,
-                            }))}
-                          >
-                            <defs>
-                              <linearGradient id="successGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
-                            <Tooltip
-                              formatter={(value, name) => [value, formatLabel(String(name))]}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="successRate"
-                              stroke="#10b981"
-                              fill="url(#successGradient)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Transfer Rate */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm font-medium">Call Transfer Rate</CardTitle>
-                      <p className="text-xs text-muted-foreground">All agents</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[200px] cursor-pointer">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={voiceData.dailyMetrics.map((d: any) => ({
-                              date: format(new Date(d.date), 'MMM dd'),
-                              transferRate: d.transferRate || 0,
-                            }))}
-                          >
-                            <defs>
-                              <linearGradient id="transferGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
-                            <Tooltip
-                              formatter={(value, name) => [value, formatLabel(String(name))]}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="transferRate"
-                              stroke="#f59e0b"
-                              fill="url(#transferGradient)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
+          {/* Enhanced Chat Visualizations */}
+          {(analyticsType === 'all' || analyticsType === 'chat') &&
+            tenantId &&
+            dateRange?.from &&
+            dateRange?.to && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-6 w-6" />
+                  <h2 className="text-2xl font-bold">Enhanced Chat Visualizations</h2>
                 </div>
-
-                <div className="grid gap-4 md:grid-cols-3 mb-8">
-                  {/* Voicemail Rate */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm font-medium">Voicemail Rate</CardTitle>
-                      <p className="text-xs text-muted-foreground">All agents</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[200px] cursor-pointer">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={voiceData.dailyMetrics.map((d: any) => ({
-                              date: format(new Date(d.date), 'MMM dd'),
-                              voicemailRate: d.voicemailRate || 0,
-                            }))}
-                          >
-                            <defs>
-                              <linearGradient id="voicemailGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
-                            <Tooltip
-                              formatter={(value, name) => [value, formatLabel(String(name))]}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="voicemailRate"
-                              stroke="#ef4444"
-                              fill="url(#voicemailGradient)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Average Duration */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm font-medium">Average Duration</CardTitle>
-                      <p className="text-xs text-muted-foreground">All agents</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[200px] cursor-pointer">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={voiceData.dailyMetrics.map((d: any) => ({
-                              date: format(new Date(d.date), 'MMM dd'),
-                              avgDuration: Math.round((d.avgDuration || 0) / 60),
-                            }))}
-                          >
-                            <defs>
-                              <linearGradient id="durationGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
-                            <Tooltip
-                              formatter={(value, name) => [
-                                `${value} min`,
-                                formatLabel(String(name)),
-                              ]}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="avgDuration"
-                              stroke="#8b5cf6"
-                              fill="url(#durationGradient)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Average Latency */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm font-medium">Average Latency</CardTitle>
-                      <p className="text-xs text-muted-foreground">All agents</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[200px] cursor-pointer">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={voiceData.dailyMetrics.map((d: any) => ({
-                              date: format(new Date(d.date), 'MMM dd'),
-                              avgLatency: d.avgLatency || 0,
-                            }))}
-                          >
-                            <defs>
-                              <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
-                            <Tooltip
-                              formatter={(value, name) => [`${value}ms`, formatLabel(String(name))]}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="avgLatency"
-                              stroke="#06b6d4"
-                              fill="url(#latencyGradient)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Stacked Bar Charts */}
-                <div className="grid gap-4 md:grid-cols-3 mb-8">
-                  {/* Call Successful */}
-                  {voiceData.callsByDateStacked && voiceData.callsByDateStacked.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm font-medium">Call Successful</CardTitle>
-                        <p className="text-xs text-muted-foreground">All agents</p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[250px] cursor-pointer">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={voiceData.callsByDateStacked.map((d: any) => ({
-                                date: format(new Date(d.date), 'MMM dd'),
-                                successful: d.successful || 0,
-                                unsuccessful: d.unsuccessful || 0,
-                              }))}
-                            >
-                              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                              <YAxis tick={{ fontSize: 10 }} />
-                              <Tooltip
-                                cursor={{ fill: 'transparent' }}
-                                formatter={(value, name) => [value, formatLabel(String(name))]}
-                              />
-                              <Bar dataKey="successful" stackId="a" fill="#3b82f6" />
-                              <Bar dataKey="unsuccessful" stackId="a" fill="#f97316" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Disconnection Reason */}
-                  {voiceData.callsByDateStacked && voiceData.callsByDateStacked.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm font-medium">Disconnection Reason</CardTitle>
-                        <p className="text-xs text-muted-foreground">All agents</p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[250px] cursor-pointer">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={voiceData.callsByDateStacked.map((d: any) => ({
-                                date: format(new Date(d.date), 'MMM dd'),
-                                agentHangup: d.agentHangup || 0,
-                                callTransfer: d.callTransfer || 0,
-                                userHangup: d.userHangup || 0,
-                                other: d.otherDisconnection || 0,
-                              }))}
-                            >
-                              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                              <YAxis tick={{ fontSize: 10 }} />
-                              <Tooltip
-                                cursor={{ fill: 'transparent' }}
-                                formatter={(value, name) => [value, formatLabel(String(name))]}
-                              />
-                              <Bar dataKey="agentHangup" stackId="a" fill="#ef4444" />
-                              <Bar dataKey="callTransfer" stackId="a" fill="#3b82f6" />
-                              <Bar dataKey="userHangup" stackId="a" fill="#10b981" />
-                              <Bar dataKey="other" stackId="a" fill="#6b7280" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* User Sentiment */}
-                  {voiceData.callsByDateStacked && voiceData.callsByDateStacked.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm font-medium">User Sentiment</CardTitle>
-                        <p className="text-xs text-muted-foreground">All agents</p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[250px] cursor-pointer">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={voiceData.callsByDateStacked.map((d: any) => ({
-                                date: format(new Date(d.date), 'MMM dd'),
-                                negative: d.negative || 0,
-                                neutral: d.neutral || 0,
-                                positive: d.positive || 0,
-                                other: d.otherSentiment || 0,
-                              }))}
-                            >
-                              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                              <YAxis tick={{ fontSize: 10 }} />
-                              <Tooltip
-                                cursor={{ fill: 'transparent' }}
-                                formatter={(value, name) => [value, formatLabel(String(name))]}
-                              />
-                              <Bar dataKey="negative" stackId="a" fill="#ef4444" />
-                              <Bar dataKey="neutral" stackId="a" fill="#f97316" />
-                              <Bar dataKey="positive" stackId="a" fill="#10b981" />
-                              <Bar dataKey="other" stackId="a" fill="#6b7280" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              </>
+                <EnhancedChatAnalytics
+                  tenantId={tenantId}
+                  startDate={dateRange.from}
+                  endDate={dateRange.to}
+                />
+              </div>
             )}
 
-          {/* No Voice Data Message */}
-          {(analyticsType === 'all' || analyticsType === 'voice') &&
+          {/* Voice Analytics - Show "no data" message only when viewing voice analytics */}
+          {analyticsType === 'voice' &&
             analyticsOverview?.voice &&
             analyticsOverview.voice.totalCalls === 0 && (
-              <Card>
+              <Card className="mb-8">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Phone className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
                   <p className="text-lg font-medium mb-2">No Voice Analytics Data Yet</p>
@@ -860,49 +502,6 @@ export default function UnifiedAnalytics() {
             )}
 
           {/* Chat Analytics Charts */}
-          {(analyticsType === 'all' || analyticsType === 'chat') &&
-            chatOverview &&
-            chatOverview.sentimentBreakdown && (
-              <div className="grid gap-4 md:grid-cols-3 mb-8">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-medium">
-                      Chat Sentiment Distribution
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground">All chat sessions</p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[250px] cursor-pointer">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={[
-                            {
-                              name: 'Sentiment',
-                              negative: chatOverview.sentimentBreakdown.negative || 0,
-                              neutral: chatOverview.sentimentBreakdown.neutral || 0,
-                              positive: chatOverview.sentimentBreakdown.positive || 0,
-                              unknown: chatOverview.sentimentBreakdown.unknown || 0,
-                            },
-                          ]}
-                        >
-                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                          <YAxis tick={{ fontSize: 10 }} />
-                          <Tooltip
-                            cursor={{ fill: 'transparent' }}
-                            formatter={(value, name) => [value, formatLabel(String(name))]}
-                          />
-                          <Bar dataKey="negative" stackId="a" fill="#ef4444" />
-                          <Bar dataKey="neutral" stackId="a" fill="#f97316" />
-                          <Bar dataKey="positive" stackId="a" fill="#10b981" />
-                          <Bar dataKey="unknown" stackId="a" fill="#6b7280" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
           {/* Chat Analytics Details */}
           {(analyticsType === 'all' || analyticsType === 'chat') && chatSessions.length > 0 && (
             <Card>
@@ -973,36 +572,6 @@ export default function UnifiedAnalytics() {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Voice Analytics Details - Add if needed */}
-          {(analyticsType === 'all' || analyticsType === 'voice') && voiceData && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Voice Call Metrics</CardTitle>
-                <CardDescription>Overview of voice call performance</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Average Duration
-                    </div>
-                    <div className="text-2xl font-bold">
-                      {formatDuration(voiceData.averageDuration)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Total Calls</div>
-                    <div className="text-2xl font-bold">{voiceData.totalCalls}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Completed</div>
-                    <div className="text-2xl font-bold">{voiceData.completedCalls}</div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           )}

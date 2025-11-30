@@ -1938,6 +1938,15 @@ export async function registerRoutes(app: Express): Promise<void> {
       const chat = payload.chat || payload;
 
       // Extract data from Retell's chat_analyzed event
+      const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
+      const endTimestamp = chat.end_timestamp ? new Date(chat.end_timestamp) : null;
+
+      // Calculate duration in seconds if not provided by Retell
+      let duration = chat.duration || null;
+      if (!duration && startTimestamp && endTimestamp) {
+        duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
+      }
+
       const chatData = {
         chatId: chat.chat_id,
         agentId: chat.agent_id,
@@ -1945,16 +1954,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         agentVersion: chat.agent_version || null,
         chatType: chat.chat_type || null,
         chatStatus: chat.chat_status || null,
-        startTimestamp: chat.start_timestamp ? new Date(chat.start_timestamp) : null,
-        endTimestamp: chat.end_timestamp ? new Date(chat.end_timestamp) : null,
-        duration: chat.duration || null,
+        startTimestamp,
+        endTimestamp,
+        duration,
         messageCount: chat.messages?.length || 0,
         toolCallsCount: chat.tool_calls?.length || 0,
         dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
         userSentiment: chat.chat_analysis?.user_sentiment || null,
         chatSuccessful: chat.chat_analysis?.chat_successful || null,
-        combinedCost: chat.chat_cost?.combined_cost || chat.combined_cost || 0,
-        productCosts: chat.chat_cost?.product_costs || chat.product_costs || null,
+        combinedCost: chat.cost_analysis?.combined || 0,
+        productCosts: chat.cost_analysis?.product_costs || null,
         metadata: {
           whatsapp_user: chat.metadata?.whatsapp_user || null,
           // Add any other metadata fields
@@ -2089,6 +2098,15 @@ export async function registerRoutes(app: Express): Promise<void> {
       const call = payload.call || payload;
 
       // Extract data from Retell's call.ended event (mirrors chat structure)
+      const startTimestamp = call.start_timestamp ? new Date(call.start_timestamp) : null;
+      const endTimestamp = call.end_timestamp ? new Date(call.end_timestamp) : null;
+
+      // Calculate duration in seconds if not provided by Retell
+      let duration = call.duration || null;
+      if (!duration && startTimestamp && endTimestamp) {
+        duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
+      }
+
       const callData = {
         callId: call.call_id,
         agentId: call.agent_id,
@@ -2096,16 +2114,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         agentVersion: call.agent_version || null,
         callType: call.call_type || null,
         callStatus: call.call_status || call.disconnect_reason || null,
-        startTimestamp: call.start_timestamp ? new Date(call.start_timestamp) : null,
-        endTimestamp: call.end_timestamp ? new Date(call.end_timestamp) : null,
-        duration: call.duration || null,
+        startTimestamp,
+        endTimestamp,
+        duration,
         messageCount: call.transcript?.length || call.messages?.length || 0,
         toolCallsCount: call.tool_calls?.length || 0,
         dynamicVariables: call.collected_dynamic_variables || call.dynamic_variables || null,
         userSentiment: call.call_analysis?.user_sentiment || null,
         callSuccessful: call.call_analysis?.call_successful || null,
-        combinedCost: call.call_cost?.combined_cost || call.combined_cost || 0,
-        productCosts: call.call_cost?.product_costs || call.product_costs || null,
+        combinedCost: call.cost_analysis?.combined || 0,
+        productCosts: call.cost_analysis?.product_costs || null,
         metadata: {
           disconnect_reason: call.disconnect_reason || null,
           from_number: call.from_number || null,
@@ -2307,6 +2325,43 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('Error fetching chat analytics:', error);
         res.status(500).json({ error: 'Failed to fetch chat analytics' });
+      }
+    },
+  );
+
+  /**
+   * Get time-series chat analytics for visualizations
+   * IMPORTANT: This must come BEFORE the /:chatId route
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/chats/time-series',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId, groupBy } = req.query;
+
+        console.log('[Analytics Time Series] Querying for tenant:', tenantId);
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+          groupBy: (groupBy as 'hour' | 'day' | 'week') || 'day',
+        };
+
+        const timeSeriesData = await storage.getChatAnalyticsTimeSeries(tenantId, filters);
+
+        console.log('[Analytics Time Series] Returning data:', {
+          chatCountsLength: timeSeriesData.chatCounts.length,
+          durationDataLength: timeSeriesData.durationData.length,
+        });
+
+        res.json(timeSeriesData);
+      } catch (error) {
+        console.error('Error fetching time-series chat analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch time-series analytics' });
       }
     },
   );
@@ -3906,482 +3961,24 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
-  // Get analytics for specific tenant (Platform Admin only)
-  app.get(
-    '/api/platform/analytics/retell/:tenantId',
-    requireAuth,
-    requirePlatformAdmin,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const { tenantId } = req.params;
-
-        // Get tenant's widget config to find their Retell API key
-        const widgetConfig = await storage.getWidgetConfig(tenantId);
-
-        // If no widget config or no API key configured, return empty analytics
-        if (!widgetConfig?.retellApiKey) {
-          console.log(`[Platform Analytics] No Retell API key configured for tenant: ${tenantId}`);
-          return res.json({
-            totalCalls: 0,
-            completedCalls: 0,
-            averageDuration: 0,
-            averageLatency: 0,
-            successRate: 0,
-            pickupRate: 0,
-            transferRate: 0,
-            voicemailRate: 0,
-            sentimentBreakdown: {
-              Positive: 0,
-              Negative: 0,
-              Neutral: 0,
-              Unknown: 0,
-            },
-            disconnectionReasons: {},
-            callStatusBreakdown: {},
-            callsOverTime: [],
-            dailyMetrics: [],
-            callsByDateStacked: [],
-            agentMetrics: [],
-            directionBreakdown: { inbound: 0, outbound: 0 },
-          });
-        }
-
-        // Create a Retell client using the tenant's own API key
-        const tenantRetellClient = new Retell({
-          apiKey: widgetConfig.retellApiKey,
-        });
-
-        // Get time range from query params (default to all time)
-        const { start_date, end_date } = req.query;
-
-        // Build filter for time range
-        const filter: any = {};
-
-        // Add time filtering if provided
-        if (start_date) {
-          filter.start_timestamp = {
-            gte: new Date(start_date as string).getTime(),
-          };
-        }
-        if (end_date) {
-          filter.start_timestamp = {
-            ...filter.start_timestamp,
-            lte: new Date(end_date as string).getTime(),
-          };
-        }
-
-        let calls: any[] = [];
-        let agentNames: Record<string, string> = {};
-
-        console.log(`[Platform Analytics] Fetching account-wide calls for tenant: ${tenantId}`);
-        console.log(`[Platform Analytics] Filter criteria:`, JSON.stringify(filter, null, 2));
-
-        try {
-          // Fetch list of active agents and store their names
-          let activeAgentIds: Set<string>;
-          try {
-            const activeAgents = await tenantRetellClient.agent.list();
-            activeAgentIds = new Set(activeAgents.map((agent: any) => agent.agent_id));
-            activeAgents.forEach((agent: any) => {
-              if (agent.agent_id && agent.agent_name) {
-                agentNames[agent.agent_id] = agent.agent_name;
-              }
-            });
-            console.log(
-              `[Platform Analytics] Found ${activeAgentIds.size} active agents in account`,
-            );
-          } catch (agentError) {
-            console.warn(
-              `[Platform Analytics] Could not fetch agent list, including all calls:`,
-              agentError,
-            );
-            activeAgentIds = new Set();
-          }
-
-          // Fetch ALL calls from tenant's Retell account with pagination
-          let paginationKey: string | undefined = undefined;
-          let pageCount = 0;
-          const maxLimit = 1000;
-
-          do {
-            pageCount++;
-            const pageParams: any = {
-              filter_criteria: Object.keys(filter).length > 0 ? filter : undefined,
-              limit: maxLimit,
-              sort_order: 'descending',
-            };
-
-            if (paginationKey) {
-              pageParams.pagination_key = paginationKey;
-            }
-
-            const response: any = await tenantRetellClient.call.list(pageParams);
-
-            if (Array.isArray(response) && response.length > 0) {
-              calls.push(...response);
-
-              if (response.length === maxLimit) {
-                const lastCall = response[response.length - 1];
-                paginationKey = lastCall.call_id;
-              } else {
-                paginationKey = undefined;
-              }
-            } else {
-              paginationKey = undefined;
-            }
-
-            if (pageCount >= 100) {
-              console.warn(`[Platform Analytics] Reached pagination safety limit`);
-              break;
-            }
-          } while (paginationKey);
-
-          console.log(
-            `[Platform Analytics] ✓ Fetched ${calls.length} total calls across ${pageCount} pages`,
-          );
-
-          // Filter out calls from deleted agents
-          if (activeAgentIds.size > 0) {
-            calls = calls.filter((call: any) => activeAgentIds.has(call.agent_id));
-          }
-
-          // Filter by date range manually
-          if (Object.keys(filter).length > 0 && filter.start_timestamp) {
-            calls = calls.filter((call: any) => {
-              if (!call.start_timestamp) return false;
-
-              if (filter.start_timestamp.gte && call.start_timestamp < filter.start_timestamp.gte) {
-                return false;
-              }
-              if (filter.start_timestamp.lte && call.start_timestamp > filter.start_timestamp.lte) {
-                return false;
-              }
-              return true;
-            });
-          }
-        } catch (retellError: any) {
-          console.error('[Platform Analytics] Error fetching calls:', retellError);
-          return res.json({
-            totalCalls: 0,
-            completedCalls: 0,
-            averageDuration: 0,
-            averageLatency: 0,
-            successRate: 0,
-            pickupRate: 0,
-            transferRate: 0,
-            voicemailRate: 0,
-            sentimentBreakdown: {
-              Positive: 0,
-              Negative: 0,
-              Neutral: 0,
-              Unknown: 0,
-            },
-            disconnectionReasons: {},
-            callStatusBreakdown: {},
-            callsOverTime: [],
-            dailyMetrics: [],
-            callsByDateStacked: [],
-            agentMetrics: [],
-            directionBreakdown: { inbound: 0, outbound: 0 },
-          });
-        }
-
-        // Aggregate analytics data (same logic as regular analytics endpoint)
-        let totalDuration = 0;
-        let totalLatency = 0;
-        let callsWithLatency = 0;
-        let completedCalls = 0;
-        let successfulCalls = 0;
-        let pickedUpCalls = 0;
-        let transferredCalls = 0;
-        let voicemailCalls = 0;
-
-        const sentimentBreakdown: Record<string, number> = {
-          Positive: 0,
-          Negative: 0,
-          Neutral: 0,
-          Unknown: 0,
-        };
-        const disconnectionReasons: Record<string, number> = {};
-        const callStatusBreakdown: Record<string, number> = {};
-        const callsByDate: Record<string, number> = {};
-        const callsByDateStacked: Record<string, any> = {};
-        const agentMetrics: Record<string, any> = {};
-        const directionBreakdown: Record<string, number> = {
-          inbound: 0,
-          outbound: 0,
-        };
-
-        for (const call of calls) {
-          if (call.call_status === 'ended') {
-            completedCalls++;
-
-            if (call.duration_ms) {
-              totalDuration += call.duration_ms;
-            }
-
-            if (call.latency?.e2e?.p50) {
-              totalLatency += call.latency.e2e.p50;
-              callsWithLatency++;
-            }
-
-            if (call.call_analysis?.call_successful) {
-              successfulCalls++;
-            }
-
-            if (
-              call.disconnection_reason !== 'voicemail' &&
-              call.disconnection_reason !== 'no_answer'
-            ) {
-              pickedUpCalls++;
-            }
-
-            if (call.disconnection_reason === 'call_transfer') {
-              transferredCalls++;
-            }
-
-            if (call.disconnection_reason === 'voicemail') {
-              voicemailCalls++;
-            }
-          }
-
-          const sentiment = call.call_analysis?.user_sentiment || 'Unknown';
-          sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
-
-          const reason = call.disconnection_reason || 'Unknown';
-          disconnectionReasons[reason] = (disconnectionReasons[reason] || 0) + 1;
-
-          const status = call.call_status || 'Unknown';
-          callStatusBreakdown[status] = (callStatusBreakdown[status] || 0) + 1;
-
-          const direction = call.direction || 'Unknown';
-          directionBreakdown[direction] = (directionBreakdown[direction] || 0) + 1;
-
-          const dateKey = call.start_timestamp
-            ? new Date(call.start_timestamp).toISOString().split('T')[0]
-            : 'unknown';
-          callsByDate[dateKey] = (callsByDate[dateKey] || 0) + 1;
-
-          if (!callsByDateStacked[dateKey]) {
-            callsByDateStacked[dateKey] = {
-              successful: 0,
-              unsuccessful: 0,
-              agentHangup: 0,
-              callTransfer: 0,
-              userHangup: 0,
-              otherDisconnection: 0,
-              positive: 0,
-              neutral: 0,
-              negative: 0,
-              otherSentiment: 0,
-            };
-          }
-
-          if (call.call_status === 'ended') {
-            if (call.call_analysis?.call_successful) {
-              callsByDateStacked[dateKey].successful++;
-            } else {
-              callsByDateStacked[dateKey].unsuccessful++;
-            }
-
-            if (call.disconnection_reason === 'agent_hangup') {
-              callsByDateStacked[dateKey].agentHangup++;
-            } else if (call.disconnection_reason === 'call_transfer') {
-              callsByDateStacked[dateKey].callTransfer++;
-            } else if (call.disconnection_reason === 'user_hangup') {
-              callsByDateStacked[dateKey].userHangup++;
-            } else {
-              callsByDateStacked[dateKey].otherDisconnection++;
-            }
-
-            const sentiment = call.call_analysis?.user_sentiment || 'Unknown';
-            if (sentiment === 'Positive') {
-              callsByDateStacked[dateKey].positive++;
-            } else if (sentiment === 'Neutral') {
-              callsByDateStacked[dateKey].neutral++;
-            } else if (sentiment === 'Negative') {
-              callsByDateStacked[dateKey].negative++;
-            } else {
-              callsByDateStacked[dateKey].otherSentiment++;
-            }
-          }
-
-          const agentId = call.agent_id;
-          if (!agentMetrics[agentId]) {
-            agentMetrics[agentId] = {
-              totalCalls: 0,
-              successfulCalls: 0,
-              pickedUpCalls: 0,
-              transferredCalls: 0,
-              voicemailCalls: 0,
-            };
-          }
-          if (call.call_status === 'ended') {
-            agentMetrics[agentId].totalCalls++;
-            if (call.call_analysis?.call_successful) {
-              agentMetrics[agentId].successfulCalls++;
-            }
-            if (
-              call.disconnection_reason !== 'voicemail' &&
-              call.disconnection_reason !== 'no_answer'
-            ) {
-              agentMetrics[agentId].pickedUpCalls++;
-            }
-            if (call.disconnection_reason === 'call_transfer') {
-              agentMetrics[agentId].transferredCalls++;
-            }
-            if (call.disconnection_reason === 'voicemail') {
-              agentMetrics[agentId].voicemailCalls++;
-            }
-          }
-        }
-
-        const averageDuration = completedCalls > 0 ? totalDuration / completedCalls : 0;
-        const averageLatency = callsWithLatency > 0 ? totalLatency / callsWithLatency : 0;
-        const successRate = completedCalls > 0 ? (successfulCalls / completedCalls) * 100 : 0;
-        const pickupRate = completedCalls > 0 ? (pickedUpCalls / completedCalls) * 100 : 0;
-        const transferRate = completedCalls > 0 ? (transferredCalls / completedCalls) * 100 : 0;
-        const voicemailRate = completedCalls > 0 ? (voicemailCalls / completedCalls) * 100 : 0;
-
-        const dailyMetrics: Record<string, any> = {};
-
-        for (const call of calls) {
-          if (call.call_status !== 'ended') continue;
-
-          const dateKey = call.start_timestamp
-            ? new Date(call.start_timestamp).toISOString().split('T')[0]
-            : 'unknown';
-
-          if (!dailyMetrics[dateKey]) {
-            dailyMetrics[dateKey] = {
-              totalCalls: 0,
-              successfulCalls: 0,
-              pickedUpCalls: 0,
-              transferredCalls: 0,
-              voicemailCalls: 0,
-              totalDuration: 0,
-              totalLatency: 0,
-              callsWithLatency: 0,
-            };
-          }
-
-          dailyMetrics[dateKey].totalCalls++;
-
-          if (call.call_analysis?.call_successful) {
-            dailyMetrics[dateKey].successfulCalls++;
-          }
-
-          if (
-            call.disconnection_reason !== 'voicemail' &&
-            call.disconnection_reason !== 'no_answer'
-          ) {
-            dailyMetrics[dateKey].pickedUpCalls++;
-          }
-
-          if (call.disconnection_reason === 'call_transfer') {
-            dailyMetrics[dateKey].transferredCalls++;
-          }
-
-          if (call.disconnection_reason === 'voicemail') {
-            dailyMetrics[dateKey].voicemailCalls++;
-          }
-
-          if (call.duration_ms) {
-            dailyMetrics[dateKey].totalDuration += call.duration_ms;
-          }
-
-          if (call.latency?.e2e?.p50) {
-            dailyMetrics[dateKey].totalLatency += call.latency.e2e.p50;
-            dailyMetrics[dateKey].callsWithLatency++;
-          }
-        }
-
-        const dailyMetricsArray = Object.entries(dailyMetrics)
-          .map(([date, metrics]: [string, any]) => ({
-            date,
-            pickupRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.pickedUpCalls / metrics.totalCalls) * 100)
-                : 0,
-            successRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.successfulCalls / metrics.totalCalls) * 100)
-                : 0,
-            transferRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.transferredCalls / metrics.totalCalls) * 100)
-                : 0,
-            voicemailRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.voicemailCalls / metrics.totalCalls) * 100)
-                : 0,
-            avgDuration:
-              metrics.totalCalls > 0
-                ? Math.round(metrics.totalDuration / metrics.totalCalls / 1000)
-                : 0,
-            avgLatency:
-              metrics.callsWithLatency > 0
-                ? Math.round(metrics.totalLatency / metrics.callsWithLatency)
-                : 0,
-          }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        const callsOverTime = Object.entries(callsByDate)
-          .map(([date, count]) => ({ date, count }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        const callsByDateStackedArray = Object.entries(callsByDateStacked)
-          .map(([date, data]) => ({ date, ...data }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        const agentMetricsArray = Object.entries(agentMetrics).map(
-          ([agentId, metrics]: [string, any]) => ({
-            agentId,
-            agentName: agentNames[agentId] || agentId,
-            successRate:
-              metrics.totalCalls > 0 ? (metrics.successfulCalls / metrics.totalCalls) * 100 : 0,
-            pickupRate:
-              metrics.totalCalls > 0 ? (metrics.pickedUpCalls / metrics.totalCalls) * 100 : 0,
-            transferRate:
-              metrics.totalCalls > 0 ? (metrics.transferredCalls / metrics.totalCalls) * 100 : 0,
-            voicemailRate:
-              metrics.totalCalls > 0 ? (metrics.voicemailCalls / metrics.totalCalls) * 100 : 0,
-            totalCalls: metrics.totalCalls,
-          }),
-        );
-
-        const endedCalls = calls.filter(
-          (call: any) =>
-            call.call_status === 'ended' &&
-            call.call_type === 'phone_call' &&
-            call.duration_ms &&
-            call.duration_ms > 0,
-        );
-
-        res.json({
-          totalCalls: endedCalls.length,
-          completedCalls,
-          averageDuration: Math.round(averageDuration / 1000),
-          averageLatency: Math.round(averageLatency),
-          successRate: Math.round(successRate),
-          pickupRate: Math.round(pickupRate),
-          transferRate: Math.round(transferRate),
-          voicemailRate: Math.round(voicemailRate),
-          sentimentBreakdown,
-          disconnectionReasons,
-          callStatusBreakdown,
-          callsOverTime,
-          dailyMetrics: dailyMetricsArray,
-          callsByDateStacked: callsByDateStackedArray,
-          agentMetrics: agentMetricsArray,
-          directionBreakdown,
-        });
-      } catch (error) {
-        console.error('Error fetching platform analytics:', error);
-        res.status(500).json({ error: 'Failed to fetch analytics' });
-      }
-    },
-  );
+  /**
+   * OLD RETELL API ANALYTICS ENDPOINT - REMOVED
+   *
+   * The endpoint `/api/platform/analytics/retell/:tenantId` has been deprecated and removed.
+   * It previously made direct calls to Retell's API to fetch analytics data.
+   *
+   * Migration path:
+   * - Use /api/platform/tenants/:tenantId/analytics/overview for unified analytics
+   * - Configure Retell webhooks to send call.ended events to /api/retell/call-ended
+   * - Analytics will be stored in the database and queried from there
+   *
+   * Benefits of new approach:
+   * - Faster performance (no external API calls)
+   * - Historical data storage
+   * - No rate limits
+   * - Cost tracking included
+   * - Unified voice + chat analytics
+   */
 
   // Health check endpoint
   app.get('/api/health', async (req, res) => {
