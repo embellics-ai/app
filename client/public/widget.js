@@ -55,7 +55,7 @@
         #embellics-widget-button { width: 60px; height: 60px; border-radius: 50%; background: hsl(262, 75%, 65%); border: none; cursor: pointer; box-shadow: 0 8px 24px hsla(262, 75%, 65%, 0.4); display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.3s; }
         #embellics-widget-button:hover { transform: scale(1.08); box-shadow: 0 12px 32px hsla(262, 75%, 65%, 0.5); }
         #embellics-widget-button svg { width: 28px; height: 28px; fill: white; }
-        #embellics-widget-panel { position: fixed; width: 380px; height: 600px; max-height: calc(100vh - 120px); border-radius: 0.75rem; box-shadow: 0 12px 48px hsla(262, 75%, 65%, 0.2), 0 0 0 1px hsla(262, 75%, 65%, 0.1); background: hsl(0, 0%, 100%); display: none; flex-direction: column; overflow: hidden; transition: opacity 0.3s, transform 0.3s; opacity: 0; transform: translateY(10px); }
+        #embellics-widget-panel { position: fixed; width: 380px; height: 600px; max-width: calc(100vw - 20px); max-height: calc(100vh - 100px); border-radius: 0.75rem; box-shadow: 0 12px 48px hsla(262, 75%, 65%, 0.2), 0 0 0 1px hsla(262, 75%, 65%, 0.1); background: hsl(0, 0%, 100%); display: none; flex-direction: column; overflow: hidden; transition: opacity 0.3s, transform 0.3s; opacity: 0; transform: translateY(10px); }
         #embellics-widget-panel.open { display: flex; opacity: 1; transform: translateY(0); }
         #embellics-widget-header { background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; }
         #embellics-widget-title { font-weight: 600; font-size: 16px; margin: 0; }
@@ -156,11 +156,68 @@
         .embellics-option-button:disabled { cursor: not-allowed; }
         .embellics-option-button:active { transform: scale(0.98); }
         
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+          #embellics-widget-panel { 
+            width: calc(100vw - 20px) !important; 
+            height: calc(100vh - 80px) !important;
+            max-height: calc(100vh - 80px) !important;
+            border-radius: 0.75rem; 
+          }
+          #embellics-widget-button { 
+            width: 56px; 
+            height: 56px; 
+          }
+          #embellics-widget-button svg { 
+            width: 26px; 
+            height: 26px; 
+          }
+          .embellics-message { 
+            max-width: 85%; 
+            font-size: 13px; 
+          }
+          .embellics-options-container { 
+            max-width: 90%; 
+          }
+          .embellics-contact-form { 
+            max-width: 95%; 
+          }
+        }
+        
         @media (max-width: 480px) {
-          #embellics-widget-panel { width: calc(100vw - 40px); right: 20px; }
-          .embellics-modal-content { padding: 20px; }
-          .embellics-modal-actions { flex-direction: column-reverse; }
-          .embellics-modal-btn { width: 100%; }
+          #embellics-widget-panel { 
+            width: calc(100vw - 16px) !important; 
+            height: calc(100vh - 70px) !important;
+            max-height: calc(100vh - 70px) !important;
+          }
+          #embellics-widget-messages { 
+            padding: 16px; 
+          }
+          #embellics-widget-header { 
+            padding: 16px; 
+          }
+          #embellics-widget-input-container { 
+            padding: 12px; 
+          }
+          #embellics-widget-input { 
+            font-size: 16px; /* Prevents zoom on iOS */
+          }
+          .embellics-contact-form-row { 
+            grid-template-columns: 1fr; 
+          }
+          .embellics-contact-form { 
+            max-width: 100%; 
+            padding: 12px; 
+          }
+          .embellics-modal-content { 
+            padding: 20px; 
+          }
+          .embellics-modal-actions { 
+            flex-direction: column-reverse; 
+          }
+          .embellics-modal-btn { 
+            width: 100%; 
+          }
         }
       </style>
       <button id="embellics-widget-button" aria-label="Open chat">
@@ -380,6 +437,10 @@
 
     if (!container || !panel) return;
 
+    // Check if mobile device
+    const isMobile = window.innerWidth <= 768;
+    const margin = isMobile ? '10px' : '20px';
+
     // Remove all positioning styles first
     container.style.top = '';
     container.style.right = '';
@@ -396,36 +457,36 @@
     // Apply positioning based on config
     const positions = {
       'top-left': {
-        container: { top: '20px', left: '20px' },
-        panel: { top: '20px', left: '20px' },
+        container: { top: margin, left: margin },
+        panel: { top: margin, left: margin },
       },
       'top-center': {
-        container: { top: '20px', left: '50%', transform: 'translateX(-50%)' },
-        panel: { top: '20px', left: '50%', transform: 'translateX(-50%)' },
+        container: { top: margin, left: '50%', transform: 'translateX(-50%)' },
+        panel: { top: margin, left: '50%', transform: 'translateX(-50%)' },
       },
       'top-right': {
-        container: { top: '20px', right: '20px' },
-        panel: { top: '20px', right: '20px' },
+        container: { top: margin, right: margin },
+        panel: { top: margin, right: margin },
       },
       'middle-left': {
-        container: { top: '50%', left: '20px', transform: 'translateY(-50%)' },
-        panel: { top: '50%', left: '20px', transform: 'translateY(-50%)' },
+        container: { top: '50%', left: margin, transform: 'translateY(-50%)' },
+        panel: { top: '50%', left: margin, transform: 'translateY(-50%)' },
       },
       'middle-right': {
-        container: { top: '50%', right: '20px', transform: 'translateY(-50%)' },
-        panel: { top: '50%', right: '20px', transform: 'translateY(-50%)' },
+        container: { top: '50%', right: margin, transform: 'translateY(-50%)' },
+        panel: { top: '50%', right: margin, transform: 'translateY(-50%)' },
       },
       'bottom-left': {
-        container: { bottom: '20px', left: '20px' },
-        panel: { bottom: '20px', left: '20px' },
+        container: { bottom: margin, left: margin },
+        panel: { bottom: margin, left: margin },
       },
       'bottom-center': {
-        container: { bottom: '20px', left: '50%', transform: 'translateX(-50%)' },
-        panel: { bottom: '20px', left: '50%', transform: 'translateX(-50%)' },
+        container: { bottom: margin, left: '50%', transform: 'translateX(-50%)' },
+        panel: { bottom: margin, left: '50%', transform: 'translateX(-50%)' },
       },
       'bottom-right': {
-        container: { bottom: '20px', right: '20px' },
-        panel: { bottom: '20px', right: '20px' },
+        container: { bottom: margin, right: margin },
+        panel: { bottom: margin, right: margin },
       },
     };
 
@@ -1834,6 +1895,18 @@
         }
       }
     });
+
+    // Reapply positioning on window resize for responsive layout
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (isInitialized) {
+          applyWidgetPosition();
+        }
+      }, 150);
+    });
+
     if (input) {
       input.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {

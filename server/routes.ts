@@ -2538,6 +2538,40 @@ export async function registerRoutes(app: Express): Promise<void> {
   );
 
   /**
+   * Get agent breakdown for chat analytics
+   * IMPORTANT: This must come BEFORE the /:chatId route
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/chats/agent-breakdown',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate } = req.query;
+
+        console.log('[Analytics Agent Breakdown] Querying for tenant:', tenantId);
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+        };
+
+        const agentBreakdown = await storage.getChatAnalyticsAgentBreakdown(tenantId, filters);
+
+        console.log('[Analytics Agent Breakdown] Returning data:', {
+          agentCount: agentBreakdown.length,
+        });
+
+        res.json(agentBreakdown);
+      } catch (error) {
+        console.error('Error fetching agent breakdown:', error);
+        res.status(500).json({ error: 'Failed to fetch agent breakdown' });
+      }
+    },
+  );
+
+  /**
    * Get detailed analytics for a specific chat session
    */
   app.get(
