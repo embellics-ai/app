@@ -88,10 +88,12 @@ interface Tenant {
 
 interface VoiceAnalytics {
   totalCalls: number;
-  completedCalls: number;
+  successfulCalls: number;
+  totalDuration: number;
   averageDuration: number;
   totalCost: number;
-  successRate: number;
+  averageCost: number;
+  sentimentBreakdown: Record<string, number>;
 }
 
 interface ChatAnalytics {
@@ -152,7 +154,30 @@ export default function UnifiedAnalytics() {
   const tenantId =
     user?.role === 'owner' || user?.isPlatformAdmin ? selectedTenantId : user?.tenantId;
 
-  // Fetch voice analytics
+  // Fetch unified analytics overview (voice + chat from our database)
+  const { data: analyticsOverview, isLoading: overviewLoading } = useQuery<UnifiedAnalytics>({
+    queryKey: [
+      'analytics-overview',
+      tenantId,
+      dateRange?.from?.toISOString(),
+      dateRange?.to?.toISOString(),
+    ],
+    queryFn: async () => {
+      if (!tenantId || !dateRange?.from || !dateRange?.to) return null as any;
+      const params = new URLSearchParams({
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
+      });
+      const response = await apiRequest(
+        'GET',
+        `/api/platform/tenants/${tenantId}/analytics/overview?${params}`,
+      );
+      return await response.json();
+    },
+    enabled: !!tenantId && !!dateRange?.from && !!dateRange?.to,
+  });
+
+  // Fetch voice analytics from Retell API (legacy - for detailed charts only)
   const { data: voiceData, isLoading: voiceLoading } = useQuery({
     queryKey: [
       'voice-analytics',
@@ -179,33 +204,8 @@ export default function UnifiedAnalytics() {
       (analyticsType === 'all' || analyticsType === 'voice'),
   });
 
-  // Fetch chat analytics
-  const { data: chatOverview, isLoading: chatLoading } = useQuery<ChatAnalytics>({
-    queryKey: [
-      'chat-analytics-overview',
-      tenantId,
-      dateRange?.from?.toISOString(),
-      dateRange?.to?.toISOString(),
-    ],
-    queryFn: async () => {
-      if (!tenantId || !dateRange?.from || !dateRange?.to) return null as any;
-      const params = new URLSearchParams({
-        startDate: dateRange.from.toISOString(),
-        endDate: dateRange.to.toISOString(),
-      });
-      const response = await apiRequest(
-        'GET',
-        `/api/platform/tenants/${tenantId}/analytics/overview?${params}`,
-      );
-      const data = await response.json();
-      return data.chat;
-    },
-    enabled:
-      !!tenantId &&
-      !!dateRange?.from &&
-      !!dateRange?.to &&
-      (analyticsType === 'all' || analyticsType === 'chat'),
-  });
+  // Fetch chat analytics - DEPRECATED, use analyticsOverview instead
+  const chatOverview = analyticsOverview?.chat;
 
   // Fetch chat sessions
   const { data: chatSessions = [], isLoading: chatSessionsLoading } = useQuery({
@@ -245,28 +245,48 @@ export default function UnifiedAnalytics() {
     enabled: !!tenantId && (analyticsType === 'all' || analyticsType === 'chat'),
   });
 
-  const isLoading = voiceLoading || chatLoading || chatSessionsLoading;
+  const isLoading = voiceLoading || overviewLoading || chatSessionsLoading;
 
   // Calculate combined metrics
   const getCombinedMetrics = () => {
-    // Use completedCalls instead of totalCalls for consistency (totalCalls filters by duration > 0)
-    const voiceCalls = voiceData?.completedCalls || 0;
-    const chats = chatOverview?.totalChats || 0;
-    // Note: Retell Call List API doesn't return cost data, only chat costs available
-    const voiceCost = 0; // Voice costs not available from Retell API
-    const chatCost = chatOverview?.totalCost || 0;
-    const totalInteractions = voiceCalls + chats;
-    const totalCost = voiceCost + chatCost; // Currently only chat costs
-    const averageCost = totalInteractions > 0 ? totalCost / totalInteractions : 0;
+    const voiceAnalytics = analyticsOverview?.voice;
+    const chatAnalytics = analyticsOverview?.chat;
+    const combined = analyticsOverview?.combined;
 
+    // For display purposes based on selected analytics type
+    if (analyticsType === 'voice') {
+      return {
+        totalInteractions: voiceAnalytics?.totalCalls || 0,
+        voiceCalls: voiceAnalytics?.totalCalls || 0,
+        chats: 0,
+        totalCost: voiceAnalytics?.totalCost || 0,
+        averageCost: voiceAnalytics?.averageCost || 0,
+        voiceCost: voiceAnalytics?.totalCost || 0,
+        chatCost: 0,
+      };
+    }
+
+    if (analyticsType === 'chat') {
+      return {
+        totalInteractions: chatAnalytics?.totalChats || 0,
+        voiceCalls: 0,
+        chats: chatAnalytics?.totalChats || 0,
+        totalCost: chatAnalytics?.totalCost || 0,
+        averageCost: chatAnalytics?.averageCost || 0,
+        voiceCost: 0,
+        chatCost: chatAnalytics?.totalCost || 0,
+      };
+    }
+
+    // analyticsType === 'all'
     return {
-      totalInteractions,
-      voiceCalls,
-      chats,
-      totalCost,
-      averageCost,
-      voiceCost,
-      chatCost,
+      totalInteractions: combined?.totalInteractions || 0,
+      voiceCalls: voiceAnalytics?.totalCalls || 0,
+      chats: chatAnalytics?.totalChats || 0,
+      totalCost: combined?.totalCost || 0,
+      averageCost: combined?.averageCost || 0,
+      voiceCost: voiceAnalytics?.totalCost || 0,
+      chatCost: chatAnalytics?.totalCost || 0,
     };
   };
 
@@ -413,7 +433,7 @@ export default function UnifiedAnalytics() {
               </Card>
             )}
 
-            {(analyticsType === 'all' || analyticsType === 'voice') && voiceData && (
+            {(analyticsType === 'all' || analyticsType === 'voice') && analyticsOverview?.voice && (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Voice Success Rate</CardTitle>
@@ -421,10 +441,17 @@ export default function UnifiedAnalytics() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {(voiceData.successRate || 0).toFixed(1)}%
+                    {analyticsOverview.voice.totalCalls > 0
+                      ? (
+                          (analyticsOverview.voice.successfulCalls /
+                            analyticsOverview.voice.totalCalls) *
+                          100
+                        ).toFixed(1)
+                      : 0}
+                    %
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {voiceData.completedCalls} completed calls
+                    {analyticsOverview.voice.successfulCalls} completed calls
                   </p>
                 </CardContent>
               </Card>
