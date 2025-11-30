@@ -1420,11 +1420,13 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Clean up old tokens (older than 1 hour)
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        for (const [token, data] of widgetTestTokens.entries()) {
+        Array.from(widgetTestTokens.entries()).forEach(([token, data]) => {
           if (data.createdAt < oneHourAgo) {
             widgetTestTokens.delete(token);
           }
-        } // Inject tenant information and widget script into HTML
+        });
+
+        // Inject tenant information and widget script into HTML
         const widgetScriptUrl = `${req.protocol}://${req.get('host')}/widget.js`;
         const tenantInfo = `
           <script>

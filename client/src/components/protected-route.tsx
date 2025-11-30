@@ -17,6 +17,7 @@ const ROUTE_ACCESS: RouteAccess[] = [
   // Platform Admin routes
   { path: '/platform-admin', requirePlatformAdmin: true, allowedRoles: ['admin', 'owner'] },
   { path: '/platform-analytics', requirePlatformAdmin: true, allowedRoles: ['admin', 'owner'] },
+  { path: '/widget-test', requirePlatformAdmin: true, allowedRoles: ['admin', 'owner'] },
 
   // Client Admin routes
   {
