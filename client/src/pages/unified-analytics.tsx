@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -14,7 +17,7 @@ import {
   Phone,
   MessageSquare,
   Activity,
-  DollarSign,
+  Euro,
   Clock,
   CheckCircle2,
   TrendingUp,
@@ -22,6 +25,8 @@ import {
   Frown,
   Meh,
   Loader2,
+  CalendarIcon,
+  BarChart3,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import {
@@ -34,6 +39,43 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
+import EnhancedChatAnalytics from '@/components/EnhancedChatAnalytics';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
+import { format, subDays } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
+
+// Helper function to format camelCase to readable labels
+const formatLabel = (label: string): string => {
+  const abbreviations: Record<string, string> = {
+    avg: 'Average',
+  };
+
+  const formatted = label
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+
+  return formatted
+    .split(' ')
+    .map(
+      (word) => abbreviations[word.toLowerCase()] || word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join(' ');
+};
 
 type AnalyticsType = 'all' | 'voice' | 'chat';
 
@@ -48,10 +90,12 @@ interface Tenant {
 
 interface VoiceAnalytics {
   totalCalls: number;
-  completedCalls: number;
+  successfulCalls: number;
+  totalDuration: number;
   averageDuration: number;
   totalCost: number;
-  successRate: number;
+  averageCost: number;
+  sentimentBreakdown: Record<string, number>;
 }
 
 interface ChatAnalytics {
@@ -75,34 +119,32 @@ interface UnifiedAnalytics {
 
 export default function UnifiedAnalytics() {
   const { user } = useAuth();
-  const [timeRange, setTimeRange] = useState<string>('7d');
   const [analyticsType, setAnalyticsType] = useState<AnalyticsType>('all');
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
-  // Calculate date range
-  const getDateRange = () => {
-    const endDate = new Date();
-    const startDate = new Date();
+  // Default to last 7 full days (midnight to midnight)
+  const getDefaultDateRange = () => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
 
-    switch (timeRange) {
-      case '24h':
-        startDate.setHours(startDate.getHours() - 24);
-        break;
-      case '7d':
-        startDate.setDate(startDate.getDate() - 7);
-        break;
-      case '30d':
-        startDate.setDate(startDate.getDate() - 30);
-        break;
-      case '90d':
-        startDate.setDate(startDate.getDate() - 90);
-        break;
-    }
+    const sevenDaysAgo = subDays(new Date(), 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0); // Start of 7 days ago
 
-    return { startDate, endDate };
+    return {
+      from: sevenDaysAgo,
+      to: today,
+    };
   };
 
-  const { startDate, endDate } = getDateRange();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const handleDateSelect = (range: DateRange | undefined) => {
+    setDateRange(range);
+    if (range?.from && range?.to) {
+      setCalendarOpen(false);
+    }
+  };
 
   // Fetch all tenants (for platform admin)
   const { data: tenants = [] } = useQuery<Tenant[]>({
@@ -111,84 +153,115 @@ export default function UnifiedAnalytics() {
   });
 
   // Auto-select tenant for client admins
-  const tenantId = (user?.role === 'owner' || user?.isPlatformAdmin) ? selectedTenantId : user?.tenantId;
+  const tenantId =
+    user?.role === 'owner' || user?.isPlatformAdmin ? selectedTenantId : user?.tenantId;
 
-  // Fetch voice analytics
-  const { data: voiceData, isLoading: voiceLoading } = useQuery({
-    queryKey: ['voice-analytics', tenantId, timeRange],
+  // Fetch unified analytics overview (voice + chat from our database)
+  const { data: analyticsOverview, isLoading: overviewLoading } = useQuery<UnifiedAnalytics>({
+    queryKey: [
+      'analytics-overview',
+      tenantId,
+      dateRange?.from?.toISOString(),
+      dateRange?.to?.toISOString(),
+    ],
     queryFn: async () => {
-      if (!tenantId) return null;
+      if (!tenantId || !dateRange?.from || !dateRange?.to) return null as any;
       const params = new URLSearchParams({
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-      });
-      const response = await apiRequest(
-        'GET',
-        `/api/platform/analytics/retell/${tenantId}?${params}`,
-      );
-      return await response.json();
-    },
-    enabled: !!tenantId && (analyticsType === 'all' || analyticsType === 'voice'),
-  });
-
-  // Fetch chat analytics
-  const { data: chatOverview, isLoading: chatLoading } = useQuery<ChatAnalytics>({
-    queryKey: ['chat-analytics-overview', tenantId, timeRange],
-    queryFn: async () => {
-      if (!tenantId) return null as any;
-      const params = new URLSearchParams({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
       });
       const response = await apiRequest(
         'GET',
         `/api/platform/tenants/${tenantId}/analytics/overview?${params}`,
       );
-      const data = await response.json();
-      return data.chat;
+      return await response.json();
     },
-    enabled: !!tenantId && (analyticsType === 'all' || analyticsType === 'chat'),
+    enabled: !!tenantId && !!dateRange?.from && !!dateRange?.to,
   });
+
+  // Fetch chat analytics - DEPRECATED, use analyticsOverview instead
+  const chatOverview = analyticsOverview?.chat;
 
   // Fetch chat sessions
   const { data: chatSessions = [], isLoading: chatSessionsLoading } = useQuery({
-    queryKey: ['chat-sessions', tenantId, timeRange],
+    queryKey: [
+      'chat-sessions',
+      tenantId,
+      dateRange?.from?.toISOString(),
+      dateRange?.to?.toISOString(),
+    ],
     queryFn: async () => {
-      if (!tenantId) return [];
+      if (!tenantId || !dateRange?.from || !dateRange?.to) return [];
       const params = new URLSearchParams({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
         limit: '50',
       });
       const response = await apiRequest(
         'GET',
         `/api/platform/tenants/${tenantId}/analytics/chats?${params}`,
       );
-      return await response.json();
+      const data = await response.json();
+      console.log('[Unified Analytics] Chat sessions data:', data);
+      if (data.length > 0) {
+        console.log('[Unified Analytics] First chat session:', {
+          chatId: data[0].chatId,
+          duration: data[0].duration,
+          messageCount: data[0].messageCount,
+          agentName: data[0].agentName,
+          userSentiment: data[0].userSentiment,
+          combinedCost: data[0].combinedCost,
+          startTimestamp: data[0].startTimestamp,
+          endTimestamp: data[0].endTimestamp,
+        });
+      }
+      return data;
     },
     enabled: !!tenantId && (analyticsType === 'all' || analyticsType === 'chat'),
   });
 
-  const isLoading = voiceLoading || chatLoading || chatSessionsLoading;
+  const isLoading = overviewLoading || chatSessionsLoading;
 
   // Calculate combined metrics
   const getCombinedMetrics = () => {
-    const voiceCalls = voiceData?.totalCalls || 0;
-    const chats = chatOverview?.totalChats || 0;
-    const voiceCost = voiceData?.totalCost || 0;
-    const chatCost = chatOverview?.totalCost || 0;
-    const totalInteractions = voiceCalls + chats;
-    const totalCost = voiceCost + chatCost;
-    const averageCost = totalInteractions > 0 ? totalCost / totalInteractions : 0;
+    const voiceAnalytics = analyticsOverview?.voice;
+    const chatAnalytics = analyticsOverview?.chat;
+    const combined = analyticsOverview?.combined;
 
+    // For display purposes based on selected analytics type
+    if (analyticsType === 'voice') {
+      return {
+        totalInteractions: voiceAnalytics?.totalCalls || 0,
+        voiceCalls: voiceAnalytics?.totalCalls || 0,
+        chats: 0,
+        totalCost: voiceAnalytics?.totalCost || 0,
+        averageCost: voiceAnalytics?.averageCost || 0,
+        voiceCost: voiceAnalytics?.totalCost || 0,
+        chatCost: 0,
+      };
+    }
+
+    if (analyticsType === 'chat') {
+      return {
+        totalInteractions: chatAnalytics?.totalChats || 0,
+        voiceCalls: 0,
+        chats: chatAnalytics?.totalChats || 0,
+        totalCost: chatAnalytics?.totalCost || 0,
+        averageCost: chatAnalytics?.averageCost || 0,
+        voiceCost: 0,
+        chatCost: chatAnalytics?.totalCost || 0,
+      };
+    }
+
+    // analyticsType === 'all'
     return {
-      totalInteractions,
-      voiceCalls,
-      chats,
-      totalCost,
-      averageCost,
-      voiceCost,
-      chatCost,
+      totalInteractions: combined?.totalInteractions || 0,
+      voiceCalls: voiceAnalytics?.totalCalls || 0,
+      chats: chatAnalytics?.totalChats || 0,
+      totalCost: combined?.totalCost || 0,
+      averageCost: combined?.averageCost || 0,
+      voiceCost: voiceAnalytics?.totalCost || 0,
+      chatCost: chatAnalytics?.totalCost || 0,
     };
   };
 
@@ -202,9 +275,9 @@ export default function UnifiedAnalytics() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('de-DE', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EUR',
     }).format(amount);
   };
 
@@ -260,18 +333,38 @@ export default function UnifiedAnalytics() {
         </div>
 
         <div className="space-y-2">
-          <Label>Time Range</Label>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24h">Last 24 Hours</SelectItem>
-              <SelectItem value="7d">Last 7 Days</SelectItem>
-              <SelectItem value="30d">Last 30 Days</SelectItem>
-              <SelectItem value="90d">Last 90 Days</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label>Date Range</Label>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start" disabled={isLoading}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {isLoading ? (
+                  <span>Loading...</span>
+                ) : dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, 'MMM dd, yyyy')} -{' '}
+                      {format(dateRange.to, 'MMM dd, yyyy')}
+                    </>
+                  ) : (
+                    format(dateRange.from, 'MMM dd, yyyy')
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={handleDateSelect}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -315,7 +408,7 @@ export default function UnifiedAnalytics() {
               </Card>
             )}
 
-            {(analyticsType === 'all' || analyticsType === 'voice') && voiceData && (
+            {(analyticsType === 'all' || analyticsType === 'voice') && analyticsOverview?.voice && (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Voice Success Rate</CardTitle>
@@ -323,10 +416,17 @@ export default function UnifiedAnalytics() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {((voiceData.successRate || 0) * 100).toFixed(1)}%
+                    {analyticsOverview.voice.totalCalls > 0
+                      ? (
+                          (analyticsOverview.voice.successfulCalls /
+                            analyticsOverview.voice.totalCalls) *
+                          100
+                        ).toFixed(1)
+                      : 0}
+                    %
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {voiceData.completedCalls} completed calls
+                    {analyticsOverview.voice.successfulCalls} completed calls
                   </p>
                 </CardContent>
               </Card>
@@ -355,7 +455,7 @@ export default function UnifiedAnalytics() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <Euro className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(metrics.totalCost)}</div>
@@ -366,6 +466,42 @@ export default function UnifiedAnalytics() {
             </Card>
           </div>
 
+          {/* Enhanced Chat Visualizations */}
+          {(analyticsType === 'all' || analyticsType === 'chat') &&
+            tenantId &&
+            dateRange?.from &&
+            dateRange?.to && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-6 w-6" />
+                  <h2 className="text-2xl font-bold">Enhanced Chat Visualizations</h2>
+                </div>
+                <EnhancedChatAnalytics
+                  tenantId={tenantId}
+                  startDate={dateRange.from}
+                  endDate={dateRange.to}
+                />
+              </div>
+            )}
+
+          {/* Voice Analytics - Show "no data" message only when viewing voice analytics */}
+          {analyticsType === 'voice' &&
+            analyticsOverview?.voice &&
+            analyticsOverview.voice.totalCalls === 0 && (
+              <Card className="mb-8">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Phone className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">No Voice Analytics Data Yet</p>
+                  <p className="text-sm text-muted-foreground text-center max-w-md">
+                    Voice analytics will appear here once you configure Retell to send{' '}
+                    <code className="bg-muted px-1 py-0.5 rounded">call.ended</code> webhooks to{' '}
+                    <code className="bg-muted px-1 py-0.5 rounded">/api/retell/call-ended</code>
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+          {/* Chat Analytics Charts */}
           {/* Chat Analytics Details */}
           {(analyticsType === 'all' || analyticsType === 'chat') && chatSessions.length > 0 && (
             <Card>
@@ -396,25 +532,30 @@ export default function UnifiedAnalytics() {
                         <TableCell>{formatDuration(chat.duration)}</TableCell>
                         <TableCell>{chat.messageCount}</TableCell>
                         <TableCell>
-                          {chat.userSentiment === 'positive' && (
+                          {chat.userSentiment?.toLowerCase() === 'positive' && (
                             <Badge className="bg-green-100 text-green-800">
                               <Smile className="h-3 w-3 mr-1" />
                               Positive
                             </Badge>
                           )}
-                          {chat.userSentiment === 'neutral' && (
+                          {chat.userSentiment?.toLowerCase() === 'neutral' && (
                             <Badge className="bg-gray-100 text-gray-800">
                               <Meh className="h-3 w-3 mr-1" />
                               Neutral
                             </Badge>
                           )}
-                          {chat.userSentiment === 'negative' && (
+                          {chat.userSentiment?.toLowerCase() === 'negative' && (
                             <Badge className="bg-red-100 text-red-800">
                               <Frown className="h-3 w-3 mr-1" />
                               Negative
                             </Badge>
                           )}
-                          {!chat.userSentiment && <Badge variant="outline">Unknown</Badge>}
+                          {!chat.userSentiment ||
+                            (chat.userSentiment?.toLowerCase() !== 'positive' &&
+                              chat.userSentiment?.toLowerCase() !== 'neutral' &&
+                              chat.userSentiment?.toLowerCase() !== 'negative' && (
+                                <Badge variant="outline">Unknown</Badge>
+                              ))}
                         </TableCell>
                         <TableCell>{formatCurrency(chat.combinedCost)}</TableCell>
                         <TableCell>
@@ -431,36 +572,6 @@ export default function UnifiedAnalytics() {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Voice Analytics Details - Add if needed */}
-          {(analyticsType === 'all' || analyticsType === 'voice') && voiceData && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Voice Call Metrics</CardTitle>
-                <CardDescription>Overview of voice call performance</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Average Duration
-                    </div>
-                    <div className="text-2xl font-bold">
-                      {formatDuration(voiceData.averageDuration)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Total Calls</div>
-                    <div className="text-2xl font-bold">{voiceData.totalCalls}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Completed</div>
-                    <div className="text-2xl font-bold">{voiceData.completedCalls}</div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           )}

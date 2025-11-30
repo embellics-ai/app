@@ -74,7 +74,7 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 
-  it('should redirect platform admin away from tenant routes', async () => {
+  it('should redirect platform admin away from tenant-only routes', async () => {
     (useAuth as any).mockReturnValue({
       user: {
         role: 'admin',
@@ -87,7 +87,7 @@ describe('ProtectedRoute Component', () => {
     });
 
     render(
-      <ProtectedRoute path="/analytics">
+      <ProtectedRoute path="/widget-config">
         <div>Protected Content</div>
       </ProtectedRoute>,
     );

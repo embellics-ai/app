@@ -14,6 +14,25 @@ import { z } from 'zod';
 import Retell from 'retell-sdk';
 import { randomBytes, createHash } from 'crypto';
 import { sendInvitationEmail, sendPasswordResetEmail } from './email';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/**
+ * Escapes a string for safe insertion into a single-quoted JavaScript string literal.
+ * Prevents injection attacks by escaping both backslashes and single quotes.
+ * @param str - The string to escape
+ * @returns The escaped string safe for use in JavaScript code
+ */
+function escapeJsString(str: string): string {
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 import {
   encrypt,
   decrypt,
@@ -48,6 +67,14 @@ import type { WebSocket } from 'ws';
 // NOTE: The system uses tenant-specific Retell Agent IDs from widget_configs.retellAgentId
 // Platform Admins configure these via: PATCH /api/platform/tenants/:tenantId/retell-api-key
 // No hardcoded agent IDs are used - each tenant has their own agent configuration
+
+// In-memory storage for widget test tokens (platform admin only)
+interface WidgetTestTokenData {
+  tenantId: string;
+  createdAt: Date;
+  createdBy?: string;
+}
+const widgetTestTokens = new Map<string, WidgetTestTokenData>();
 
 export async function registerRoutes(app: Express): Promise<void> {
   // SECURITY: Cleanup expired invitation passwords on startup
@@ -880,6 +907,22 @@ export async function registerRoutes(app: Express): Promise<void> {
               }
             }
 
+            // Mask WhatsApp Agent ID if configured
+            let maskedWhatsappAgentId = '';
+            if (widgetConfig?.whatsappAgentId) {
+              const underscoreIndex = widgetConfig.whatsappAgentId.indexOf('_');
+              if (
+                underscoreIndex !== -1 &&
+                widgetConfig.whatsappAgentId.length > underscoreIndex + 8
+              ) {
+                const visiblePart = widgetConfig.whatsappAgentId.substring(0, underscoreIndex + 9);
+                maskedWhatsappAgentId = `${visiblePart}********`;
+              } else {
+                // Fallback if format is unexpected
+                maskedWhatsappAgentId = `${widgetConfig.whatsappAgentId.substring(0, 12)}********`;
+              }
+            }
+
             return {
               id: tenant.id,
               name: tenant.name,
@@ -889,8 +932,12 @@ export async function registerRoutes(app: Express): Promise<void> {
               status: tenant.status,
               hasRetellApiKey: !!widgetConfig?.retellApiKey,
               hasRetellAgentId: !!widgetConfig?.retellAgentId,
+              hasWhatsappAgentId: !!widgetConfig?.whatsappAgentId,
+              retellApiKey: maskedRetellApiKey, // For backward compatibility
+              retellAgentId: widgetConfig?.retellAgentId || null, // Full agent ID for widget testing
               maskedRetellApiKey,
               maskedAgentId,
+              maskedWhatsappAgentId,
               createdAt: tenant.createdAt,
             };
           }),
@@ -912,7 +959,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
-        const { retellApiKey, retellAgentId } = req.body;
+        const { retellApiKey, retellAgentId, whatsappAgentId } = req.body;
 
         // Validate Retell API key format if provided
         if (retellApiKey && retellApiKey !== '__KEEP_EXISTING__') {
@@ -927,7 +974,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
         }
 
-        // Validate Retell Agent ID format if provided
+        // Validate Retell Agent ID format if provided (for widget chat)
         if (retellAgentId) {
           if (typeof retellAgentId !== 'string') {
             return res.status(400).json({ error: 'Retell Agent ID must be a string' });
@@ -937,6 +984,20 @@ export async function registerRoutes(app: Express): Promise<void> {
             return res.status(400).json({
               error:
                 'Invalid Retell Agent ID format. Agent IDs must start with "agent_". Did you accidentally provide an API key instead?',
+            });
+          }
+        }
+
+        // Validate WhatsApp Agent ID format if provided
+        if (whatsappAgentId) {
+          if (typeof whatsappAgentId !== 'string') {
+            return res.status(400).json({ error: 'WhatsApp Agent ID must be a string' });
+          }
+
+          if (!whatsappAgentId.trim().startsWith('agent_')) {
+            return res.status(400).json({
+              error:
+                'Invalid WhatsApp Agent ID format. Agent IDs must start with "agent_". Did you accidentally provide an API key instead?',
             });
           }
         }
@@ -961,15 +1022,20 @@ export async function registerRoutes(app: Express): Promise<void> {
           updateData.retellApiKey = retellApiKey.trim();
         }
 
-        // Include retellAgentId if provided
+        // Include retellAgentId (widget chat agent) if provided
         if (retellAgentId) {
           updateData.retellAgentId = retellAgentId.trim();
+        }
+
+        // Include whatsappAgentId if provided
+        if (whatsappAgentId) {
+          updateData.whatsappAgentId = whatsappAgentId.trim();
         }
 
         // Check if we have anything to update
         if (Object.keys(updateData).length === 0) {
           return res.status(400).json({
-            error: 'No updates provided. Please provide either API key or Agent ID.',
+            error: 'No updates provided. Please provide API key, Agent ID, or WhatsApp Agent ID.',
           });
         }
 
@@ -1280,6 +1346,146 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('Error cleaning up invitation passwords:', error);
         res.status(500).json({ error: 'Failed to cleanup passwords' });
+      }
+    },
+  );
+
+  // Widget Test Page (Platform Admin only)
+  app.get(
+    '/api/platform/widget-test-page',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.query;
+
+        console.log('[Widget Test] Request received for tenantId:', tenantId);
+
+        if (!tenantId) {
+          return res.status(400).send('Tenant ID is required. Please select a tenant to test.');
+        }
+
+        // Verify tenant exists
+        console.log('[Widget Test] Fetching tenant...');
+        const tenant = await storage.getTenant(tenantId as string);
+        console.log('[Widget Test] Tenant result:', tenant ? tenant.name : 'NOT FOUND');
+
+        if (!tenant) {
+          return res.status(404).send('Tenant not found');
+        }
+
+        // Get widget configuration for this tenant
+        console.log('[Widget Test] Fetching widget config...');
+        const widgetConfig = await storage.getWidgetConfig(tenantId as string);
+        console.log('[Widget Test] Widget config result:', widgetConfig);
+
+        if (!widgetConfig || !widgetConfig.retellAgentId) {
+          return res.status(400).send(`
+            <html>
+              <head><title>Widget Not Configured</title></head>
+              <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                <h1>⚠️ Widget Not Configured</h1>
+                <p>The tenant "${tenant.name}" does not have a widget configured.</p>
+                <p>Please configure the Retell Agent ID in the Platform Admin panel first.</p>
+                <a href="/widget-test" style="color: #667eea;">← Back to Widget Test</a>
+              </body>
+            </html>
+          `);
+        }
+
+        // Get the HTML file path - try multiple locations for dev/prod
+        let htmlPath = path.join(__dirname, '../client/public/widget-test.html');
+
+        // If not found, try from project root
+        if (!fs.existsSync(htmlPath)) {
+          htmlPath = path.join(process.cwd(), 'client/public/widget-test.html');
+        }
+
+        // Read the HTML file
+        if (!fs.existsSync(htmlPath)) {
+          console.error('[Widget Test] HTML file not found. Tried paths:', {
+            path1: path.join(__dirname, '../client/public/widget-test.html'),
+            path2: path.join(process.cwd(), 'client/public/widget-test.html'),
+            __dirname,
+            cwd: process.cwd(),
+          });
+          return res.status(404).send('Widget test page not found');
+        }
+
+        let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+
+        // Generate a one-time test token for platform admin widget testing
+        // This token will be valid for this specific test session
+        const testToken = `test_${randomBytes(32).toString('hex')}`;
+
+        console.log('[Widget Test] Generated test token:', testToken);
+
+        // Store the test token in module-level Map
+        widgetTestTokens.set(testToken, {
+          tenantId: tenantId as string,
+          createdAt: new Date(),
+          createdBy: req.user?.email,
+        });
+
+        console.log('[Widget Test] Stored token, total tokens:', widgetTestTokens.size);
+
+        // Clean up old tokens (older than 1 hour)
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        Array.from(widgetTestTokens.entries()).forEach(([token, data]) => {
+          if (data.createdAt < oneHourAgo) {
+            widgetTestTokens.delete(token);
+          }
+        });
+
+        // Inject tenant information and widget script into HTML
+        const widgetScriptUrl = `${req.protocol}://${req.get('host')}/widget.js`;
+        const tenantInfo = `
+          <script>
+            // Tenant configuration
+            window.WIDGET_TEST_CONFIG = {
+              tenantId: '${tenantId}',
+              tenantName: '${escapeJsString(tenant.name)}',
+              agentId: '${widgetConfig.retellAgentId}',
+              testMode: true,
+            };
+            
+            // Update page with tenant info
+            document.addEventListener('DOMContentLoaded', () => {
+              const tenantNameEl = document.getElementById('tenant-name');
+              const agentIdEl = document.getElementById('agent-id');
+              
+              if (tenantNameEl) tenantNameEl.textContent = '${escapeJsString(tenant.name)}';
+              if (agentIdEl) agentIdEl.textContent = '${widgetConfig.retellAgentId}';
+              
+              // Update status after widget loads
+              setTimeout(() => {
+                const statusEl = document.getElementById('widget-status');
+                if (statusEl) {
+                  statusEl.textContent = '✅ Widget loaded successfully! Look for the chat bubble in the bottom-right corner.';
+                  statusEl.style.color = '#28a745';
+                }
+              }, 1000);
+            });
+          </script>
+          
+          <!-- Embellics Chat Widget -->
+          <script src="${widgetScriptUrl}" data-api-key="${testToken}"></script>
+        `;
+
+        // Insert tenant info and scripts before closing </body> tag
+        htmlContent = htmlContent.replace('</body>', `${tenantInfo}</body>`);
+
+        // Log access for security audit
+        console.log(
+          `[Widget Test] Platform admin ${req.user?.email} accessed widget test page for tenant: ${tenant.name} (${tenantId})`,
+        );
+
+        // Send HTML with proper content type
+        res.setHeader('Content-Type', 'text/html');
+        res.send(htmlContent);
+      } catch (error) {
+        console.error('Error serving widget test page:', error);
+        res.status(500).send('Failed to load widget test page');
       }
     },
   );
@@ -1901,6 +2107,15 @@ export async function registerRoutes(app: Express): Promise<void> {
       const chat = payload.chat || payload;
 
       // Extract data from Retell's chat_analyzed event
+      const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
+      const endTimestamp = chat.end_timestamp ? new Date(chat.end_timestamp) : null;
+
+      // Calculate duration in seconds if not provided by Retell
+      let duration = chat.duration || null;
+      if (!duration && startTimestamp && endTimestamp) {
+        duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
+      }
+
       const chatData = {
         chatId: chat.chat_id,
         agentId: chat.agent_id,
@@ -1908,18 +2123,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         agentVersion: chat.agent_version || null,
         chatType: chat.chat_type || null,
         chatStatus: chat.chat_status || null,
-        startTimestamp: chat.start_timestamp ? new Date(chat.start_timestamp) : null,
-        endTimestamp: chat.end_timestamp ? new Date(chat.end_timestamp) : null,
-        duration: chat.duration || null,
-        transcript: chat.transcript || null,
+        startTimestamp,
+        endTimestamp,
+        duration,
         messageCount: chat.messages?.length || 0,
         toolCallsCount: chat.tool_calls?.length || 0,
         dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
-        chatSummary: chat.chat_analysis?.chat_summary || null,
         userSentiment: chat.chat_analysis?.user_sentiment || null,
         chatSuccessful: chat.chat_analysis?.chat_successful || null,
-        combinedCost: chat.chat_cost?.combined_cost || chat.combined_cost || 0,
-        productCosts: chat.chat_cost?.product_costs || chat.product_costs || null,
+        combinedCost: chat.cost_analysis?.combined || 0,
+        productCosts: chat.cost_analysis?.product_costs || null,
         metadata: {
           whatsapp_user: chat.metadata?.whatsapp_user || null,
           // Add any other metadata fields
@@ -1958,7 +2171,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       console.log(
         `[Retell Webhook] Processing chat analytics for tenant ${tenantId}, chat ${chatData.chatId}`,
       );
-      
+
       console.log('[Retell Webhook] Extracted chat data:', {
         chatId: chatData.chatId,
         startTimestamp: chatData.startTimestamp,
@@ -2035,6 +2248,152 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Retell AI voice call.ended webhook
+  app.post('/api/retell/call-ended', async (req, res) => {
+    try {
+      const signature = req.headers['x-retell-signature'] as string;
+
+      // TODO: Implement signature verification
+      // For now, we'll accept all requests (add verification in production)
+
+      const payload = req.body;
+
+      // DEBUG: Log full payload to understand what Retell sends
+      console.log('[Retell Voice Webhook] === FULL PAYLOAD DEBUG ===');
+      console.log(JSON.stringify(payload, null, 2));
+      console.log('[Retell Voice Webhook] === END PAYLOAD ===');
+
+      // Retell sends data nested under "call" object
+      const call = payload.call || payload;
+
+      // Extract data from Retell's call.ended event (mirrors chat structure)
+      const startTimestamp = call.start_timestamp ? new Date(call.start_timestamp) : null;
+      const endTimestamp = call.end_timestamp ? new Date(call.end_timestamp) : null;
+
+      // Calculate duration in seconds if not provided by Retell
+      let duration = call.duration || null;
+      if (!duration && startTimestamp && endTimestamp) {
+        duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
+      }
+
+      const callData = {
+        callId: call.call_id,
+        agentId: call.agent_id,
+        agentName: call.agent_name || null,
+        agentVersion: call.agent_version || null,
+        callType: call.call_type || null,
+        callStatus: call.call_status || call.disconnect_reason || null,
+        startTimestamp,
+        endTimestamp,
+        duration,
+        messageCount: call.transcript?.length || call.messages?.length || 0,
+        toolCallsCount: call.tool_calls?.length || 0,
+        dynamicVariables: call.collected_dynamic_variables || call.dynamic_variables || null,
+        userSentiment: call.call_analysis?.user_sentiment || null,
+        callSuccessful: call.call_analysis?.call_successful || null,
+        combinedCost: call.cost_analysis?.combined || 0,
+        productCosts: call.cost_analysis?.product_costs || null,
+        metadata: {
+          disconnect_reason: call.disconnect_reason || null,
+          from_number: call.from_number || null,
+          to_number: call.to_number || null,
+          // Add any other metadata fields
+          ...call.metadata,
+        },
+      };
+
+      // Determine tenant ID from metadata or by looking up the agent configuration
+      let tenantId = call.metadata?.tenant_id || payload.tenant_id;
+
+      if (!tenantId && callData.agentId) {
+        // Try to find tenant by agent ID
+        console.log(
+          '[Retell Voice Webhook] No tenant_id in metadata, looking up by agent ID:',
+          callData.agentId,
+        );
+        const widgetConfig = await storage.getWidgetConfigByAgentId(callData.agentId);
+        if (widgetConfig) {
+          tenantId = widgetConfig.tenantId;
+          console.log('[Retell Voice Webhook] Found tenant from agent ID:', tenantId);
+        }
+      }
+
+      if (!tenantId) {
+        console.error(
+          '[Retell Voice Webhook] Could not determine tenant_id from payload or agent configuration',
+        );
+        console.error('[Retell Voice Webhook] Payload metadata:', payload.metadata);
+        console.error('[Retell Voice Webhook] Agent ID:', callData.agentId);
+        return res.status(400).json({
+          error:
+            'Could not determine tenant_id. Include tenant_id in metadata or configure agent in system.',
+        });
+      }
+
+      console.log(
+        `[Retell Voice Webhook] Processing voice analytics for tenant ${tenantId}, call ${callData.callId}`,
+      );
+
+      console.log('[Retell Voice Webhook] Extracted call data:', {
+        callId: callData.callId,
+        startTimestamp: callData.startTimestamp,
+        endTimestamp: callData.endTimestamp,
+        duration: callData.duration,
+      });
+
+      // Create voice analytics record
+      const createdAnalytics = await storage.createVoiceAnalytics({
+        tenantId,
+        ...callData,
+      });
+
+      console.log('[Retell Voice Webhook] Voice analytics created successfully:', {
+        id: createdAnalytics.id,
+        tenantId: createdAnalytics.tenantId,
+        callId: createdAnalytics.callId,
+        agentId: createdAnalytics.agentId,
+        startTimestamp: createdAnalytics.startTimestamp,
+        endTimestamp: createdAnalytics.endTimestamp,
+        duration: createdAnalytics.duration,
+      });
+
+      console.log(`[Retell Voice Webhook] Stored voice analytics for call ${callData.callId}`);
+
+      // Forward webhook to n8n if configured
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+      if (n8nWebhookUrl) {
+        try {
+          console.log('[Retell Voice Webhook] Forwarding to n8n:', n8nWebhookUrl);
+          const response = await fetch(n8nWebhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log('[Retell Voice Webhook] Successfully forwarded to n8n');
+          } else {
+            console.error(
+              '[Retell Voice Webhook] n8n forward failed:',
+              response.status,
+              await response.text(),
+            );
+          }
+        } catch (forwardError: any) {
+          console.error('[Retell Voice Webhook] Error forwarding to n8n:', forwardError.message);
+          // Don't fail the main webhook - just log the error
+        }
+      }
+
+      res.status(200).json({ success: true, message: 'Voice analytics stored' });
+    } catch (error: any) {
+      console.error('[Retell Voice Webhook] Error processing call.ended event:', error);
+      res.status(500).json({ error: 'Failed to process voice analytics', details: error.message });
+    }
+  });
+
   // ============================================
   // CHAT ANALYTICS API ENDPOINTS (Platform Admin)
   // ============================================
@@ -2062,19 +2421,23 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Get chat analytics summary
         const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
-
         console.log('[Analytics Overview] Chat summary result:', chatSummary);
 
-        // TODO: Add voice call analytics when available
-        // const voiceSummary = await storage.getVoiceCallSummary(tenantId, filters);
+        // Get voice analytics summary
+        const voiceSummary = await storage.getVoiceAnalyticsSummary(tenantId, filters);
+        console.log('[Analytics Overview] Voice summary result:', voiceSummary);
 
         res.json({
           chat: chatSummary,
-          // voice: voiceSummary,
+          voice: voiceSummary,
           combined: {
-            totalInteractions: chatSummary.totalChats, // + voiceSummary.totalCalls
-            totalCost: chatSummary.totalCost, // + voiceSummary.totalCost
-            averageCost: chatSummary.averageCost,
+            totalInteractions: chatSummary.totalChats + voiceSummary.totalCalls,
+            totalCost: chatSummary.totalCost + voiceSummary.totalCost,
+            averageCost:
+              chatSummary.totalChats + voiceSummary.totalCalls > 0
+                ? (chatSummary.totalCost + voiceSummary.totalCost) /
+                  (chatSummary.totalChats + voiceSummary.totalCalls)
+                : 0,
           },
         });
       } catch (error) {
@@ -2131,6 +2494,43 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('Error fetching chat analytics:', error);
         res.status(500).json({ error: 'Failed to fetch chat analytics' });
+      }
+    },
+  );
+
+  /**
+   * Get time-series chat analytics for visualizations
+   * IMPORTANT: This must come BEFORE the /:chatId route
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/chats/time-series',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId, groupBy } = req.query;
+
+        console.log('[Analytics Time Series] Querying for tenant:', tenantId);
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+          groupBy: (groupBy as 'hour' | 'day' | 'week') || 'day',
+        };
+
+        const timeSeriesData = await storage.getChatAnalyticsTimeSeries(tenantId, filters);
+
+        console.log('[Analytics Time Series] Returning data:', {
+          chatCountsLength: timeSeriesData.chatCounts.length,
+          durationDataLength: timeSeriesData.durationData.length,
+        });
+
+        res.json(timeSeriesData);
+      } catch (error) {
+        console.error('Error fetching time-series chat analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch time-series analytics' });
       }
     },
   );
@@ -2240,6 +2640,86 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('Error fetching cost analytics:', error);
         res.status(500).json({ error: 'Failed to fetch cost analytics' });
+      }
+    },
+  );
+
+  // ============================================
+  // VOICE ANALYTICS API ENDPOINTS (Platform Admin)
+  // ============================================
+
+  /**
+   * Get list of voice call sessions with filters
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/calls',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId, sentiment, callStatus, limit } = req.query;
+
+        console.log('[Analytics Calls] Querying for tenant:', tenantId);
+        console.log('[Analytics Calls] Filters:', {
+          startDate,
+          endDate,
+          agentId,
+          sentiment,
+          callStatus,
+          limit,
+        });
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+          sentiment: sentiment as string | undefined,
+          callStatus: callStatus as string | undefined,
+          limit: limit ? parseInt(limit as string) : 100,
+        };
+
+        const calls = await storage.getVoiceAnalyticsByTenant(tenantId, filters);
+
+        console.log('[Analytics Calls] Found calls:', calls.length);
+        if (calls.length > 0) {
+          console.log('[Analytics Calls] First call sample:', {
+            id: calls[0].id,
+            tenantId: calls[0].tenantId,
+            callId: calls[0].callId,
+            agentId: calls[0].agentId,
+          });
+        }
+
+        res.json(calls);
+      } catch (error) {
+        console.error('Error fetching voice analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch voice analytics' });
+      }
+    },
+  );
+
+  /**
+   * Get detailed analytics for a specific voice call
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/calls/:callId',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId, callId } = req.params;
+
+        const call = await storage.getVoiceAnalytics(callId);
+
+        if (!call || call.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Call not found' });
+        }
+
+        res.json(call);
+      } catch (error) {
+        console.error('Error fetching call details:', error);
+        res.status(500).json({ error: 'Failed to fetch call details' });
       }
     },
   );
@@ -3650,482 +4130,24 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
-  // Get analytics for specific tenant (Platform Admin only)
-  app.get(
-    '/api/platform/analytics/retell/:tenantId',
-    requireAuth,
-    requirePlatformAdmin,
-    async (req: AuthenticatedRequest, res) => {
-      try {
-        const { tenantId } = req.params;
-
-        // Get tenant's widget config to find their Retell API key
-        const widgetConfig = await storage.getWidgetConfig(tenantId);
-
-        // If no widget config or no API key configured, return empty analytics
-        if (!widgetConfig?.retellApiKey) {
-          console.log(`[Platform Analytics] No Retell API key configured for tenant: ${tenantId}`);
-          return res.json({
-            totalCalls: 0,
-            completedCalls: 0,
-            averageDuration: 0,
-            averageLatency: 0,
-            successRate: 0,
-            pickupRate: 0,
-            transferRate: 0,
-            voicemailRate: 0,
-            sentimentBreakdown: {
-              Positive: 0,
-              Negative: 0,
-              Neutral: 0,
-              Unknown: 0,
-            },
-            disconnectionReasons: {},
-            callStatusBreakdown: {},
-            callsOverTime: [],
-            dailyMetrics: [],
-            callsByDateStacked: [],
-            agentMetrics: [],
-            directionBreakdown: { inbound: 0, outbound: 0 },
-          });
-        }
-
-        // Create a Retell client using the tenant's own API key
-        const tenantRetellClient = new Retell({
-          apiKey: widgetConfig.retellApiKey,
-        });
-
-        // Get time range from query params (default to all time)
-        const { start_date, end_date } = req.query;
-
-        // Build filter for time range
-        const filter: any = {};
-
-        // Add time filtering if provided
-        if (start_date) {
-          filter.start_timestamp = {
-            gte: new Date(start_date as string).getTime(),
-          };
-        }
-        if (end_date) {
-          filter.start_timestamp = {
-            ...filter.start_timestamp,
-            lte: new Date(end_date as string).getTime(),
-          };
-        }
-
-        let calls: any[] = [];
-        let agentNames: Record<string, string> = {};
-
-        console.log(`[Platform Analytics] Fetching account-wide calls for tenant: ${tenantId}`);
-        console.log(`[Platform Analytics] Filter criteria:`, JSON.stringify(filter, null, 2));
-
-        try {
-          // Fetch list of active agents and store their names
-          let activeAgentIds: Set<string>;
-          try {
-            const activeAgents = await tenantRetellClient.agent.list();
-            activeAgentIds = new Set(activeAgents.map((agent: any) => agent.agent_id));
-            activeAgents.forEach((agent: any) => {
-              if (agent.agent_id && agent.agent_name) {
-                agentNames[agent.agent_id] = agent.agent_name;
-              }
-            });
-            console.log(
-              `[Platform Analytics] Found ${activeAgentIds.size} active agents in account`,
-            );
-          } catch (agentError) {
-            console.warn(
-              `[Platform Analytics] Could not fetch agent list, including all calls:`,
-              agentError,
-            );
-            activeAgentIds = new Set();
-          }
-
-          // Fetch ALL calls from tenant's Retell account with pagination
-          let paginationKey: string | undefined = undefined;
-          let pageCount = 0;
-          const maxLimit = 1000;
-
-          do {
-            pageCount++;
-            const pageParams: any = {
-              filter_criteria: Object.keys(filter).length > 0 ? filter : undefined,
-              limit: maxLimit,
-              sort_order: 'descending',
-            };
-
-            if (paginationKey) {
-              pageParams.pagination_key = paginationKey;
-            }
-
-            const response: any = await tenantRetellClient.call.list(pageParams);
-
-            if (Array.isArray(response) && response.length > 0) {
-              calls.push(...response);
-
-              if (response.length === maxLimit) {
-                const lastCall = response[response.length - 1];
-                paginationKey = lastCall.call_id;
-              } else {
-                paginationKey = undefined;
-              }
-            } else {
-              paginationKey = undefined;
-            }
-
-            if (pageCount >= 100) {
-              console.warn(`[Platform Analytics] Reached pagination safety limit`);
-              break;
-            }
-          } while (paginationKey);
-
-          console.log(
-            `[Platform Analytics] ✓ Fetched ${calls.length} total calls across ${pageCount} pages`,
-          );
-
-          // Filter out calls from deleted agents
-          if (activeAgentIds.size > 0) {
-            calls = calls.filter((call: any) => activeAgentIds.has(call.agent_id));
-          }
-
-          // Filter by date range manually
-          if (Object.keys(filter).length > 0 && filter.start_timestamp) {
-            calls = calls.filter((call: any) => {
-              if (!call.start_timestamp) return false;
-
-              if (filter.start_timestamp.gte && call.start_timestamp < filter.start_timestamp.gte) {
-                return false;
-              }
-              if (filter.start_timestamp.lte && call.start_timestamp > filter.start_timestamp.lte) {
-                return false;
-              }
-              return true;
-            });
-          }
-        } catch (retellError: any) {
-          console.error('[Platform Analytics] Error fetching calls:', retellError);
-          return res.json({
-            totalCalls: 0,
-            completedCalls: 0,
-            averageDuration: 0,
-            averageLatency: 0,
-            successRate: 0,
-            pickupRate: 0,
-            transferRate: 0,
-            voicemailRate: 0,
-            sentimentBreakdown: {
-              Positive: 0,
-              Negative: 0,
-              Neutral: 0,
-              Unknown: 0,
-            },
-            disconnectionReasons: {},
-            callStatusBreakdown: {},
-            callsOverTime: [],
-            dailyMetrics: [],
-            callsByDateStacked: [],
-            agentMetrics: [],
-            directionBreakdown: { inbound: 0, outbound: 0 },
-          });
-        }
-
-        // Aggregate analytics data (same logic as regular analytics endpoint)
-        let totalDuration = 0;
-        let totalLatency = 0;
-        let callsWithLatency = 0;
-        let completedCalls = 0;
-        let successfulCalls = 0;
-        let pickedUpCalls = 0;
-        let transferredCalls = 0;
-        let voicemailCalls = 0;
-
-        const sentimentBreakdown: Record<string, number> = {
-          Positive: 0,
-          Negative: 0,
-          Neutral: 0,
-          Unknown: 0,
-        };
-        const disconnectionReasons: Record<string, number> = {};
-        const callStatusBreakdown: Record<string, number> = {};
-        const callsByDate: Record<string, number> = {};
-        const callsByDateStacked: Record<string, any> = {};
-        const agentMetrics: Record<string, any> = {};
-        const directionBreakdown: Record<string, number> = {
-          inbound: 0,
-          outbound: 0,
-        };
-
-        for (const call of calls) {
-          if (call.call_status === 'ended') {
-            completedCalls++;
-
-            if (call.duration_ms) {
-              totalDuration += call.duration_ms;
-            }
-
-            if (call.latency?.e2e?.p50) {
-              totalLatency += call.latency.e2e.p50;
-              callsWithLatency++;
-            }
-
-            if (call.call_analysis?.call_successful) {
-              successfulCalls++;
-            }
-
-            if (
-              call.disconnection_reason !== 'voicemail' &&
-              call.disconnection_reason !== 'no_answer'
-            ) {
-              pickedUpCalls++;
-            }
-
-            if (call.disconnection_reason === 'call_transfer') {
-              transferredCalls++;
-            }
-
-            if (call.disconnection_reason === 'voicemail') {
-              voicemailCalls++;
-            }
-          }
-
-          const sentiment = call.call_analysis?.user_sentiment || 'Unknown';
-          sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
-
-          const reason = call.disconnection_reason || 'Unknown';
-          disconnectionReasons[reason] = (disconnectionReasons[reason] || 0) + 1;
-
-          const status = call.call_status || 'Unknown';
-          callStatusBreakdown[status] = (callStatusBreakdown[status] || 0) + 1;
-
-          const direction = call.direction || 'Unknown';
-          directionBreakdown[direction] = (directionBreakdown[direction] || 0) + 1;
-
-          const dateKey = call.start_timestamp
-            ? new Date(call.start_timestamp).toISOString().split('T')[0]
-            : 'unknown';
-          callsByDate[dateKey] = (callsByDate[dateKey] || 0) + 1;
-
-          if (!callsByDateStacked[dateKey]) {
-            callsByDateStacked[dateKey] = {
-              successful: 0,
-              unsuccessful: 0,
-              agentHangup: 0,
-              callTransfer: 0,
-              userHangup: 0,
-              otherDisconnection: 0,
-              positive: 0,
-              neutral: 0,
-              negative: 0,
-              otherSentiment: 0,
-            };
-          }
-
-          if (call.call_status === 'ended') {
-            if (call.call_analysis?.call_successful) {
-              callsByDateStacked[dateKey].successful++;
-            } else {
-              callsByDateStacked[dateKey].unsuccessful++;
-            }
-
-            if (call.disconnection_reason === 'agent_hangup') {
-              callsByDateStacked[dateKey].agentHangup++;
-            } else if (call.disconnection_reason === 'call_transfer') {
-              callsByDateStacked[dateKey].callTransfer++;
-            } else if (call.disconnection_reason === 'user_hangup') {
-              callsByDateStacked[dateKey].userHangup++;
-            } else {
-              callsByDateStacked[dateKey].otherDisconnection++;
-            }
-
-            const sentiment = call.call_analysis?.user_sentiment || 'Unknown';
-            if (sentiment === 'Positive') {
-              callsByDateStacked[dateKey].positive++;
-            } else if (sentiment === 'Neutral') {
-              callsByDateStacked[dateKey].neutral++;
-            } else if (sentiment === 'Negative') {
-              callsByDateStacked[dateKey].negative++;
-            } else {
-              callsByDateStacked[dateKey].otherSentiment++;
-            }
-          }
-
-          const agentId = call.agent_id;
-          if (!agentMetrics[agentId]) {
-            agentMetrics[agentId] = {
-              totalCalls: 0,
-              successfulCalls: 0,
-              pickedUpCalls: 0,
-              transferredCalls: 0,
-              voicemailCalls: 0,
-            };
-          }
-          if (call.call_status === 'ended') {
-            agentMetrics[agentId].totalCalls++;
-            if (call.call_analysis?.call_successful) {
-              agentMetrics[agentId].successfulCalls++;
-            }
-            if (
-              call.disconnection_reason !== 'voicemail' &&
-              call.disconnection_reason !== 'no_answer'
-            ) {
-              agentMetrics[agentId].pickedUpCalls++;
-            }
-            if (call.disconnection_reason === 'call_transfer') {
-              agentMetrics[agentId].transferredCalls++;
-            }
-            if (call.disconnection_reason === 'voicemail') {
-              agentMetrics[agentId].voicemailCalls++;
-            }
-          }
-        }
-
-        const averageDuration = completedCalls > 0 ? totalDuration / completedCalls : 0;
-        const averageLatency = callsWithLatency > 0 ? totalLatency / callsWithLatency : 0;
-        const successRate = completedCalls > 0 ? (successfulCalls / completedCalls) * 100 : 0;
-        const pickupRate = completedCalls > 0 ? (pickedUpCalls / completedCalls) * 100 : 0;
-        const transferRate = completedCalls > 0 ? (transferredCalls / completedCalls) * 100 : 0;
-        const voicemailRate = completedCalls > 0 ? (voicemailCalls / completedCalls) * 100 : 0;
-
-        const dailyMetrics: Record<string, any> = {};
-
-        for (const call of calls) {
-          if (call.call_status !== 'ended') continue;
-
-          const dateKey = call.start_timestamp
-            ? new Date(call.start_timestamp).toISOString().split('T')[0]
-            : 'unknown';
-
-          if (!dailyMetrics[dateKey]) {
-            dailyMetrics[dateKey] = {
-              totalCalls: 0,
-              successfulCalls: 0,
-              pickedUpCalls: 0,
-              transferredCalls: 0,
-              voicemailCalls: 0,
-              totalDuration: 0,
-              totalLatency: 0,
-              callsWithLatency: 0,
-            };
-          }
-
-          dailyMetrics[dateKey].totalCalls++;
-
-          if (call.call_analysis?.call_successful) {
-            dailyMetrics[dateKey].successfulCalls++;
-          }
-
-          if (
-            call.disconnection_reason !== 'voicemail' &&
-            call.disconnection_reason !== 'no_answer'
-          ) {
-            dailyMetrics[dateKey].pickedUpCalls++;
-          }
-
-          if (call.disconnection_reason === 'call_transfer') {
-            dailyMetrics[dateKey].transferredCalls++;
-          }
-
-          if (call.disconnection_reason === 'voicemail') {
-            dailyMetrics[dateKey].voicemailCalls++;
-          }
-
-          if (call.duration_ms) {
-            dailyMetrics[dateKey].totalDuration += call.duration_ms;
-          }
-
-          if (call.latency?.e2e?.p50) {
-            dailyMetrics[dateKey].totalLatency += call.latency.e2e.p50;
-            dailyMetrics[dateKey].callsWithLatency++;
-          }
-        }
-
-        const dailyMetricsArray = Object.entries(dailyMetrics)
-          .map(([date, metrics]: [string, any]) => ({
-            date,
-            pickupRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.pickedUpCalls / metrics.totalCalls) * 100)
-                : 0,
-            successRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.successfulCalls / metrics.totalCalls) * 100)
-                : 0,
-            transferRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.transferredCalls / metrics.totalCalls) * 100)
-                : 0,
-            voicemailRate:
-              metrics.totalCalls > 0
-                ? Math.round((metrics.voicemailCalls / metrics.totalCalls) * 100)
-                : 0,
-            avgDuration:
-              metrics.totalCalls > 0
-                ? Math.round(metrics.totalDuration / metrics.totalCalls / 1000)
-                : 0,
-            avgLatency:
-              metrics.callsWithLatency > 0
-                ? Math.round(metrics.totalLatency / metrics.callsWithLatency)
-                : 0,
-          }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        const callsOverTime = Object.entries(callsByDate)
-          .map(([date, count]) => ({ date, count }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        const callsByDateStackedArray = Object.entries(callsByDateStacked)
-          .map(([date, data]) => ({ date, ...data }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        const agentMetricsArray = Object.entries(agentMetrics).map(
-          ([agentId, metrics]: [string, any]) => ({
-            agentId,
-            agentName: agentNames[agentId] || agentId,
-            successRate:
-              metrics.totalCalls > 0 ? (metrics.successfulCalls / metrics.totalCalls) * 100 : 0,
-            pickupRate:
-              metrics.totalCalls > 0 ? (metrics.pickedUpCalls / metrics.totalCalls) * 100 : 0,
-            transferRate:
-              metrics.totalCalls > 0 ? (metrics.transferredCalls / metrics.totalCalls) * 100 : 0,
-            voicemailRate:
-              metrics.totalCalls > 0 ? (metrics.voicemailCalls / metrics.totalCalls) * 100 : 0,
-            totalCalls: metrics.totalCalls,
-          }),
-        );
-
-        const endedCalls = calls.filter(
-          (call: any) =>
-            call.call_status === 'ended' &&
-            call.call_type === 'phone_call' &&
-            call.duration_ms &&
-            call.duration_ms > 0,
-        );
-
-        res.json({
-          totalCalls: endedCalls.length,
-          completedCalls,
-          averageDuration: Math.round(averageDuration / 1000),
-          averageLatency: Math.round(averageLatency),
-          successRate: Math.round(successRate),
-          pickupRate: Math.round(pickupRate),
-          transferRate: Math.round(transferRate),
-          voicemailRate: Math.round(voicemailRate),
-          sentimentBreakdown,
-          disconnectionReasons,
-          callStatusBreakdown,
-          callsOverTime,
-          dailyMetrics: dailyMetricsArray,
-          callsByDateStacked: callsByDateStackedArray,
-          agentMetrics: agentMetricsArray,
-          directionBreakdown,
-        });
-      } catch (error) {
-        console.error('Error fetching platform analytics:', error);
-        res.status(500).json({ error: 'Failed to fetch analytics' });
-      }
-    },
-  );
+  /**
+   * OLD RETELL API ANALYTICS ENDPOINT - REMOVED
+   *
+   * The endpoint `/api/platform/analytics/retell/:tenantId` has been deprecated and removed.
+   * It previously made direct calls to Retell's API to fetch analytics data.
+   *
+   * Migration path:
+   * - Use /api/platform/tenants/:tenantId/analytics/overview for unified analytics
+   * - Configure Retell webhooks to send call.ended events to /api/retell/call-ended
+   * - Analytics will be stored in the database and queried from there
+   *
+   * Benefits of new approach:
+   * - Faster performance (no external API calls)
+   * - Historical data storage
+   * - No rate limits
+   * - Cost tracking included
+   * - Unified voice + chat analytics
+   */
 
   // Health check endpoint
   app.get('/api/health', async (req, res) => {
@@ -4884,27 +4906,47 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys for tenant and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
+      let tenantId: string;
+      let widgetConfig;
 
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
+      // Check if this is a platform admin test token
+      if (apiKey.startsWith('test_')) {
+        console.log('[Widget Test] Received test token:', apiKey);
+        console.log('[Widget Test] Available tokens:', Array.from(widgetTestTokens.keys()));
+
+        const testTokenData = widgetTestTokens.get(apiKey);
+
+        if (!testTokenData) {
+          console.log('[Widget Test] Test token not found in map');
+          return res.status(401).json({ error: 'Invalid or expired test token' });
         }
-      }
 
-      if (!apiKeyRecord) {
-        return res.status(401).json({ error: 'Invalid API key' });
-      }
+        tenantId = testTokenData.tenantId;
+        console.log('[Widget Test] Platform admin testing widget for tenant:', tenantId);
+      } else {
+        // Normal API key validation - get all keys for tenant and verify with bcrypt
+        const allApiKeys = await storage.getAllApiKeys();
+        let apiKeyRecord = null;
 
-      // Update last used timestamp
-      await storage.updateApiKeyLastUsed(apiKeyRecord.id);
+        for (const key of allApiKeys) {
+          const isMatch = await verifyPassword(apiKey, key.keyHash);
+          if (isMatch) {
+            apiKeyRecord = key;
+            break;
+          }
+        }
+
+        if (!apiKeyRecord) {
+          return res.status(401).json({ error: 'Invalid API key' });
+        }
+
+        // Update last used timestamp
+        await storage.updateApiKeyLastUsed(apiKeyRecord.id);
+        tenantId = apiKeyRecord.tenantId;
+      }
 
       // Get widget configuration for this tenant
-      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      widgetConfig = await storage.getWidgetConfig(tenantId);
 
       if (!widgetConfig) {
         return res.status(404).json({ error: 'Widget configuration not found' });
@@ -4931,7 +4973,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Return safe configuration (exclude sensitive data)
       res.json({
-        tenantId: apiKeyRecord.tenantId,
+        tenantId: tenantId,
         greeting: widgetConfig.greeting,
         primaryColor: widgetConfig.primaryColor || '#9b7ddd',
         textColor: widgetConfig.textColor || '#ffffff',
@@ -4972,24 +5014,40 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
+      let tenantId: string;
 
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
+      // Check if this is a platform admin test token
+      if (apiKey.startsWith('test_')) {
+        const testTokenData = widgetTestTokens.get(apiKey);
+
+        if (!testTokenData) {
+          return res.status(401).json({ error: 'Invalid or expired test token' });
         }
-      }
 
-      if (!apiKeyRecord) {
-        return res.status(401).json({ error: 'Invalid API key' });
+        tenantId = testTokenData.tenantId;
+        console.log('[Widget Test] Platform admin chat message for tenant:', tenantId);
+      } else {
+        // Validate API key - get all keys and verify with bcrypt
+        const allApiKeys = await storage.getAllApiKeys();
+        let apiKeyRecord = null;
+
+        for (const key of allApiKeys) {
+          const isMatch = await verifyPassword(apiKey, key.keyHash);
+          if (isMatch) {
+            apiKeyRecord = key;
+            break;
+          }
+        }
+
+        if (!apiKeyRecord) {
+          return res.status(401).json({ error: 'Invalid API key' });
+        }
+
+        tenantId = apiKeyRecord.tenantId;
       }
 
       // Get widget configuration for this tenant
-      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      const widgetConfig = await storage.getWidgetConfig(tenantId);
 
       if (!widgetConfig || !widgetConfig.retellApiKey || !widgetConfig.retellAgentId) {
         return res.status(400).json({
@@ -5020,7 +5078,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         const chatSession = await tenantRetellClient.chat.create({
           agent_id: widgetConfig.retellAgentId,
           metadata: {
-            tenantId: apiKeyRecord.tenantId,
+            tenantId: tenantId,
             source: 'widget',
           },
         });
@@ -5084,7 +5142,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       try {
         // Save user message
         await storage.createWidgetChatMessage({
-          tenantId: apiKeyRecord.tenantId,
+          tenantId: tenantId,
           chatId: retellChatId,
           role: 'user',
           content: message,
@@ -5093,7 +5151,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Save combined assistant response
         const combinedResponse = responseMessages.join('\n\n');
         await storage.createWidgetChatMessage({
-          tenantId: apiKeyRecord.tenantId,
+          tenantId: tenantId,
           chatId: retellChatId,
           role: 'assistant',
           content: combinedResponse,

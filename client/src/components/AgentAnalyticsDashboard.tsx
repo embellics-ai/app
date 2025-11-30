@@ -36,6 +36,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import EnhancedChatAnalytics from './EnhancedChatAnalytics';
 
 interface AgentAnalyticsDashboardProps {
   tenantId: string | null;
@@ -216,8 +217,11 @@ export default function AgentAnalyticsDashboard({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  const formatCost = (cents: number) => {
-    return `$${(cents / 100).toFixed(2)}`;
+  const formatCost = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
   };
 
   const formatTimestamp = (timestamp: string | null) => {
@@ -308,10 +312,14 @@ export default function AgentAnalyticsDashboard({
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="visualizations" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">
+          <TabsTrigger value="visualizations">
             <BarChart3 className="w-4 h-4 mr-2" />
+            Visualizations
+          </TabsTrigger>
+          <TabsTrigger value="overview">
+            <TrendingUp className="w-4 h-4 mr-2" />
             Overview
           </TabsTrigger>
           <TabsTrigger value="chats">
@@ -327,6 +335,16 @@ export default function AgentAnalyticsDashboard({
             Cost Tracking
           </TabsTrigger>
         </TabsList>
+
+        {/* Enhanced Visualizations Tab */}
+        <TabsContent value="visualizations">
+          <EnhancedChatAnalytics
+            tenantId={tenantId!}
+            startDate={getDateRange().startDate}
+            endDate={getDateRange().endDate}
+            agentId={selectedAgentId !== 'all' ? selectedAgentId : undefined}
+          />
+        </TabsContent>
 
         {/* Overview Tab */}
         <TabsContent value="overview">

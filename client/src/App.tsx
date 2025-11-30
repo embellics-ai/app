@@ -26,6 +26,7 @@ import PlatformAdminPage from '@/pages/platform-admin';
 import TeamManagementPage from '@/pages/team-management';
 import ChangePasswordPage from '@/pages/change-password';
 import OnboardingPage from '@/pages/onboarding';
+import WidgetTestPage from '@/pages/widget-test';
 import Login from '@/pages/login';
 import ForgotPassword from '@/pages/forgot-password';
 import ResetPassword from '@/pages/reset-password';
@@ -93,6 +94,11 @@ function Router() {
       <Route path="/platform-admin">
         <ProtectedRoute path="/platform-admin">
           <PlatformAdminPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/widget-test">
+        <ProtectedRoute path="/widget-test">
+          <WidgetTestPage />
         </ProtectedRoute>
       </Route>
       <Route path="/team-management">

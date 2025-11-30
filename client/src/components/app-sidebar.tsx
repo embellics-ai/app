@@ -24,6 +24,7 @@ import {
   Sparkles,
   ClipboardList,
   Palette,
+  TestTube2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +49,11 @@ export function AppSidebar() {
           title: 'Platform Admin',
           url: '/platform-admin',
           icon: Shield,
+        },
+        {
+          title: 'Widget Test',
+          url: '/widget-test',
+          icon: TestTube2,
         },
       ];
     }

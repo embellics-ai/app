@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Widget Test - Platform Admin Only</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        padding: 40px;
+        max-width: 800px;
+        width: 100%;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .header h1 {
+        color: #333;
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+
+      .badge {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .info-box {
+        background: #f8f9fa;
+        border-left: 4px solid #667eea;
+        padding: 20px;
+        margin-bottom: 30px;
+        border-radius: 4px;
+      }
+
+      .info-box h2 {
+        color: #333;
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
+
+      .info-box ul {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .info-box li {
+        color: #666;
+        padding: 8px 0;
+        padding-left: 24px;
+        position: relative;
+      }
+
+      .info-box li:before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        color: #667eea;
+        font-weight: bold;
+      }
+
+      .test-area {
+        background: #f8f9fa;
+        padding: 30px;
+        border-radius: 8px;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .test-area h3 {
+        color: #333;
+        font-size: 16px;
+        margin-bottom: 15px;
+      }
+
+      .test-area p {
+        color: #666;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .warning {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 15px;
+        margin-top: 20px;
+        border-radius: 4px;
+      }
+
+      .warning p {
+        color: #856404;
+        font-size: 14px;
+        margin: 0;
+      }
+
+      .widget-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 30px;
+      }
+
+      .widget-card {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .widget-card h4 {
+        color: #667eea;
+        font-size: 14px;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .widget-card p {
+        color: #333;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .footer {
+        margin-top: 30px;
+        text-align: center;
+        color: #666;
+        font-size: 12px;
+      }
+
+      .back-button {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 24px;
+        background: #667eea;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+        transition: background 0.3s ease;
+      }
+
+      .back-button:hover {
+        background: #5568d3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🧪 Chat Widget Test Page</h1>
+        <span class="badge">Platform Admin Only</span>
+      </div>
+
+      <div class="info-box">
+        <h2>📋 Test Instructions</h2>
+        <ul>
+          <li>This is a controlled testing environment for the Retell AI chat widget</li>
+          <li>Widget will appear in the bottom-right corner when initialized</li>
+          <li>Test all widget functionalities including theming, positioning, and chat flow</li>
+          <li>Monitor browser console for any errors or warnings</li>
+          <li>Verify widget appearance across different screen sizes</li>
+        </ul>
+      </div>
+
+      <div class="test-area">
+        <h3>🤖 Widget Status</h3>
+        <p id="widget-status">Initializing widget...</p>
+      </div>
+
+      <div class="widget-info">
+        <div class="widget-card">
+          <h4>Tenant</h4>
+          <p id="tenant-name">Loading...</p>
+        </div>
+        <div class="widget-card">
+          <h4>Agent ID</h4>
+          <p id="agent-id" style="font-size: 14px; word-break: break-all">Loading...</p>
+        </div>
+        <div class="widget-card">
+          <h4>Access Level</h4>
+          <p>Platform Admin</p>
+        </div>
+      </div>
+
+      <div class="warning">
+        <p>
+          ⚠️ <strong>Note:</strong> This page is only accessible to platform administrators. Widget
+          configuration and API keys are managed through the platform admin panel.
+        </p>
+      </div>
+
+      <div class="footer">
+        <a href="/widget-test" class="back-button">← Back to Dashboard</a>
+        <p style="margin-top: 15px">RetellChatFlow Platform Admin Tools</p>
+      </div>
+    </div>
+
+    <!-- Tenant-specific widget script will be injected by backend -->
+    <script>
+      // Log to console
+      console.log(
+        '%c[Widget Test Page] Platform Admin Test Environment',
+        'background: #667eea; color: white; padding: 5px 10px; border-radius: 3px;',
+      );
+      console.log(
+        'Widget test page loaded. This page is only accessible to platform administrators.',
+      );
+
+      // Display tenant info if available
+      document.addEventListener('DOMContentLoaded', () => {
+        if (window.WIDGET_TEST_CONFIG) {
+          console.log(
+            '[Widget Test] Testing widget for tenant:',
+            window.WIDGET_TEST_CONFIG.tenantName,
+          );
+          console.log('[Widget Test] Agent ID:', window.WIDGET_TEST_CONFIG.agentId);
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -39,6 +39,8 @@ import {
   type InsertChatAnalytics,
   type ChatMessage,
   type InsertChatMessage,
+  type VoiceAnalytics,
+  type InsertVoiceAnalytics,
   users,
   messages,
   conversations,
@@ -59,6 +61,7 @@ import {
   webhookAnalytics,
   chatAnalytics,
   chatMessages,
+  voiceAnalytics,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -284,6 +287,39 @@ export interface IStorage {
     sentimentBreakdown: Record<string, number>;
   }>;
   deleteOldChatAnalytics(olderThanDays: number): Promise<void>;
+
+  // Voice Analytics Methods (mirrors chat analytics structure)
+  createVoiceAnalytics(analytics: InsertVoiceAnalytics): Promise<VoiceAnalytics>;
+  getVoiceAnalytics(id: string): Promise<VoiceAnalytics | undefined>;
+  getVoiceAnalyticsByCallId(callId: string): Promise<VoiceAnalytics | undefined>;
+  getVoiceAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      callStatus?: string;
+      limit?: number;
+    },
+  ): Promise<VoiceAnalytics[]>;
+  getVoiceAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }>;
+  deleteOldVoiceAnalytics(olderThanDays: number): Promise<void>;
 
   // Chat Messages Methods (optional - for detailed message storage)
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
@@ -512,7 +548,10 @@ export class MemStorage implements IStorage {
   }
 
   async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
-    const config = Array.from(this.widgetConfigs.values()).find((c) => c.retellAgentId === agentId);
+    // Check both widget agent ID and WhatsApp agent ID
+    const config = Array.from(this.widgetConfigs.values()).find(
+      (c) => c.retellAgentId === agentId || c.whatsappAgentId === agentId,
+    );
     if (!config) return undefined;
 
     // Decrypt the Retell API key if it exists
@@ -544,6 +583,7 @@ export class MemStorage implements IStorage {
       id,
       tenantId: encryptedConfig.tenantId,
       retellAgentId: encryptedConfig.retellAgentId ?? null,
+      whatsappAgentId: encryptedConfig.whatsappAgentId ?? null,
       retellApiKey: encryptedConfig.retellApiKey ?? null,
       greeting: encryptedConfig.greeting ?? 'Hi! How can I help you today?',
       allowedDomains: encryptedConfig.allowedDomains ?? null,
@@ -1377,7 +1417,104 @@ export class MemStorage implements IStorage {
     }; // Stub
   }
 
+  async getChatAnalyticsTimeSeries(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      groupBy?: 'hour' | 'day' | 'week';
+    },
+  ): Promise<{
+    chatCounts: { date: string; count: number; successful: number; unsuccessful: number }[];
+    durationData: { date: string; averageDuration: number; totalDuration: number }[];
+    sentimentData: {
+      date: string;
+      positive: number;
+      neutral: number;
+      negative: number;
+      unknown: number;
+    }[];
+    costData: { date: string; totalCost: number; averageCost: number }[];
+    statusBreakdown: Record<string, number>;
+    messageCountStats: { average: number; min: number; max: number; total: number };
+    toolCallsStats: { average: number; total: number };
+  }> {
+    return {
+      chatCounts: [],
+      durationData: [],
+      sentimentData: [],
+      costData: [],
+      statusBreakdown: {},
+      messageCountStats: { average: 0, min: 0, max: 0, total: 0 },
+      toolCallsStats: { average: 0, total: 0 },
+    }; // Stub
+  }
+
   async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
+    // Stub
+  }
+
+  // Voice Analytics stubs (mirrors chat analytics)
+  async createVoiceAnalytics(analytics: InsertVoiceAnalytics): Promise<VoiceAnalytics> {
+    const id = randomUUID();
+    return {
+      id,
+      ...analytics,
+      createdAt: new Date(),
+    } as VoiceAnalytics;
+  }
+
+  async getVoiceAnalytics(id: string): Promise<VoiceAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getVoiceAnalyticsByCallId(callId: string): Promise<VoiceAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getVoiceAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      callStatus?: string;
+      limit?: number;
+    },
+  ): Promise<VoiceAnalytics[]> {
+    return []; // Stub
+  }
+
+  async getVoiceAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    return {
+      totalCalls: 0,
+      successfulCalls: 0,
+      totalDuration: 0,
+      averageDuration: 0,
+      totalCost: 0,
+      averageCost: 0,
+      sentimentBreakdown: {},
+    }; // Stub
+  }
+
+  async deleteOldVoiceAnalytics(olderThanDays: number): Promise<void> {
     // Stub
   }
 
@@ -1578,10 +1715,13 @@ export class DbStorage implements IStorage {
   }
 
   async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
+    // Check both widget agent ID and WhatsApp agent ID
     const result = await this.db
       .select()
       .from(widgetConfigs)
-      .where(eq(widgetConfigs.retellAgentId, agentId));
+      .where(
+        or(eq(widgetConfigs.retellAgentId, agentId), eq(widgetConfigs.whatsappAgentId, agentId)),
+      );
 
     const config = result[0];
     if (!config) return undefined;
@@ -1640,7 +1780,7 @@ export class DbStorage implements IStorage {
     }
 
     console.log(
-      `[Storage] updateWidgetConfig - tenantId: ${tenantId}, retellAgentId: ${updatesToApply.retellAgentId || 'not in updates'}`,
+      `[Storage] updateWidgetConfig - tenantId: ${tenantId}, retellAgentId: ${updatesToApply.retellAgentId || 'not in updates'}, whatsappAgentId: ${updatesToApply.whatsappAgentId || 'not in updates'}`,
     );
 
     const result = await this.db
@@ -1653,7 +1793,7 @@ export class DbStorage implements IStorage {
     if (!config) return undefined;
 
     console.log(
-      `[Storage] updateWidgetConfig - Saved to DB, retellAgentId: ${config.retellAgentId || 'null'}`,
+      `[Storage] updateWidgetConfig - Saved to DB, retellAgentId: ${config.retellAgentId || 'null'}, whatsappAgentId: ${config.whatsappAgentId || 'null'}`,
     );
 
     // Decrypt the API key for immediate use
@@ -2564,11 +2704,9 @@ export class DbStorage implements IStorage {
           startTimestamp: analytics.startTimestamp,
           endTimestamp: analytics.endTimestamp,
           duration: analytics.duration,
-          transcript: analytics.transcript,
           messageCount: analytics.messageCount,
           toolCallsCount: analytics.toolCallsCount,
           dynamicVariables: analytics.dynamicVariables,
-          chatSummary: analytics.chatSummary,
           userSentiment: analytics.userSentiment,
           chatSuccessful: analytics.chatSuccessful,
           combinedCost: analytics.combinedCost,
@@ -2679,10 +2817,7 @@ export class DbStorage implements IStorage {
     if (filters?.endDate) {
       // Include records where endTimestamp is within range OR is NULL (chat still in progress)
       conditions.push(
-        or(
-          lte(chatAnalytics.endTimestamp, filters.endDate),
-          isNull(chatAnalytics.endTimestamp)
-        )!
+        or(lte(chatAnalytics.endTimestamp, filters.endDate), isNull(chatAnalytics.endTimestamp))!,
       );
     }
     if (filters?.agentId) {
@@ -2694,6 +2829,17 @@ export class DbStorage implements IStorage {
       .from(chatAnalytics)
       .where(and(...conditions));
 
+    // DEBUG: Log duration data
+    console.log(
+      '[Duration Debug] Sample chat durations:',
+      chats.slice(0, 3).map((c) => ({
+        chatId: c.chatId,
+        duration: c.duration,
+        startTimestamp: c.startTimestamp,
+        endTimestamp: c.endTimestamp,
+      })),
+    );
+
     const totalChats = chats.length;
     const successfulChats = chats.filter((c) => c.chatSuccessful).length;
     const totalDuration = chats.reduce((sum, c) => sum + (c.duration || 0), 0);
@@ -2704,9 +2850,12 @@ export class DbStorage implements IStorage {
     // Sentiment breakdown
     const sentimentBreakdown: Record<string, number> = {};
     chats.forEach((chat) => {
-      const sentiment = chat.userSentiment || 'unknown';
+      const sentiment = chat.userSentiment?.toLowerCase() || 'unknown';
+      console.log('[Sentiment Debug] Raw:', chat.userSentiment, '→ Lowercase:', sentiment);
       sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
     });
+
+    console.log('[Sentiment Breakdown Final]:', JSON.stringify(sentimentBreakdown));
 
     return {
       totalChats,
@@ -2720,6 +2869,200 @@ export class DbStorage implements IStorage {
   }
 
   /**
+   * Get detailed time-series chat analytics for visualization
+   */
+  async getChatAnalyticsTimeSeries(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      groupBy?: 'hour' | 'day' | 'week';
+    },
+  ): Promise<{
+    chatCounts: { date: string; count: number; successful: number; unsuccessful: number }[];
+    durationData: { date: string; averageDuration: number; totalDuration: number }[];
+    sentimentData: {
+      date: string;
+      positive: number;
+      neutral: number;
+      negative: number;
+      unknown: number;
+    }[];
+    costData: { date: string; totalCost: number; averageCost: number }[];
+    statusBreakdown: Record<string, number>;
+    messageCountStats: { average: number; min: number; max: number; total: number };
+    toolCallsStats: { average: number; total: number };
+  }> {
+    const conditions = [eq(chatAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(chatAnalytics.endTimestamp, filters.endDate), isNull(chatAnalytics.endTimestamp))!,
+      );
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(chatAnalytics.agentId, filters.agentId));
+    }
+
+    const chats = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(and(...conditions))
+      .orderBy(chatAnalytics.startTimestamp);
+
+    // Group by date
+    const groupBy = filters?.groupBy || 'day';
+    const getDateKey = (date: Date | null): string => {
+      if (!date) return 'Unknown';
+      const d = new Date(date);
+      if (groupBy === 'hour') {
+        return d.toISOString().slice(0, 13) + ':00:00';
+      } else if (groupBy === 'week') {
+        const startOfWeek = new Date(d);
+        startOfWeek.setDate(d.getDate() - d.getDay());
+        return startOfWeek.toISOString().slice(0, 10);
+      }
+      return d.toISOString().slice(0, 10); // day
+    };
+
+    // Initialize data structures
+    const chatCountMap = new Map<
+      string,
+      { count: number; successful: number; unsuccessful: number }
+    >();
+    const durationMap = new Map<string, { durations: number[]; total: number }>();
+    const sentimentMap = new Map<
+      string,
+      { positive: number; neutral: number; negative: number; unknown: number }
+    >();
+    const costMap = new Map<string, { costs: number[]; total: number }>();
+    const statusBreakdown: Record<string, number> = {};
+    const messageCounts: number[] = [];
+    let totalToolCalls = 0;
+
+    // Process each chat
+    chats.forEach((chat) => {
+      const dateKey = getDateKey(chat.startTimestamp);
+
+      // Chat counts
+      if (!chatCountMap.has(dateKey)) {
+        chatCountMap.set(dateKey, { count: 0, successful: 0, unsuccessful: 0 });
+      }
+      const countData = chatCountMap.get(dateKey)!;
+      countData.count++;
+      if (chat.chatSuccessful) {
+        countData.successful++;
+      } else {
+        countData.unsuccessful++;
+      }
+
+      // Duration data
+      if (chat.duration && chat.duration > 0) {
+        if (!durationMap.has(dateKey)) {
+          durationMap.set(dateKey, { durations: [], total: 0 });
+        }
+        const durData = durationMap.get(dateKey)!;
+        durData.durations.push(chat.duration);
+        durData.total += chat.duration;
+      }
+
+      // Sentiment data
+      if (!sentimentMap.has(dateKey)) {
+        sentimentMap.set(dateKey, { positive: 0, neutral: 0, negative: 0, unknown: 0 });
+      }
+      const sentData = sentimentMap.get(dateKey)!;
+      const sentiment = (chat.userSentiment?.toLowerCase() || 'unknown') as
+        | 'positive'
+        | 'neutral'
+        | 'negative'
+        | 'unknown';
+      if (sentiment in sentData) {
+        sentData[sentiment]++;
+      }
+
+      // Cost data
+      if (chat.combinedCost && chat.combinedCost > 0) {
+        if (!costMap.has(dateKey)) {
+          costMap.set(dateKey, { costs: [], total: 0 });
+        }
+        const costData = costMap.get(dateKey)!;
+        costData.costs.push(chat.combinedCost);
+        costData.total += chat.combinedCost;
+      }
+
+      // Status breakdown
+      const status = chat.chatStatus || 'unknown';
+      statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+
+      // Message counts
+      if (chat.messageCount) {
+        messageCounts.push(chat.messageCount);
+      }
+
+      // Tool calls
+      if (chat.toolCallsCount) {
+        totalToolCalls += chat.toolCallsCount;
+      }
+    });
+
+    // Convert maps to arrays
+    const chatCounts = Array.from(chatCountMap.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const durationData = Array.from(durationMap.entries())
+      .map(([date, data]) => ({
+        date,
+        averageDuration: data.durations.length > 0 ? data.total / data.durations.length : 0,
+        totalDuration: data.total,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const sentimentData = Array.from(sentimentMap.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const costData = Array.from(costMap.entries())
+      .map(([date, data]) => ({
+        date,
+        totalCost: data.total,
+        averageCost: data.costs.length > 0 ? data.total / data.costs.length : 0,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Message count stats
+    const messageCountStats = {
+      average:
+        messageCounts.length > 0
+          ? messageCounts.reduce((a, b) => a + b, 0) / messageCounts.length
+          : 0,
+      min: messageCounts.length > 0 ? Math.min(...messageCounts) : 0,
+      max: messageCounts.length > 0 ? Math.max(...messageCounts) : 0,
+      total: messageCounts.reduce((a, b) => a + b, 0),
+    };
+
+    // Tool calls stats
+    const toolCallsStats = {
+      average: chats.length > 0 ? totalToolCalls / chats.length : 0,
+      total: totalToolCalls,
+    };
+
+    return {
+      chatCounts,
+      durationData,
+      sentimentData,
+      costData,
+      statusBreakdown,
+      messageCountStats,
+      toolCallsStats,
+    };
+  }
+
+  /**
    * Delete old chat analytics (for cleanup/archiving)
    */
   async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
@@ -2727,6 +3070,157 @@ export class DbStorage implements IStorage {
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
     await this.db.delete(chatAnalytics).where(lte(chatAnalytics.createdAt, cutoffDate));
+  }
+
+  // ============================================
+  // VOICE ANALYTICS METHODS (mirrors chat analytics)
+  // ============================================
+
+  /**
+   * Create a new voice analytics record
+   */
+  async createVoiceAnalytics(analytics: InsertVoiceAnalytics): Promise<VoiceAnalytics> {
+    const [created] = await this.db.insert(voiceAnalytics).values(analytics).returning();
+    return created!;
+  }
+
+  /**
+   * Get voice analytics by ID
+   */
+  async getVoiceAnalytics(id: string): Promise<VoiceAnalytics | undefined> {
+    const result = await this.db.select().from(voiceAnalytics).where(eq(voiceAnalytics.id, id));
+    return result[0];
+  }
+
+  /**
+   * Get voice analytics by call ID
+   */
+  async getVoiceAnalyticsByCallId(callId: string): Promise<VoiceAnalytics | undefined> {
+    const result = await this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(eq(voiceAnalytics.callId, callId));
+    return result[0];
+  }
+
+  /**
+   * Get voice analytics for a tenant with optional filters
+   */
+  async getVoiceAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      callStatus?: string;
+      limit?: number;
+    },
+  ): Promise<VoiceAnalytics[]> {
+    const conditions = [eq(voiceAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(voiceAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(voiceAnalytics.endTimestamp, filters.endDate), isNull(voiceAnalytics.endTimestamp))!,
+      );
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(voiceAnalytics.agentId, filters.agentId));
+    }
+    if (filters?.sentiment) {
+      conditions.push(eq(voiceAnalytics.userSentiment, filters.sentiment));
+    }
+    if (filters?.callStatus) {
+      conditions.push(eq(voiceAnalytics.callStatus, filters.callStatus));
+    }
+
+    const baseQuery = this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(and(...conditions))
+      .orderBy(desc(voiceAnalytics.startTimestamp));
+
+    if (filters?.limit) {
+      return await baseQuery.limit(filters.limit);
+    }
+
+    return await baseQuery;
+  }
+
+  /**
+   * Get voice analytics summary for a tenant
+   */
+  async getVoiceAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    const conditions = [eq(voiceAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(voiceAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(voiceAnalytics.endTimestamp, filters.endDate), isNull(voiceAnalytics.endTimestamp))!,
+      );
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(voiceAnalytics.agentId, filters.agentId));
+    }
+
+    const calls = await this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(and(...conditions));
+
+    const totalCalls = calls.length;
+    const successfulCalls = calls.filter((c) => c.callSuccessful).length;
+    const totalDuration = calls.reduce((sum, c) => sum + (c.duration || 0), 0);
+    const averageDuration = totalCalls > 0 ? totalDuration / totalCalls : 0;
+    const totalCost = calls.reduce((sum, c) => sum + (c.combinedCost || 0), 0);
+    const averageCost = totalCalls > 0 ? totalCost / totalCalls : 0;
+
+    // Sentiment breakdown
+    const sentimentBreakdown: Record<string, number> = {};
+    calls.forEach((call) => {
+      const sentiment = call.userSentiment?.toLowerCase() || 'unknown';
+      sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
+    });
+
+    return {
+      totalCalls,
+      successfulCalls,
+      totalDuration,
+      averageDuration,
+      totalCost,
+      averageCost,
+      sentimentBreakdown,
+    };
+  }
+
+  /**
+   * Delete old voice analytics (for cleanup/archiving)
+   */
+  async deleteOldVoiceAnalytics(olderThanDays: number): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+    await this.db.delete(voiceAnalytics).where(lte(voiceAnalytics.createdAt, cutoffDate));
   }
 
   // ============================================

@@ -17,9 +17,14 @@ const ROUTE_ACCESS: RouteAccess[] = [
   // Platform Admin routes
   { path: '/platform-admin', requirePlatformAdmin: true, allowedRoles: ['admin', 'owner'] },
   { path: '/platform-analytics', requirePlatformAdmin: true, allowedRoles: ['admin', 'owner'] },
+  { path: '/widget-test', requirePlatformAdmin: true, allowedRoles: ['admin', 'owner'] },
 
   // Client Admin routes
-  { path: '/analytics', requirePlatformAdmin: false, allowedRoles: ['client_admin'] },
+  {
+    path: '/analytics',
+    requirePlatformAdmin: undefined,
+    allowedRoles: ['client_admin', 'admin', 'owner'],
+  },
   { path: '/widget-config', requirePlatformAdmin: false, allowedRoles: ['client_admin'] },
   { path: '/api-keys', requirePlatformAdmin: false, allowedRoles: ['client_admin'] },
   { path: '/team-management', requirePlatformAdmin: false, allowedRoles: ['client_admin'] },
