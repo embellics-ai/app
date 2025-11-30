@@ -961,11 +961,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { retellApiKey, retellAgentId, whatsappAgentId } = req.body;
 
-        console.log('[Update Retell API Key] Request body:', req.body);
-        console.log('[Update Retell API Key] retellApiKey:', retellApiKey);
-        console.log('[Update Retell API Key] retellAgentId:', retellAgentId);
-        console.log('[Update Retell API Key] whatsappAgentId:', whatsappAgentId);
-
         // Validate Retell API key format if provided
         if (retellApiKey && retellApiKey !== '__KEEP_EXISTING__') {
           if (typeof retellApiKey !== 'string') {
@@ -1007,10 +1002,6 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
         }
 
-        console.log(
-          `[Update Retell API Key] Platform admin updating configuration for tenant: ${tenantId}`,
-        );
-
         // Check if tenant exists
         const tenant = await storage.getTenant(tenantId);
         if (!tenant) {
@@ -1036,9 +1027,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         if (whatsappAgentId && whatsappAgentId.trim()) {
           updateData.whatsappAgentId = whatsappAgentId.trim();
         }
-
-        console.log('[Update Retell API Key] Update data:', updateData);
-        console.log('[Update Retell API Key] Update data keys:', Object.keys(updateData));
 
         // Check if we have anything to update
         if (Object.keys(updateData).length === 0) {
@@ -1420,16 +1408,12 @@ export async function registerRoutes(app: Express): Promise<void> {
         // This token will be valid for this specific test session
         const testToken = `test_${randomBytes(32).toString('hex')}`;
 
-        console.log('[Widget Test] Generated test token:', testToken);
-
         // Store the test token in module-level Map
         widgetTestTokens.set(testToken, {
           tenantId: tenantId as string,
           createdAt: new Date(),
           createdBy: req.user?.email,
         });
-
-        console.log('[Widget Test] Stored token, total tokens:', widgetTestTokens.size);
 
         // Clean up old tokens (older than 1 hour)
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
@@ -2102,11 +2086,6 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const payload = req.body;
 
-      // DEBUG: Log full payload to understand what Retell sends
-      console.log('[Retell Webhook] === FULL PAYLOAD DEBUG ===');
-      console.log(JSON.stringify(payload, null, 2));
-      console.log('[Retell Webhook] === END PAYLOAD ===');
-
       // Retell sends data nested under "chat" object
       const chat = payload.chat || payload;
 
@@ -2149,14 +2128,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       if (!tenantId && chatData.agentId) {
         // Try to find tenant by agent ID (useful for WhatsApp and other integrations)
-        console.log(
-          '[Retell Webhook] No tenant_id in metadata, looking up by agent ID:',
-          chatData.agentId,
-        );
         const widgetConfig = await storage.getWidgetConfigByAgentId(chatData.agentId);
         if (widgetConfig) {
           tenantId = widgetConfig.tenantId;
-          console.log('[Retell Webhook] Found tenant from agent ID:', tenantId);
         }
       }
 
@@ -2164,39 +2138,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.error(
           '[Retell Webhook] Could not determine tenant_id from payload or agent configuration',
         );
-        console.error('[Retell Webhook] Payload metadata:', payload.metadata);
-        console.error('[Retell Webhook] Agent ID:', chatData.agentId);
         return res.status(400).json({
           error:
             'Could not determine tenant_id. Include tenant_id in metadata or configure agent in system.',
         });
       }
 
-      console.log(
-        `[Retell Webhook] Processing chat analytics for tenant ${tenantId}, chat ${chatData.chatId}`,
-      );
-
-      console.log('[Retell Webhook] Extracted chat data:', {
-        chatId: chatData.chatId,
-        startTimestamp: chatData.startTimestamp,
-        endTimestamp: chatData.endTimestamp,
-        duration: chatData.duration,
-      });
-
       // Create chat analytics record
       const createdAnalytics = await storage.createChatAnalytics({
         tenantId,
         ...chatData,
-      });
-
-      console.log('[Retell Webhook] Chat analytics created successfully:', {
-        id: createdAnalytics.id,
-        tenantId: createdAnalytics.tenantId,
-        chatId: createdAnalytics.chatId,
-        agentId: createdAnalytics.agentId,
-        startTimestamp: createdAnalytics.startTimestamp,
-        endTimestamp: createdAnalytics.endTimestamp,
-        duration: createdAnalytics.duration,
       });
 
       // Optionally store individual messages
@@ -2215,13 +2166,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         // }
       }
 
-      console.log(`[Retell Webhook] Stored chat analytics for chat ${chatData.chatId}`);
-
       // Forward webhook to n8n if configured
       const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
       if (n8nWebhookUrl) {
         try {
-          console.log('[Retell Webhook] Forwarding to n8n:', n8nWebhookUrl);
           const response = await fetch(n8nWebhookUrl, {
             method: 'POST',
             headers: {
@@ -2414,9 +2362,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId } = req.query;
 
-        console.log('[Analytics Overview] Querying for tenant:', tenantId);
-        console.log('[Analytics Overview] Filters:', { startDate, endDate, agentId });
-
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
           endDate: endDate ? new Date(endDate as string) : undefined,
@@ -2425,11 +2370,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Get chat analytics summary
         const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
-        console.log('[Analytics Overview] Chat summary result:', chatSummary);
 
         // Get voice analytics summary
         const voiceSummary = await storage.getVoiceAnalyticsSummary(tenantId, filters);
-        console.log('[Analytics Overview] Voice summary result:', voiceSummary);
 
         res.json({
           chat: chatSummary,
@@ -2463,16 +2406,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId, sentiment, chatStatus, limit } = req.query;
 
-        console.log('[Analytics Chats] Querying for tenant:', tenantId);
-        console.log('[Analytics Chats] Filters:', {
-          startDate,
-          endDate,
-          agentId,
-          sentiment,
-          chatStatus,
-          limit,
-        });
-
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
           endDate: endDate ? new Date(endDate as string) : undefined,
@@ -2483,16 +2416,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         };
 
         const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
-
-        console.log('[Analytics Chats] Found chats:', chats.length);
-        if (chats.length > 0) {
-          console.log('[Analytics Chats] First chat sample:', {
-            id: chats[0].id,
-            tenantId: chats[0].tenantId,
-            chatId: chats[0].chatId,
-            agentId: chats[0].agentId,
-          });
-        }
 
         res.json(chats);
       } catch (error) {
@@ -2515,8 +2438,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId, groupBy } = req.query;
 
-        console.log('[Analytics Time Series] Querying for tenant:', tenantId);
-
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
           endDate: endDate ? new Date(endDate as string) : undefined,
@@ -2525,11 +2446,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         };
 
         const timeSeriesData = await storage.getChatAnalyticsTimeSeries(tenantId, filters);
-
-        console.log('[Analytics Time Series] Returning data:', {
-          chatCountsLength: timeSeriesData.chatCounts.length,
-          durationDataLength: timeSeriesData.durationData.length,
-        });
 
         res.json(timeSeriesData);
       } catch (error) {
