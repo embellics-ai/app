@@ -14,6 +14,14 @@ import { z } from 'zod';
 import Retell from 'retell-sdk';
 import { randomBytes, createHash } from 'crypto';
 import { sendInvitationEmail, sendPasswordResetEmail } from './email';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import {
   encrypt,
   decrypt,
@@ -48,6 +56,14 @@ import type { WebSocket } from 'ws';
 // NOTE: The system uses tenant-specific Retell Agent IDs from widget_configs.retellAgentId
 // Platform Admins configure these via: PATCH /api/platform/tenants/:tenantId/retell-api-key
 // No hardcoded agent IDs are used - each tenant has their own agent configuration
+
+// In-memory storage for widget test tokens (platform admin only)
+interface WidgetTestTokenData {
+  tenantId: string;
+  createdAt: Date;
+  createdBy?: string;
+}
+const widgetTestTokens = new Map<string, WidgetTestTokenData>();
 
 export async function registerRoutes(app: Express): Promise<void> {
   // SECURITY: Cleanup expired invitation passwords on startup
@@ -906,6 +922,8 @@ export async function registerRoutes(app: Express): Promise<void> {
               hasRetellApiKey: !!widgetConfig?.retellApiKey,
               hasRetellAgentId: !!widgetConfig?.retellAgentId,
               hasWhatsappAgentId: !!widgetConfig?.whatsappAgentId,
+              retellApiKey: maskedRetellApiKey, // For backward compatibility
+              retellAgentId: widgetConfig?.retellAgentId || null, // Full agent ID for widget testing
               maskedRetellApiKey,
               maskedAgentId,
               maskedWhatsappAgentId,
@@ -1317,6 +1335,144 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('Error cleaning up invitation passwords:', error);
         res.status(500).json({ error: 'Failed to cleanup passwords' });
+      }
+    },
+  );
+
+  // Widget Test Page (Platform Admin only)
+  app.get(
+    '/api/platform/widget-test-page',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.query;
+
+        console.log('[Widget Test] Request received for tenantId:', tenantId);
+
+        if (!tenantId) {
+          return res.status(400).send('Tenant ID is required. Please select a tenant to test.');
+        }
+
+        // Verify tenant exists
+        console.log('[Widget Test] Fetching tenant...');
+        const tenant = await storage.getTenant(tenantId as string);
+        console.log('[Widget Test] Tenant result:', tenant ? tenant.name : 'NOT FOUND');
+
+        if (!tenant) {
+          return res.status(404).send('Tenant not found');
+        }
+
+        // Get widget configuration for this tenant
+        console.log('[Widget Test] Fetching widget config...');
+        const widgetConfig = await storage.getWidgetConfig(tenantId as string);
+        console.log('[Widget Test] Widget config result:', widgetConfig);
+
+        if (!widgetConfig || !widgetConfig.retellAgentId) {
+          return res.status(400).send(`
+            <html>
+              <head><title>Widget Not Configured</title></head>
+              <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                <h1>⚠️ Widget Not Configured</h1>
+                <p>The tenant "${tenant.name}" does not have a widget configured.</p>
+                <p>Please configure the Retell Agent ID in the Platform Admin panel first.</p>
+                <a href="/widget-test" style="color: #667eea;">← Back to Widget Test</a>
+              </body>
+            </html>
+          `);
+        }
+
+        // Get the HTML file path - try multiple locations for dev/prod
+        let htmlPath = path.join(__dirname, '../client/public/widget-test.html');
+
+        // If not found, try from project root
+        if (!fs.existsSync(htmlPath)) {
+          htmlPath = path.join(process.cwd(), 'client/public/widget-test.html');
+        }
+
+        // Read the HTML file
+        if (!fs.existsSync(htmlPath)) {
+          console.error('[Widget Test] HTML file not found. Tried paths:', {
+            path1: path.join(__dirname, '../client/public/widget-test.html'),
+            path2: path.join(process.cwd(), 'client/public/widget-test.html'),
+            __dirname,
+            cwd: process.cwd(),
+          });
+          return res.status(404).send('Widget test page not found');
+        }
+
+        let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+
+        // Generate a one-time test token for platform admin widget testing
+        // This token will be valid for this specific test session
+        const testToken = `test_${randomBytes(32).toString('hex')}`;
+
+        console.log('[Widget Test] Generated test token:', testToken);
+
+        // Store the test token in module-level Map
+        widgetTestTokens.set(testToken, {
+          tenantId: tenantId as string,
+          createdAt: new Date(),
+          createdBy: req.user?.email,
+        });
+
+        console.log('[Widget Test] Stored token, total tokens:', widgetTestTokens.size);
+
+        // Clean up old tokens (older than 1 hour)
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        for (const [token, data] of widgetTestTokens.entries()) {
+          if (data.createdAt < oneHourAgo) {
+            widgetTestTokens.delete(token);
+          }
+        } // Inject tenant information and widget script into HTML
+        const widgetScriptUrl = `${req.protocol}://${req.get('host')}/widget.js`;
+        const tenantInfo = `
+          <script>
+            // Tenant configuration
+            window.WIDGET_TEST_CONFIG = {
+              tenantId: '${tenantId}',
+              tenantName: '${tenant.name.replace(/'/g, "\\'")}',
+              agentId: '${widgetConfig.retellAgentId}',
+              testMode: true,
+            };
+            
+            // Update page with tenant info
+            document.addEventListener('DOMContentLoaded', () => {
+              const tenantNameEl = document.getElementById('tenant-name');
+              const agentIdEl = document.getElementById('agent-id');
+              
+              if (tenantNameEl) tenantNameEl.textContent = '${tenant.name.replace(/'/g, "\\'")}';
+              if (agentIdEl) agentIdEl.textContent = '${widgetConfig.retellAgentId}';
+              
+              // Update status after widget loads
+              setTimeout(() => {
+                const statusEl = document.getElementById('widget-status');
+                if (statusEl) {
+                  statusEl.textContent = '✅ Widget loaded successfully! Look for the chat bubble in the bottom-right corner.';
+                  statusEl.style.color = '#28a745';
+                }
+              }, 1000);
+            });
+          </script>
+          
+          <!-- Embellics Chat Widget -->
+          <script src="${widgetScriptUrl}" data-api-key="${testToken}"></script>
+        `;
+
+        // Insert tenant info and scripts before closing </body> tag
+        htmlContent = htmlContent.replace('</body>', `${tenantInfo}</body>`);
+
+        // Log access for security audit
+        console.log(
+          `[Widget Test] Platform admin ${req.user?.email} accessed widget test page for tenant: ${tenant.name} (${tenantId})`,
+        );
+
+        // Send HTML with proper content type
+        res.setHeader('Content-Type', 'text/html');
+        res.send(htmlContent);
+      } catch (error) {
+        console.error('Error serving widget test page:', error);
+        res.status(500).send('Failed to load widget test page');
       }
     },
   );
@@ -4737,27 +4893,47 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys for tenant and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
+      let tenantId: string;
+      let widgetConfig;
 
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
+      // Check if this is a platform admin test token
+      if (apiKey.startsWith('test_')) {
+        console.log('[Widget Test] Received test token:', apiKey);
+        console.log('[Widget Test] Available tokens:', Array.from(widgetTestTokens.keys()));
+
+        const testTokenData = widgetTestTokens.get(apiKey);
+
+        if (!testTokenData) {
+          console.log('[Widget Test] Test token not found in map');
+          return res.status(401).json({ error: 'Invalid or expired test token' });
         }
-      }
 
-      if (!apiKeyRecord) {
-        return res.status(401).json({ error: 'Invalid API key' });
-      }
+        tenantId = testTokenData.tenantId;
+        console.log('[Widget Test] Platform admin testing widget for tenant:', tenantId);
+      } else {
+        // Normal API key validation - get all keys for tenant and verify with bcrypt
+        const allApiKeys = await storage.getAllApiKeys();
+        let apiKeyRecord = null;
 
-      // Update last used timestamp
-      await storage.updateApiKeyLastUsed(apiKeyRecord.id);
+        for (const key of allApiKeys) {
+          const isMatch = await verifyPassword(apiKey, key.keyHash);
+          if (isMatch) {
+            apiKeyRecord = key;
+            break;
+          }
+        }
+
+        if (!apiKeyRecord) {
+          return res.status(401).json({ error: 'Invalid API key' });
+        }
+
+        // Update last used timestamp
+        await storage.updateApiKeyLastUsed(apiKeyRecord.id);
+        tenantId = apiKeyRecord.tenantId;
+      }
 
       // Get widget configuration for this tenant
-      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      widgetConfig = await storage.getWidgetConfig(tenantId);
 
       if (!widgetConfig) {
         return res.status(404).json({ error: 'Widget configuration not found' });
@@ -4784,7 +4960,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Return safe configuration (exclude sensitive data)
       res.json({
-        tenantId: apiKeyRecord.tenantId,
+        tenantId: tenantId,
         greeting: widgetConfig.greeting,
         primaryColor: widgetConfig.primaryColor || '#9b7ddd',
         textColor: widgetConfig.textColor || '#ffffff',
@@ -4825,24 +5001,40 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      // Validate API key - get all keys and verify with bcrypt
-      const allApiKeys = await storage.getAllApiKeys();
-      let apiKeyRecord = null;
+      let tenantId: string;
 
-      for (const key of allApiKeys) {
-        const isMatch = await verifyPassword(apiKey, key.keyHash);
-        if (isMatch) {
-          apiKeyRecord = key;
-          break;
+      // Check if this is a platform admin test token
+      if (apiKey.startsWith('test_')) {
+        const testTokenData = widgetTestTokens.get(apiKey);
+
+        if (!testTokenData) {
+          return res.status(401).json({ error: 'Invalid or expired test token' });
         }
-      }
 
-      if (!apiKeyRecord) {
-        return res.status(401).json({ error: 'Invalid API key' });
+        tenantId = testTokenData.tenantId;
+        console.log('[Widget Test] Platform admin chat message for tenant:', tenantId);
+      } else {
+        // Validate API key - get all keys and verify with bcrypt
+        const allApiKeys = await storage.getAllApiKeys();
+        let apiKeyRecord = null;
+
+        for (const key of allApiKeys) {
+          const isMatch = await verifyPassword(apiKey, key.keyHash);
+          if (isMatch) {
+            apiKeyRecord = key;
+            break;
+          }
+        }
+
+        if (!apiKeyRecord) {
+          return res.status(401).json({ error: 'Invalid API key' });
+        }
+
+        tenantId = apiKeyRecord.tenantId;
       }
 
       // Get widget configuration for this tenant
-      const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+      const widgetConfig = await storage.getWidgetConfig(tenantId);
 
       if (!widgetConfig || !widgetConfig.retellApiKey || !widgetConfig.retellAgentId) {
         return res.status(400).json({
@@ -4873,7 +5065,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         const chatSession = await tenantRetellClient.chat.create({
           agent_id: widgetConfig.retellAgentId,
           metadata: {
-            tenantId: apiKeyRecord.tenantId,
+            tenantId: tenantId,
             source: 'widget',
           },
         });
@@ -4937,7 +5129,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       try {
         // Save user message
         await storage.createWidgetChatMessage({
-          tenantId: apiKeyRecord.tenantId,
+          tenantId: tenantId,
           chatId: retellChatId,
           role: 'user',
           content: message,
@@ -4946,7 +5138,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Save combined assistant response
         const combinedResponse = responseMessages.join('\n\n');
         await storage.createWidgetChatMessage({
-          tenantId: apiKeyRecord.tenantId,
+          tenantId: tenantId,
           chatId: retellChatId,
           role: 'assistant',
           content: combinedResponse,
