@@ -39,6 +39,8 @@ import {
   type InsertChatAnalytics,
   type ChatMessage,
   type InsertChatMessage,
+  type VoiceAnalytics,
+  type InsertVoiceAnalytics,
   users,
   messages,
   conversations,
@@ -59,6 +61,7 @@ import {
   webhookAnalytics,
   chatAnalytics,
   chatMessages,
+  voiceAnalytics,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -284,6 +287,39 @@ export interface IStorage {
     sentimentBreakdown: Record<string, number>;
   }>;
   deleteOldChatAnalytics(olderThanDays: number): Promise<void>;
+
+  // Voice Analytics Methods (mirrors chat analytics structure)
+  createVoiceAnalytics(analytics: InsertVoiceAnalytics): Promise<VoiceAnalytics>;
+  getVoiceAnalytics(id: string): Promise<VoiceAnalytics | undefined>;
+  getVoiceAnalyticsByCallId(callId: string): Promise<VoiceAnalytics | undefined>;
+  getVoiceAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      callStatus?: string;
+      limit?: number;
+    },
+  ): Promise<VoiceAnalytics[]>;
+  getVoiceAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }>;
+  deleteOldVoiceAnalytics(olderThanDays: number): Promise<void>;
 
   // Chat Messages Methods (optional - for detailed message storage)
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
@@ -1382,6 +1418,69 @@ export class MemStorage implements IStorage {
   }
 
   async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
+    // Stub
+  }
+
+  // Voice Analytics stubs (mirrors chat analytics)
+  async createVoiceAnalytics(analytics: InsertVoiceAnalytics): Promise<VoiceAnalytics> {
+    const id = randomUUID();
+    return {
+      id,
+      ...analytics,
+      createdAt: new Date(),
+    } as VoiceAnalytics;
+  }
+
+  async getVoiceAnalytics(id: string): Promise<VoiceAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getVoiceAnalyticsByCallId(callId: string): Promise<VoiceAnalytics | undefined> {
+    return undefined; // Stub
+  }
+
+  async getVoiceAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      callStatus?: string;
+      limit?: number;
+    },
+  ): Promise<VoiceAnalytics[]> {
+    return []; // Stub
+  }
+
+  async getVoiceAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    return {
+      totalCalls: 0,
+      successfulCalls: 0,
+      totalDuration: 0,
+      averageDuration: 0,
+      totalCost: 0,
+      averageCost: 0,
+      sentimentBreakdown: {},
+    }; // Stub
+  }
+
+  async deleteOldVoiceAnalytics(olderThanDays: number): Promise<void> {
     // Stub
   }
 
@@ -2732,6 +2831,157 @@ export class DbStorage implements IStorage {
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
     await this.db.delete(chatAnalytics).where(lte(chatAnalytics.createdAt, cutoffDate));
+  }
+
+  // ============================================
+  // VOICE ANALYTICS METHODS (mirrors chat analytics)
+  // ============================================
+
+  /**
+   * Create a new voice analytics record
+   */
+  async createVoiceAnalytics(analytics: InsertVoiceAnalytics): Promise<VoiceAnalytics> {
+    const [created] = await this.db.insert(voiceAnalytics).values(analytics).returning();
+    return created!;
+  }
+
+  /**
+   * Get voice analytics by ID
+   */
+  async getVoiceAnalytics(id: string): Promise<VoiceAnalytics | undefined> {
+    const result = await this.db.select().from(voiceAnalytics).where(eq(voiceAnalytics.id, id));
+    return result[0];
+  }
+
+  /**
+   * Get voice analytics by call ID
+   */
+  async getVoiceAnalyticsByCallId(callId: string): Promise<VoiceAnalytics | undefined> {
+    const result = await this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(eq(voiceAnalytics.callId, callId));
+    return result[0];
+  }
+
+  /**
+   * Get voice analytics for a tenant with optional filters
+   */
+  async getVoiceAnalyticsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      sentiment?: string;
+      callStatus?: string;
+      limit?: number;
+    },
+  ): Promise<VoiceAnalytics[]> {
+    const conditions = [eq(voiceAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(voiceAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(voiceAnalytics.endTimestamp, filters.endDate), isNull(voiceAnalytics.endTimestamp))!,
+      );
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(voiceAnalytics.agentId, filters.agentId));
+    }
+    if (filters?.sentiment) {
+      conditions.push(eq(voiceAnalytics.userSentiment, filters.sentiment));
+    }
+    if (filters?.callStatus) {
+      conditions.push(eq(voiceAnalytics.callStatus, filters.callStatus));
+    }
+
+    const baseQuery = this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(and(...conditions))
+      .orderBy(desc(voiceAnalytics.startTimestamp));
+
+    if (filters?.limit) {
+      return await baseQuery.limit(filters.limit);
+    }
+
+    return await baseQuery;
+  }
+
+  /**
+   * Get voice analytics summary for a tenant
+   */
+  async getVoiceAnalyticsSummary(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+    },
+  ): Promise<{
+    totalCalls: number;
+    successfulCalls: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }> {
+    const conditions = [eq(voiceAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(voiceAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(voiceAnalytics.endTimestamp, filters.endDate), isNull(voiceAnalytics.endTimestamp))!,
+      );
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(voiceAnalytics.agentId, filters.agentId));
+    }
+
+    const calls = await this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(and(...conditions));
+
+    const totalCalls = calls.length;
+    const successfulCalls = calls.filter((c) => c.callSuccessful).length;
+    const totalDuration = calls.reduce((sum, c) => sum + (c.duration || 0), 0);
+    const averageDuration = totalCalls > 0 ? totalDuration / totalCalls : 0;
+    const totalCost = calls.reduce((sum, c) => sum + (c.combinedCost || 0), 0);
+    const averageCost = totalCalls > 0 ? totalCost / totalCalls : 0;
+
+    // Sentiment breakdown
+    const sentimentBreakdown: Record<string, number> = {};
+    calls.forEach((call) => {
+      const sentiment = call.userSentiment?.toLowerCase() || 'unknown';
+      sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
+    });
+
+    return {
+      totalCalls,
+      successfulCalls,
+      totalDuration,
+      averageDuration,
+      totalCost,
+      averageCost,
+      sentimentBreakdown,
+    };
+  }
+
+  /**
+   * Delete old voice analytics (for cleanup/archiving)
+   */
+  async deleteOldVoiceAnalytics(olderThanDays: number): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+    await this.db.delete(voiceAnalytics).where(lte(voiceAnalytics.createdAt, cutoffDate));
   }
 
   // ============================================

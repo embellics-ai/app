@@ -690,6 +690,80 @@ export const insertChatAnalyticsSchema = createInsertSchema(chatAnalytics).omit(
 export type InsertChatAnalytics = z.infer<typeof insertChatAnalyticsSchema>;
 export type ChatAnalytics = typeof chatAnalytics.$inferSelect;
 
+// ============================================
+// RETELL AI VOICE ANALYTICS
+// ============================================
+
+// Voice Analytics (Track voice call sessions from Retell AI call.ended webhook)
+// Mirrors chat_analytics structure for consistency
+export const voiceAnalytics = pgTable(
+  'voice_analytics',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Retell Call Metadata
+    callId: text('call_id').notNull().unique(), // Retell's call ID
+    agentId: text('agent_id').notNull(), // Retell agent ID
+    agentName: text('agent_name'), // Agent display name
+    agentVersion: text('agent_version'), // Agent version number
+    callType: text('call_type'), // e.g., "inbound", "outbound", "web_call"
+    callStatus: text('call_status'), // e.g., "ended", "voicemail", "failed"
+
+    // Timestamps
+    startTimestamp: timestamp('start_timestamp'), // When call started
+    endTimestamp: timestamp('end_timestamp'), // When call ended
+    duration: integer('duration'), // Duration in seconds
+
+    // Call Data
+    messageCount: integer('message_count'), // Total messages/turns exchanged
+    toolCallsCount: integer('tool_calls_count'), // Number of tool/function calls
+    dynamicVariables: jsonb('dynamic_variables'), // Collected variables (booking_uid, user_intention, etc.)
+
+    // Call Analysis (AI-generated)
+    userSentiment: text('user_sentiment'), // positive, negative, neutral, frustrated, satisfied
+    callSuccessful: boolean('call_successful'), // Whether call achieved its goal
+
+    // Cost Tracking
+    combinedCost: real('combined_cost'), // Total cost (supports decimals)
+    productCosts: jsonb('product_costs'), // Breakdown by model (gpt-4o, whisper, etc.)
+
+    // Metadata
+    metadata: jsonb('metadata'), // Additional data (disconnect_reason, from_number, to_number, etc.)
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Indexes for fast lookups
+    tenantCallIdx: uniqueIndex('voice_analytics_tenant_call_idx').on(
+      table.tenantId,
+      table.callId,
+    ),
+    tenantAgentIdx: uniqueIndex('voice_analytics_tenant_agent_idx').on(
+      table.tenantId,
+      table.agentId,
+      table.startTimestamp,
+    ),
+    sentimentIdx: uniqueIndex('voice_analytics_sentiment_idx').on(
+      table.tenantId,
+      table.userSentiment,
+      table.startTimestamp,
+    ),
+  }),
+);
+
+export const insertVoiceAnalyticsSchema = createInsertSchema(voiceAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertVoiceAnalytics = z.infer<typeof insertVoiceAnalyticsSchema>;
+export type VoiceAnalytics = typeof voiceAnalytics.$inferSelect;
+
 // Chat Messages (Individual messages from chat sessions - optional detailed storage)
 export const chatMessages = pgTable(
   'chat_messages',

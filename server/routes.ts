@@ -2070,6 +2070,143 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Retell AI voice call.ended webhook
+  app.post('/api/retell/call-ended', async (req, res) => {
+    try {
+      const signature = req.headers['x-retell-signature'] as string;
+
+      // TODO: Implement signature verification
+      // For now, we'll accept all requests (add verification in production)
+
+      const payload = req.body;
+
+      // DEBUG: Log full payload to understand what Retell sends
+      console.log('[Retell Voice Webhook] === FULL PAYLOAD DEBUG ===');
+      console.log(JSON.stringify(payload, null, 2));
+      console.log('[Retell Voice Webhook] === END PAYLOAD ===');
+
+      // Retell sends data nested under "call" object
+      const call = payload.call || payload;
+
+      // Extract data from Retell's call.ended event (mirrors chat structure)
+      const callData = {
+        callId: call.call_id,
+        agentId: call.agent_id,
+        agentName: call.agent_name || null,
+        agentVersion: call.agent_version || null,
+        callType: call.call_type || null,
+        callStatus: call.call_status || call.disconnect_reason || null,
+        startTimestamp: call.start_timestamp ? new Date(call.start_timestamp) : null,
+        endTimestamp: call.end_timestamp ? new Date(call.end_timestamp) : null,
+        duration: call.duration || null,
+        messageCount: call.transcript?.length || call.messages?.length || 0,
+        toolCallsCount: call.tool_calls?.length || 0,
+        dynamicVariables: call.collected_dynamic_variables || call.dynamic_variables || null,
+        userSentiment: call.call_analysis?.user_sentiment || null,
+        callSuccessful: call.call_analysis?.call_successful || null,
+        combinedCost: call.call_cost?.combined_cost || call.combined_cost || 0,
+        productCosts: call.call_cost?.product_costs || call.product_costs || null,
+        metadata: {
+          disconnect_reason: call.disconnect_reason || null,
+          from_number: call.from_number || null,
+          to_number: call.to_number || null,
+          // Add any other metadata fields
+          ...call.metadata,
+        },
+      };
+
+      // Determine tenant ID from metadata or by looking up the agent configuration
+      let tenantId = call.metadata?.tenant_id || payload.tenant_id;
+
+      if (!tenantId && callData.agentId) {
+        // Try to find tenant by agent ID
+        console.log(
+          '[Retell Voice Webhook] No tenant_id in metadata, looking up by agent ID:',
+          callData.agentId,
+        );
+        const widgetConfig = await storage.getWidgetConfigByAgentId(callData.agentId);
+        if (widgetConfig) {
+          tenantId = widgetConfig.tenantId;
+          console.log('[Retell Voice Webhook] Found tenant from agent ID:', tenantId);
+        }
+      }
+
+      if (!tenantId) {
+        console.error(
+          '[Retell Voice Webhook] Could not determine tenant_id from payload or agent configuration',
+        );
+        console.error('[Retell Voice Webhook] Payload metadata:', payload.metadata);
+        console.error('[Retell Voice Webhook] Agent ID:', callData.agentId);
+        return res.status(400).json({
+          error:
+            'Could not determine tenant_id. Include tenant_id in metadata or configure agent in system.',
+        });
+      }
+
+      console.log(
+        `[Retell Voice Webhook] Processing voice analytics for tenant ${tenantId}, call ${callData.callId}`,
+      );
+
+      console.log('[Retell Voice Webhook] Extracted call data:', {
+        callId: callData.callId,
+        startTimestamp: callData.startTimestamp,
+        endTimestamp: callData.endTimestamp,
+        duration: callData.duration,
+      });
+
+      // Create voice analytics record
+      const createdAnalytics = await storage.createVoiceAnalytics({
+        tenantId,
+        ...callData,
+      });
+
+      console.log('[Retell Voice Webhook] Voice analytics created successfully:', {
+        id: createdAnalytics.id,
+        tenantId: createdAnalytics.tenantId,
+        callId: createdAnalytics.callId,
+        agentId: createdAnalytics.agentId,
+        startTimestamp: createdAnalytics.startTimestamp,
+        endTimestamp: createdAnalytics.endTimestamp,
+        duration: createdAnalytics.duration,
+      });
+
+      console.log(`[Retell Voice Webhook] Stored voice analytics for call ${callData.callId}`);
+
+      // Forward webhook to n8n if configured
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+      if (n8nWebhookUrl) {
+        try {
+          console.log('[Retell Voice Webhook] Forwarding to n8n:', n8nWebhookUrl);
+          const response = await fetch(n8nWebhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log('[Retell Voice Webhook] Successfully forwarded to n8n');
+          } else {
+            console.error(
+              '[Retell Voice Webhook] n8n forward failed:',
+              response.status,
+              await response.text(),
+            );
+          }
+        } catch (forwardError: any) {
+          console.error('[Retell Voice Webhook] Error forwarding to n8n:', forwardError.message);
+          // Don't fail the main webhook - just log the error
+        }
+      }
+
+      res.status(200).json({ success: true, message: 'Voice analytics stored' });
+    } catch (error: any) {
+      console.error('[Retell Voice Webhook] Error processing call.ended event:', error);
+      res.status(500).json({ error: 'Failed to process voice analytics', details: error.message });
+    }
+  });
+
   // ============================================
   // CHAT ANALYTICS API ENDPOINTS (Platform Admin)
   // ============================================
