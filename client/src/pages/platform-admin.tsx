@@ -51,7 +51,6 @@ import {
   BarChart3,
 } from 'lucide-react';
 import IntegrationManagement from '@/components/IntegrationManagement';
-import AgentAnalyticsDashboard from '@/components/AgentAnalyticsDashboard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -115,10 +114,6 @@ export default function PlatformAdminPage() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [selectedIntegrationTenant, setSelectedIntegrationTenant] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [selectedAnalyticsTenant, setSelectedAnalyticsTenant] = useState<{
     id: string;
     name: string;
   } | null>(null);
@@ -376,10 +371,6 @@ export default function PlatformAdminPage() {
             <TabsTrigger value="integrations" data-testid="tab-integrations">
               <Webhook className="w-4 h-4 mr-2" />
               Integrations
-            </TabsTrigger>
-            <TabsTrigger value="analytics" data-testid="tab-analytics">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Analytics
             </TabsTrigger>
           </TabsList>
 
@@ -988,69 +979,6 @@ export default function PlatformAdminPage() {
                   <div className="text-center py-12 text-muted-foreground">
                     <Webhook className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>Select a tenant to view and manage their integrations</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analytics" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Chat Analytics</CardTitle>
-                <CardDescription>
-                  View analytics for chat agents powered by Retell AI
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Tenant Selector */}
-                <div className="space-y-2">
-                  <Label htmlFor="analytics-tenant-select">Select Tenant</Label>
-                  <Select
-                    value={selectedAnalyticsTenant?.id || ''}
-                    onValueChange={(value) => {
-                      const tenant = tenants.find((t: any) => t.id === value);
-                      if (tenant) {
-                        setSelectedAnalyticsTenant({
-                          id: tenant.id,
-                          name: tenant.name,
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger id="analytics-tenant-select" className="w-full">
-                      <SelectValue placeholder="Select a tenant to view analytics" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tenantsLoading ? (
-                        <div className="flex items-center justify-center py-4">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        </div>
-                      ) : tenants.length === 0 ? (
-                        <div className="text-center py-4 text-sm text-muted-foreground">
-                          No tenants available
-                        </div>
-                      ) : (
-                        tenants.map((tenant: any) => (
-                          <SelectItem key={tenant.id} value={tenant.id}>
-                            {tenant.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Analytics Dashboard Component */}
-                {selectedAnalyticsTenant ? (
-                  <AgentAnalyticsDashboard
-                    tenantId={selectedAnalyticsTenant.id}
-                    tenantName={selectedAnalyticsTenant.name}
-                  />
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Select a tenant to view their chat analytics</p>
                   </div>
                 )}
               </CardContent>

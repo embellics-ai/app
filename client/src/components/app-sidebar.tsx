@@ -41,7 +41,7 @@ export function AppSidebar() {
       return [
         {
           title: 'Analytics',
-          url: '/platform-analytics',
+          url: '/analytics',
           icon: BarChart3,
         },
         {

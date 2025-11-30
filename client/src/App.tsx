@@ -15,6 +15,7 @@ import { RoleProtectedRoute } from '@/components/role-protected-route';
 import { ChangePasswordRequired } from '@/components/change-password-required';
 import Chat from '@/pages/chat';
 import Analytics from '@/pages/analytics';
+import UnifiedAnalytics from '@/pages/unified-analytics';
 import PlatformAnalytics from '@/pages/platform-analytics';
 import WidgetConfigPage from '@/pages/widget-config';
 import ApiKeysPage from '@/pages/api-keys';
@@ -52,9 +53,7 @@ function Router() {
       </Route>
       <Route path="/analytics">
         <ProtectedRoute path="/analytics">
-          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
-            <Analytics />
-          </RoleProtectedRoute>
+          <UnifiedAnalytics />
         </ProtectedRoute>
       </Route>
       <Route path="/platform-analytics">
