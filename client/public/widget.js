@@ -588,7 +588,6 @@
 
       if (savedChatId) {
         chatId = savedChatId;
-        console.log('[Embellics Widget] Restored chat session:', chatId);
 
         // Show actions menu and enable items
         const actionsBtn = document.getElementById('embellics-widget-actions-btn');
@@ -603,7 +602,6 @@
       if (savedHandoffId && savedHandoffStatus) {
         handoffId = savedHandoffId;
         handoffStatus = savedHandoffStatus;
-        console.log('[Embellics Widget] Restored handoff session:', handoffId, handoffStatus);
 
         // If handoff is active, restart message polling AND status checking
         if (handoffStatus === 'active') {
@@ -637,7 +635,6 @@
       handoffStatus = 'none';
       messages = [];
       displayedMessageIds.clear();
-      console.log('[Embellics Widget] Session state cleared');
     } catch (error) {
       console.error('[Embellics Widget] Failed to clear session state:', error);
     }
@@ -648,7 +645,6 @@
     // Check for test override via URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('forceMobile') === 'true') {
-      console.log('[Embellics Widget] isMobileDevice - FORCE MOBILE MODE ACTIVE');
       return true;
     }
 
@@ -660,16 +656,8 @@
       navigator.userAgent,
     );
 
-    console.log('[Embellics Widget] isMobileDevice - width:', width);
-    console.log('[Embellics Widget] isMobileDevice - isMobileWidth:', isMobileWidth);
-    console.log('[Embellics Widget] isMobileDevice - isTouchDevice:', isTouchDevice);
-    console.log('[Embellics Widget] isMobileDevice - isMobileUserAgent:', isMobileUserAgent);
-    console.log('[Embellics Widget] isMobileDevice - navigator.userAgent:', navigator.userAgent);
-
     // Return true if mobile width OR (touch device AND mobile user agent)
-    const result = isMobileWidth || (isTouchDevice && isMobileUserAgent);
-    console.log('[Embellics Widget] isMobileDevice - result:', result);
-    return result;
+    return isMobileWidth || (isTouchDevice && isMobileUserAgent);
   }
 
   // Redirect to WhatsApp
@@ -683,7 +671,6 @@
     const greeting = encodeURIComponent(widgetConfig.greeting || 'Hello! I would like to chat.');
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${greeting}`;
 
-    console.log('[Embellics Widget] Redirecting to WhatsApp:', whatsappUrl);
     window.open(whatsappUrl, '_blank');
 
     // Close the widget after redirect
@@ -697,7 +684,6 @@
     if (!modal) return;
 
     modal.classList.add('show');
-    console.log('[Embellics Widget] Channel selection modal shown');
   }
 
   // Hide channel selection modal
@@ -706,7 +692,6 @@
     if (!modal) return;
 
     modal.classList.remove('show');
-    console.log('[Embellics Widget] Channel selection modal hidden');
   }
 
   // Inactivity timer functions
@@ -721,9 +706,7 @@
       return;
     }
 
-    console.log('[Embellics Widget] Starting inactivity timer');
     inactivityTimer = setTimeout(() => {
-      console.log('[Embellics Widget] Inactivity timeout - ending chat');
       confirmEndChat();
     }, INACTIVITY_TIMEOUT);
   }
@@ -743,15 +726,12 @@
     if (inactivityTimer) {
       clearTimeout(inactivityTimer);
       inactivityTimer = null;
-      console.log('[Embellics Widget] Inactivity timer stopped');
     }
   }
 
   // Auto-start conversation when widget opens
   async function autoStartConversation() {
     try {
-      console.log('[Embellics Widget] Auto-starting conversation...');
-
       // Send an initial message to start the conversation (waving hand for better UX)
       const response = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
         method: 'POST',
@@ -781,8 +761,6 @@
       if (data.messages && data.messages.length > 0) {
         await displayMessagesSequentially(data.messages);
       }
-
-      console.log('[Embellics Widget] Conversation auto-started');
     } catch (error) {
       console.error('[Embellics Widget] Error auto-starting conversation:', error);
     }
@@ -793,8 +771,6 @@
     if (!chatId) return;
 
     try {
-      console.log('[Embellics Widget] Fetching history from API...');
-
       const url = new URL(`${WIDGET_API_BASE}/api/widget/session/${chatId}/history`);
       url.searchParams.append('apiKey', API_KEY);
       url.searchParams.append('referrer', window.location.host);
@@ -808,43 +784,19 @@
 
         // If chat ended (400) or not found (404), clear and start fresh
         if (response.status === 400 || response.status === 404 || response.status === 500) {
-          console.log('[Embellics Widget] Chat ended or not found, starting new session');
           clearSessionState();
           const messagesContainer = document.getElementById('embellics-widget-messages');
           messagesContainer.innerHTML = '';
 
           // Check if we should show channel selection or auto-start
-          console.log('[Embellics Widget] loadHistory - Checking channel selection...');
-          console.log('[Embellics Widget] loadHistory - isMobile:', isMobileDevice());
-          console.log(
-            '[Embellics Widget] loadHistory - whatsappAvailable:',
-            widgetConfig?.whatsappAvailable,
-          );
-          console.log(
-            '[Embellics Widget] loadHistory - whatsappPhoneNumber:',
-            widgetConfig?.whatsappPhoneNumber,
-          );
-
           const shouldShowChannelSelection =
             isMobileDevice() &&
             widgetConfig?.whatsappAvailable &&
             widgetConfig?.whatsappPhoneNumber;
 
-          console.log(
-            '[Embellics Widget] loadHistory - shouldShowChannelSelection:',
-            shouldShowChannelSelection,
-          );
-
           if (!shouldShowChannelSelection) {
             // Desktop or no WhatsApp - auto-start conversation
-            console.log(
-              '[Embellics Widget] loadHistory - Auto-starting (no channel selection needed)',
-            );
             await autoStartConversation();
-          } else {
-            console.log(
-              '[Embellics Widget] loadHistory - Skipping auto-start, waiting for user channel choice',
-            );
           }
           // If shouldShowChannelSelection is true, wait for user to choose in toggleWidget
           return;
@@ -855,46 +807,23 @@
 
       // Check if the response indicates chat has ended
       if (data.chatEnded || data.error) {
-        console.log('[Embellics Widget] Chat ended, starting new session');
         clearSessionState();
         const messagesContainer = document.getElementById('embellics-widget-messages');
         messagesContainer.innerHTML = '';
 
         // Check if we should show channel selection or auto-start
-        console.log('[Embellics Widget] dataCheck - Checking channel selection...');
-        console.log('[Embellics Widget] dataCheck - isMobile:', isMobileDevice());
-        console.log(
-          '[Embellics Widget] dataCheck - whatsappAvailable:',
-          widgetConfig?.whatsappAvailable,
-        );
-        console.log(
-          '[Embellics Widget] dataCheck - whatsappPhoneNumber:',
-          widgetConfig?.whatsappPhoneNumber,
-        );
-
         const shouldShowChannelSelection =
           isMobileDevice() && widgetConfig?.whatsappAvailable && widgetConfig?.whatsappPhoneNumber;
 
-        console.log(
-          '[Embellics Widget] dataCheck - shouldShowChannelSelection:',
-          shouldShowChannelSelection,
-        );
-
         if (!shouldShowChannelSelection) {
           // Desktop or no WhatsApp - auto-start conversation
-          console.log('[Embellics Widget] dataCheck - Auto-starting (no channel selection)');
           await autoStartConversation();
-        } else {
-          console.log(
-            '[Embellics Widget] dataCheck - Skipping auto-start, will show modal on widget open',
-          );
         }
         // If shouldShowChannelSelection is true, wait for user to choose in toggleWidget
         return;
       }
 
       // Chat history loaded successfully - display the history
-      console.log('[Embellics Widget] Chat history loaded, displaying messages...');
 
       // Clear message container
       const messagesContainer = document.getElementById('embellics-widget-messages');
@@ -905,8 +834,6 @@
 
       // Display all messages from history
       if (data.messages && data.messages.length > 0) {
-        console.log('[Embellics Widget] Loaded', data.messages.length, 'messages from API');
-
         data.messages.forEach((msg, index) => {
           // Track message ID to prevent duplicates
           if (msg.id) {
@@ -998,28 +925,9 @@
         const shouldShowChannelSelection =
           isMobileDevice() && widgetConfig?.whatsappAvailable && widgetConfig?.whatsappPhoneNumber;
 
-        console.log(
-          '[Embellics Widget] Init - shouldShowChannelSelection:',
-          shouldShowChannelSelection,
-        );
-        console.log('[Embellics Widget] Init - isMobile:', isMobileDevice());
-        console.log(
-          '[Embellics Widget] Init - whatsappAvailable:',
-          widgetConfig?.whatsappAvailable,
-        );
-        console.log(
-          '[Embellics Widget] Init - whatsappPhoneNumber:',
-          widgetConfig?.whatsappPhoneNumber,
-        );
-
         if (!shouldShowChannelSelection) {
           // Desktop or no WhatsApp - auto-start (Retell will send the greeting)
-          console.log(
-            '[Embellics Widget] Init - Auto-starting conversation (no channel selection)',
-          );
           await autoStartConversation();
-        } else {
-          console.log('[Embellics Widget] Init - Waiting for user to choose channel');
         }
         // If shouldShowChannelSelection is true, we wait for toggleWidget to show the modal
       }
@@ -2039,26 +1947,12 @@
     if (isOpen) {
       panel.classList.add('open');
 
-      // Debug logging for channel selection
-      console.log('[Embellics Widget] Toggle widget - isMobile:', isMobileDevice());
-      console.log(
-        '[Embellics Widget] Toggle widget - whatsappAvailable:',
-        widgetConfig?.whatsappAvailable,
-      );
-      console.log(
-        '[Embellics Widget] Toggle widget - whatsappPhoneNumber:',
-        widgetConfig?.whatsappPhoneNumber,
-      );
-      console.log('[Embellics Widget] Toggle widget - chatId:', chatId);
-
       // Check if mobile and WhatsApp is available, and no existing session
       if (isMobileDevice() && widgetConfig && widgetConfig.whatsappAvailable && !chatId) {
         // Show channel selection modal instead of auto-starting conversation
-        console.log('[Embellics Widget] Showing channel selection modal');
         showChannelSelectionModal();
       } else {
         // Desktop or no WhatsApp - proceed normally
-        console.log('[Embellics Widget] Skipping modal - focusing input');
         document.getElementById('embellics-widget-input').focus();
         // Don't start timer on open - wait for first user interaction
       }

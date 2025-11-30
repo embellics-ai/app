@@ -1144,10 +1144,6 @@ export default function PlatformAdminPage() {
                       tenantId: editApiKeyDialog.tenant.id,
                     };
 
-                    console.log('[Platform Admin] apiKeyInput:', apiKeyInput);
-                    console.log('[Platform Admin] selectedAgentId:', selectedAgentId);
-                    console.log('[Platform Admin] whatsappAgentId:', whatsappAgentId);
-
                     // If user entered a new API key, send it
                     if (apiKeyInput.trim()) {
                       payload.retellApiKey = apiKeyInput.trim();
@@ -1165,8 +1161,6 @@ export default function PlatformAdminPage() {
                     if (whatsappAgentId.trim()) {
                       payload.whatsappAgentId = whatsappAgentId.trim();
                     }
-
-                    console.log('[Platform Admin] Final payload:', payload);
 
                     updateRetellApiKeyMutation.mutate(payload);
                   }

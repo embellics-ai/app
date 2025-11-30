@@ -1367,25 +1367,19 @@ export async function registerRoutes(app: Express): Promise<void> {
       try {
         const { tenantId } = req.query;
 
-        console.log('[Widget Test] Request received for tenantId:', tenantId);
-
         if (!tenantId) {
           return res.status(400).send('Tenant ID is required. Please select a tenant to test.');
         }
 
         // Verify tenant exists
-        console.log('[Widget Test] Fetching tenant...');
         const tenant = await storage.getTenant(tenantId as string);
-        console.log('[Widget Test] Tenant result:', tenant ? tenant.name : 'NOT FOUND');
 
         if (!tenant) {
           return res.status(404).send('Tenant not found');
         }
 
         // Get widget configuration for this tenant
-        console.log('[Widget Test] Fetching widget config...');
         const widgetConfig = await storage.getWidgetConfig(tenantId as string);
-        console.log('[Widget Test] Widget config result:', widgetConfig);
 
         if (!widgetConfig || !widgetConfig.retellAgentId) {
           return res.status(400).send(`
@@ -5019,11 +5013,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       const integration = await storage.getTenantIntegration(tenantId);
       let whatsappPhoneNumber = null;
 
-      console.log('[Widget Init] Tenant integration:', integration ? 'Found' : 'Not found');
-      console.log('[Widget Init] WhatsApp enabled:', integration?.whatsappEnabled);
-      console.log('[Widget Init] WhatsApp config exists:', !!integration?.whatsappConfig);
-      console.log('[Widget Init] Widget has whatsappAgentId:', widgetConfig.whatsappAgentId);
-
       // Check if WhatsApp is available - either through integration OR if widget has whatsappAgentId
       const hasWhatsappIntegration = integration?.whatsappEnabled && integration?.whatsappConfig;
       const hasWhatsappAgent = !!widgetConfig.whatsappAgentId;
@@ -5032,7 +5021,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         try {
           const config = integration.whatsappConfig as any;
           whatsappPhoneNumber = config.phoneNumber || null;
-          console.log('[Widget Init] WhatsApp phone number from integration:', whatsappPhoneNumber);
         } catch (e) {
           console.error('[Widget Init] Error parsing WhatsApp config:', e);
         }
@@ -5040,15 +5028,6 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // WhatsApp is available if we have BOTH agent ID and phone number
       const whatsappAvailable = hasWhatsappAgent && !!whatsappPhoneNumber;
-
-      console.log(
-        '[Widget Init] WhatsApp available:',
-        whatsappAvailable,
-        'hasAgent:',
-        hasWhatsappAgent,
-        'hasPhone:',
-        !!whatsappPhoneNumber,
-      );
 
       // Return safe configuration (exclude sensitive data)
       res.json({
