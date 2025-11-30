@@ -2839,17 +2839,6 @@ export class DbStorage implements IStorage {
       .from(chatAnalytics)
       .where(and(...conditions));
 
-    // DEBUG: Log duration data
-    console.log(
-      '[Duration Debug] Sample chat durations:',
-      chats.slice(0, 3).map((c) => ({
-        chatId: c.chatId,
-        duration: c.duration,
-        startTimestamp: c.startTimestamp,
-        endTimestamp: c.endTimestamp,
-      })),
-    );
-
     const totalChats = chats.length;
     const successfulChats = chats.filter((c) => c.chatSuccessful).length;
     const totalDuration = chats.reduce((sum, c) => sum + (c.duration || 0), 0);
@@ -2861,11 +2850,8 @@ export class DbStorage implements IStorage {
     const sentimentBreakdown: Record<string, number> = {};
     chats.forEach((chat) => {
       const sentiment = chat.userSentiment?.toLowerCase() || 'unknown';
-      console.log('[Sentiment Debug] Raw:', chat.userSentiment, '→ Lowercase:', sentiment);
       sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
     });
-
-    console.log('[Sentiment Breakdown Final]:', JSON.stringify(sentimentBreakdown));
 
     return {
       totalChats,
