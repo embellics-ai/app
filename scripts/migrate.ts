@@ -1,9 +1,14 @@
+import { config } from 'dotenv';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { sql } from 'drizzle-orm';
 import { readdir, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+
+// Load environment variables from .env.local (for dev) or .env (for production)
+config({ path: '.env.local' });
+config(); // Fallback to .env if .env.local doesn't exist
 
 const { Pool } = pg;
 
