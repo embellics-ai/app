@@ -1,10 +1,13 @@
 /**
  * Embellics Chat Widget (Powered by Retell AI)
  * Embeddable text chat widget for external websites
+ * Version: 2.0.0-channel-selection
  */
 
 (function () {
   'use strict';
+
+  console.log('[Embellics Widget] Version 2.0.0-channel-selection loaded');
 
   const currentScript =
     document.currentScript ||
@@ -96,6 +99,9 @@
         .embellics-menu-item.hidden { display: none; }
         
         @keyframes slideUpFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
         .embellics-handoff-notice { background: hsl(199, 89%, 92%); color: hsl(199, 89%, 32%); padding: 12px; border-radius: 0.75rem; font-size: 13px; margin: 8px 0; text-align: center; border: 1px solid hsl(199, 89%, 85%); }
         #embellics-widget-error { color: hsl(0, 72%, 42%); font-size: 12px; padding: 12px 16px; background: hsl(0, 72%, 98%); border-top: 1px solid hsl(0, 72%, 90%); text-align: center; display: none; }
         #embellics-widget-error.show { display: block; }
@@ -155,6 +161,20 @@
         .embellics-option-button:hover:not(:disabled) { background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); transform: translateX(4px); box-shadow: 0 4px 12px hsla(262, 75%, 65%, 0.3); }
         .embellics-option-button:disabled { cursor: not-allowed; }
         .embellics-option-button:active { transform: scale(0.98); }
+        
+        /* Channel Selection Modal */
+        .embellics-channel-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 9999999; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .embellics-channel-modal.show { display: flex; animation: fadeIn 0.3s ease-out; }
+        .embellics-channel-content { background: hsl(0, 0%, 100%); border-radius: 1.5rem; padding: 32px 24px; max-width: 360px; width: calc(100% - 40px); box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2); text-align: center; animation: slideUp 0.4s ease-out; }
+        .embellics-channel-title { font-size: 20px; font-weight: 600; color: hsl(262, 75%, 40%); margin: 0 0 8px 0; }
+        .embellics-channel-subtitle { font-size: 14px; color: hsl(0, 0%, 40%); margin: 0 0 24px 0; line-height: 1.5; }
+        .embellics-channel-buttons { display: flex; flex-direction: column; gap: 12px; }
+        .embellics-channel-btn { padding: 16px 24px; border-radius: 0.75rem; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .embellics-channel-btn-whatsapp { background: #25D366; color: white; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3); }
+        .embellics-channel-btn-whatsapp:hover { background: #20BA5A; box-shadow: 0 6px 16px rgba(37, 211, 102, 0.4); transform: translateY(-2px); }
+        .embellics-channel-btn-web { background: hsl(262, 75%, 65%); color: white; box-shadow: 0 4px 12px hsla(262, 75%, 65%, 0.3); }
+        .embellics-channel-btn-web:hover { background: hsl(262, 75%, 55%); box-shadow: 0 6px 16px hsla(262, 75%, 65%, 0.4); transform: translateY(-2px); }
+        .embellics-channel-icon { width: 24px; height: 24px; }
         
         /* Mobile Responsiveness */
         @media (max-width: 768px) {
@@ -263,6 +283,28 @@
                 <path d="M18 6L6 18M6 6l12 12"></path>
               </svg>
               <span>End Chat</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Channel Selection Modal -->
+      <div id="embellics-channel-modal" class="embellics-channel-modal">
+        <div class="embellics-channel-content">
+          <h3 class="embellics-channel-title">Choose Your Chat Channel</h3>
+          <p class="embellics-channel-subtitle">Continue this conversation on your preferred platform</p>
+          <div class="embellics-channel-buttons">
+            <button class="embellics-channel-btn embellics-channel-btn-whatsapp" id="embellics-channel-whatsapp">
+              <svg class="embellics-channel-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+              Continue on WhatsApp
+            </button>
+            <button class="embellics-channel-btn embellics-channel-btn-web" id="embellics-channel-web">
+              <svg class="embellics-channel-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+              </svg>
+              Continue Here
             </button>
           </div>
         </div>
@@ -601,6 +643,72 @@
     }
   }
 
+  // Check if user is on mobile device
+  function isMobileDevice() {
+    // Check for test override via URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('forceMobile') === 'true') {
+      console.log('[Embellics Widget] isMobileDevice - FORCE MOBILE MODE ACTIVE');
+      return true;
+    }
+
+    const width =
+      window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+    const isMobileWidth = width <= 768;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
+
+    console.log('[Embellics Widget] isMobileDevice - width:', width);
+    console.log('[Embellics Widget] isMobileDevice - isMobileWidth:', isMobileWidth);
+    console.log('[Embellics Widget] isMobileDevice - isTouchDevice:', isTouchDevice);
+    console.log('[Embellics Widget] isMobileDevice - isMobileUserAgent:', isMobileUserAgent);
+    console.log('[Embellics Widget] isMobileDevice - navigator.userAgent:', navigator.userAgent);
+
+    // Return true if mobile width OR (touch device AND mobile user agent)
+    const result = isMobileWidth || (isTouchDevice && isMobileUserAgent);
+    console.log('[Embellics Widget] isMobileDevice - result:', result);
+    return result;
+  }
+
+  // Redirect to WhatsApp
+  function redirectToWhatsApp() {
+    if (!widgetConfig || !widgetConfig.whatsappAvailable || !widgetConfig.whatsappPhoneNumber) {
+      console.error('[Embellics Widget] WhatsApp not available');
+      return;
+    }
+
+    const phoneNumber = widgetConfig.whatsappPhoneNumber.replace(/\s+/g, '');
+    const greeting = encodeURIComponent(widgetConfig.greeting || 'Hello! I would like to chat.');
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${greeting}`;
+
+    console.log('[Embellics Widget] Redirecting to WhatsApp:', whatsappUrl);
+    window.open(whatsappUrl, '_blank');
+
+    // Close the widget after redirect
+    hideChannelSelectionModal();
+    toggleWidget();
+  }
+
+  // Show channel selection modal
+  function showChannelSelectionModal() {
+    const modal = document.getElementById('embellics-channel-modal');
+    if (!modal) return;
+
+    modal.classList.add('show');
+    console.log('[Embellics Widget] Channel selection modal shown');
+  }
+
+  // Hide channel selection modal
+  function hideChannelSelectionModal() {
+    const modal = document.getElementById('embellics-channel-modal');
+    if (!modal) return;
+
+    modal.classList.remove('show');
+    console.log('[Embellics Widget] Channel selection modal hidden');
+  }
+
   // Inactivity timer functions
   function startInactivityTimer() {
     // Clear any existing timer first
@@ -705,8 +813,40 @@
           const messagesContainer = document.getElementById('embellics-widget-messages');
           messagesContainer.innerHTML = '';
 
-          // Don't show greeting here - autoStartConversation will trigger Retell's greeting
-          await autoStartConversation();
+          // Check if we should show channel selection or auto-start
+          console.log('[Embellics Widget] loadHistory - Checking channel selection...');
+          console.log('[Embellics Widget] loadHistory - isMobile:', isMobileDevice());
+          console.log(
+            '[Embellics Widget] loadHistory - whatsappAvailable:',
+            widgetConfig?.whatsappAvailable,
+          );
+          console.log(
+            '[Embellics Widget] loadHistory - whatsappPhoneNumber:',
+            widgetConfig?.whatsappPhoneNumber,
+          );
+
+          const shouldShowChannelSelection =
+            isMobileDevice() &&
+            widgetConfig?.whatsappAvailable &&
+            widgetConfig?.whatsappPhoneNumber;
+
+          console.log(
+            '[Embellics Widget] loadHistory - shouldShowChannelSelection:',
+            shouldShowChannelSelection,
+          );
+
+          if (!shouldShowChannelSelection) {
+            // Desktop or no WhatsApp - auto-start conversation
+            console.log(
+              '[Embellics Widget] loadHistory - Auto-starting (no channel selection needed)',
+            );
+            await autoStartConversation();
+          } else {
+            console.log(
+              '[Embellics Widget] loadHistory - Skipping auto-start, waiting for user channel choice',
+            );
+          }
+          // If shouldShowChannelSelection is true, wait for user to choose in toggleWidget
           return;
         }
       }
@@ -719,7 +859,37 @@
         clearSessionState();
         const messagesContainer = document.getElementById('embellics-widget-messages');
         messagesContainer.innerHTML = '';
-        await autoStartConversation();
+
+        // Check if we should show channel selection or auto-start
+        console.log('[Embellics Widget] dataCheck - Checking channel selection...');
+        console.log('[Embellics Widget] dataCheck - isMobile:', isMobileDevice());
+        console.log(
+          '[Embellics Widget] dataCheck - whatsappAvailable:',
+          widgetConfig?.whatsappAvailable,
+        );
+        console.log(
+          '[Embellics Widget] dataCheck - whatsappPhoneNumber:',
+          widgetConfig?.whatsappPhoneNumber,
+        );
+
+        const shouldShowChannelSelection =
+          isMobileDevice() && widgetConfig?.whatsappAvailable && widgetConfig?.whatsappPhoneNumber;
+
+        console.log(
+          '[Embellics Widget] dataCheck - shouldShowChannelSelection:',
+          shouldShowChannelSelection,
+        );
+
+        if (!shouldShowChannelSelection) {
+          // Desktop or no WhatsApp - auto-start conversation
+          console.log('[Embellics Widget] dataCheck - Auto-starting (no channel selection)');
+          await autoStartConversation();
+        } else {
+          console.log(
+            '[Embellics Widget] dataCheck - Skipping auto-start, will show modal on widget open',
+          );
+        }
+        // If shouldShowChannelSelection is true, wait for user to choose in toggleWidget
         return;
       }
 
@@ -823,8 +993,35 @@
         // If chat ended, loadChatHistory will clear and auto-start new conversation
         await loadChatHistory();
       } else {
-        // New session - auto-start (Retell will send the greeting)
-        await autoStartConversation();
+        // New session - check if we should show channel selection or auto-start
+        // Don't auto-start if mobile + WhatsApp available (wait for user to choose channel)
+        const shouldShowChannelSelection =
+          isMobileDevice() && widgetConfig?.whatsappAvailable && widgetConfig?.whatsappPhoneNumber;
+
+        console.log(
+          '[Embellics Widget] Init - shouldShowChannelSelection:',
+          shouldShowChannelSelection,
+        );
+        console.log('[Embellics Widget] Init - isMobile:', isMobileDevice());
+        console.log(
+          '[Embellics Widget] Init - whatsappAvailable:',
+          widgetConfig?.whatsappAvailable,
+        );
+        console.log(
+          '[Embellics Widget] Init - whatsappPhoneNumber:',
+          widgetConfig?.whatsappPhoneNumber,
+        );
+
+        if (!shouldShowChannelSelection) {
+          // Desktop or no WhatsApp - auto-start (Retell will send the greeting)
+          console.log(
+            '[Embellics Widget] Init - Auto-starting conversation (no channel selection)',
+          );
+          await autoStartConversation();
+        } else {
+          console.log('[Embellics Widget] Init - Waiting for user to choose channel');
+        }
+        // If shouldShowChannelSelection is true, we wait for toggleWidget to show the modal
       }
     } catch (error) {
       console.error('[Embellics Widget] Init failed:', error);
@@ -1841,8 +2038,30 @@
     const panel = document.getElementById('embellics-widget-panel');
     if (isOpen) {
       panel.classList.add('open');
-      document.getElementById('embellics-widget-input').focus();
-      // Don't start timer on open - wait for first user interaction
+
+      // Debug logging for channel selection
+      console.log('[Embellics Widget] Toggle widget - isMobile:', isMobileDevice());
+      console.log(
+        '[Embellics Widget] Toggle widget - whatsappAvailable:',
+        widgetConfig?.whatsappAvailable,
+      );
+      console.log(
+        '[Embellics Widget] Toggle widget - whatsappPhoneNumber:',
+        widgetConfig?.whatsappPhoneNumber,
+      );
+      console.log('[Embellics Widget] Toggle widget - chatId:', chatId);
+
+      // Check if mobile and WhatsApp is available, and no existing session
+      if (isMobileDevice() && widgetConfig && widgetConfig.whatsappAvailable && !chatId) {
+        // Show channel selection modal instead of auto-starting conversation
+        console.log('[Embellics Widget] Showing channel selection modal');
+        showChannelSelectionModal();
+      } else {
+        // Desktop or no WhatsApp - proceed normally
+        console.log('[Embellics Widget] Skipping modal - focusing input');
+        document.getElementById('embellics-widget-input').focus();
+        // Don't start timer on open - wait for first user interaction
+      }
     } else {
       panel.classList.remove('open');
       // Stop inactivity timer when widget closes
@@ -1867,11 +2086,29 @@
     const actionsMenu = document.getElementById('embellics-widget-actions-menu');
     const menuHandoffButton = document.getElementById('embellics-menu-handoff');
     const menuEndChatButton = document.getElementById('embellics-menu-end-chat');
+    const channelWhatsAppButton = document.getElementById('embellics-channel-whatsapp');
+    const channelWebButton = document.getElementById('embellics-channel-web');
 
     if (button) button.addEventListener('click', toggleWidget);
     if (closeButton) closeButton.addEventListener('click', toggleWidget);
     if (sendButton) sendButton.addEventListener('click', sendMessage);
     if (actionsButton) actionsButton.addEventListener('click', toggleActionsMenu);
+
+    // Channel selection event listeners
+    if (channelWhatsAppButton) {
+      channelWhatsAppButton.addEventListener('click', redirectToWhatsApp);
+    }
+
+    if (channelWebButton) {
+      channelWebButton.addEventListener('click', async () => {
+        hideChannelSelectionModal();
+        document.getElementById('embellics-widget-input').focus();
+        // Start the conversation if not already started
+        if (!chatId) {
+          await autoStartConversation();
+        }
+      });
+    }
 
     if (menuHandoffButton) {
       menuHandoffButton.addEventListener('click', () => {
