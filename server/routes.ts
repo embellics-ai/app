@@ -961,6 +961,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId } = req.params;
         const { retellApiKey, retellAgentId, whatsappAgentId } = req.body;
 
+        console.log('[Update Retell API Key] Request body:', req.body);
+        console.log('[Update Retell API Key] retellApiKey:', retellApiKey);
+        console.log('[Update Retell API Key] retellAgentId:', retellAgentId);
+        console.log('[Update Retell API Key] whatsappAgentId:', whatsappAgentId);
+
         // Validate Retell API key format if provided
         if (retellApiKey && retellApiKey !== '__KEEP_EXISTING__') {
           if (typeof retellApiKey !== 'string') {
@@ -1022,15 +1027,18 @@ export async function registerRoutes(app: Express): Promise<void> {
           updateData.retellApiKey = retellApiKey.trim();
         }
 
-        // Include retellAgentId (widget chat agent) if provided
-        if (retellAgentId) {
+        // Include retellAgentId (widget chat agent) if provided and not empty
+        if (retellAgentId && retellAgentId.trim()) {
           updateData.retellAgentId = retellAgentId.trim();
         }
 
-        // Include whatsappAgentId if provided
-        if (whatsappAgentId) {
+        // Include whatsappAgentId if provided and not empty
+        if (whatsappAgentId && whatsappAgentId.trim()) {
           updateData.whatsappAgentId = whatsappAgentId.trim();
         }
+
+        console.log('[Update Retell API Key] Update data:', updateData);
+        console.log('[Update Retell API Key] Update data keys:', Object.keys(updateData));
 
         // Check if we have anything to update
         if (Object.keys(updateData).length === 0) {
@@ -5007,6 +5015,41 @@ export async function registerRoutes(app: Express): Promise<void> {
         }
       }
 
+      // Get tenant integration for WhatsApp config
+      const integration = await storage.getTenantIntegration(tenantId);
+      let whatsappPhoneNumber = null;
+
+      console.log('[Widget Init] Tenant integration:', integration ? 'Found' : 'Not found');
+      console.log('[Widget Init] WhatsApp enabled:', integration?.whatsappEnabled);
+      console.log('[Widget Init] WhatsApp config exists:', !!integration?.whatsappConfig);
+      console.log('[Widget Init] Widget has whatsappAgentId:', widgetConfig.whatsappAgentId);
+
+      // Check if WhatsApp is available - either through integration OR if widget has whatsappAgentId
+      const hasWhatsappIntegration = integration?.whatsappEnabled && integration?.whatsappConfig;
+      const hasWhatsappAgent = !!widgetConfig.whatsappAgentId;
+
+      if (hasWhatsappIntegration) {
+        try {
+          const config = integration.whatsappConfig as any;
+          whatsappPhoneNumber = config.phoneNumber || null;
+          console.log('[Widget Init] WhatsApp phone number from integration:', whatsappPhoneNumber);
+        } catch (e) {
+          console.error('[Widget Init] Error parsing WhatsApp config:', e);
+        }
+      }
+
+      // WhatsApp is available if we have BOTH agent ID and phone number
+      const whatsappAvailable = hasWhatsappAgent && !!whatsappPhoneNumber;
+
+      console.log(
+        '[Widget Init] WhatsApp available:',
+        whatsappAvailable,
+        'hasAgent:',
+        hasWhatsappAgent,
+        'hasPhone:',
+        !!whatsappPhoneNumber,
+      );
+
       // Return safe configuration (exclude sensitive data)
       res.json({
         tenantId: tenantId,
@@ -5015,6 +5058,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         textColor: widgetConfig.textColor || '#ffffff',
         borderRadius: widgetConfig.borderRadius || '12px',
         position: widgetConfig.position || 'bottom-right',
+        whatsappAvailable: whatsappAvailable,
+        whatsappPhoneNumber: whatsappPhoneNumber,
       });
     } catch (error) {
       console.error('Error initializing widget:', error);

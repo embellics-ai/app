@@ -290,10 +290,12 @@ export default function PlatformAdminPage() {
       tenantId,
       retellApiKey,
       retellAgentId,
+      whatsappAgentId,
     }: {
       tenantId: string;
       retellApiKey?: string;
       retellAgentId?: string;
+      whatsappAgentId?: string;
     }) => {
       const response = await apiRequest(
         'PATCH',
@@ -301,6 +303,7 @@ export default function PlatformAdminPage() {
         {
           retellApiKey: retellApiKey || undefined,
           retellAgentId: retellAgentId || undefined,
+          whatsappAgentId: whatsappAgentId || undefined,
         },
       );
       return await response.json();
@@ -1141,6 +1144,10 @@ export default function PlatformAdminPage() {
                       tenantId: editApiKeyDialog.tenant.id,
                     };
 
+                    console.log('[Platform Admin] apiKeyInput:', apiKeyInput);
+                    console.log('[Platform Admin] selectedAgentId:', selectedAgentId);
+                    console.log('[Platform Admin] whatsappAgentId:', whatsappAgentId);
+
                     // If user entered a new API key, send it
                     if (apiKeyInput.trim()) {
                       payload.retellApiKey = apiKeyInput.trim();
@@ -1158,6 +1165,8 @@ export default function PlatformAdminPage() {
                     if (whatsappAgentId.trim()) {
                       payload.whatsappAgentId = whatsappAgentId.trim();
                     }
+
+                    console.log('[Platform Admin] Final payload:', payload);
 
                     updateRetellApiKeyMutation.mutate(payload);
                   }
