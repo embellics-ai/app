@@ -2564,11 +2564,9 @@ export class DbStorage implements IStorage {
           startTimestamp: analytics.startTimestamp,
           endTimestamp: analytics.endTimestamp,
           duration: analytics.duration,
-          transcript: analytics.transcript,
           messageCount: analytics.messageCount,
           toolCallsCount: analytics.toolCallsCount,
           dynamicVariables: analytics.dynamicVariables,
-          chatSummary: analytics.chatSummary,
           userSentiment: analytics.userSentiment,
           chatSuccessful: analytics.chatSuccessful,
           combinedCost: analytics.combinedCost,
@@ -2679,10 +2677,7 @@ export class DbStorage implements IStorage {
     if (filters?.endDate) {
       // Include records where endTimestamp is within range OR is NULL (chat still in progress)
       conditions.push(
-        or(
-          lte(chatAnalytics.endTimestamp, filters.endDate),
-          isNull(chatAnalytics.endTimestamp)
-        )!
+        or(lte(chatAnalytics.endTimestamp, filters.endDate), isNull(chatAnalytics.endTimestamp))!,
       );
     }
     if (filters?.agentId) {
@@ -2704,9 +2699,12 @@ export class DbStorage implements IStorage {
     // Sentiment breakdown
     const sentimentBreakdown: Record<string, number> = {};
     chats.forEach((chat) => {
-      const sentiment = chat.userSentiment || 'unknown';
+      const sentiment = chat.userSentiment?.toLowerCase() || 'unknown';
+      console.log('[Sentiment Debug] Raw:', chat.userSentiment, '→ Lowercase:', sentiment);
       sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
     });
+
+    console.log('[Sentiment Breakdown Final]:', JSON.stringify(sentimentBreakdown));
 
     return {
       totalChats,

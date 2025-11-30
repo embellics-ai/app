@@ -1911,11 +1911,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         startTimestamp: chat.start_timestamp ? new Date(chat.start_timestamp) : null,
         endTimestamp: chat.end_timestamp ? new Date(chat.end_timestamp) : null,
         duration: chat.duration || null,
-        transcript: chat.transcript || null,
         messageCount: chat.messages?.length || 0,
         toolCallsCount: chat.tool_calls?.length || 0,
         dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
-        chatSummary: chat.chat_analysis?.chat_summary || null,
         userSentiment: chat.chat_analysis?.user_sentiment || null,
         chatSuccessful: chat.chat_analysis?.chat_successful || null,
         combinedCost: chat.chat_cost?.combined_cost || chat.combined_cost || 0,
@@ -1958,7 +1956,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       console.log(
         `[Retell Webhook] Processing chat analytics for tenant ${tenantId}, chat ${chatData.chatId}`,
       );
-      
+
       console.log('[Retell Webhook] Extracted chat data:', {
         chatId: chatData.chatId,
         startTimestamp: chatData.startTimestamp,

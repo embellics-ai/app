@@ -648,13 +648,11 @@ export const chatAnalytics = pgTable(
     duration: integer('duration'), // Duration in seconds
 
     // Conversation Data
-    transcript: text('transcript'), // Full conversation transcript
     messageCount: integer('message_count'), // Total messages exchanged
     toolCallsCount: integer('tool_calls_count'), // Number of tool/function calls
     dynamicVariables: jsonb('dynamic_variables'), // Collected variables (booking_uid, user_intention, etc.)
 
     // Chat Analysis (AI-generated)
-    chatSummary: text('chat_summary'), // AI-generated summary
     userSentiment: text('user_sentiment'), // positive, negative, neutral, frustrated, satisfied
     chatSuccessful: boolean('chat_successful'), // Whether chat achieved its goal
 
