@@ -491,8 +491,10 @@ export default function UnifiedAnalytics() {
             </Card>
           </div>
 
-          {/* Voice Analytics Charts */}
+          {/* Voice Analytics Charts - Only show if we have voice data from our database */}
           {(analyticsType === 'all' || analyticsType === 'voice') &&
+            analyticsOverview?.voice &&
+            analyticsOverview.voice.totalCalls > 0 &&
             voiceData?.dailyMetrics &&
             voiceData.dailyMetrics.length > 0 && (
               <>
@@ -838,6 +840,23 @@ export default function UnifiedAnalytics() {
                   )}
                 </div>
               </>
+            )}
+
+          {/* No Voice Data Message */}
+          {(analyticsType === 'all' || analyticsType === 'voice') &&
+            analyticsOverview?.voice &&
+            analyticsOverview.voice.totalCalls === 0 && (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Phone className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">No Voice Analytics Data Yet</p>
+                  <p className="text-sm text-muted-foreground text-center max-w-md">
+                    Voice analytics will appear here once you configure Retell to send{' '}
+                    <code className="bg-muted px-1 py-0.5 rounded">call.ended</code> webhooks to{' '}
+                    <code className="bg-muted px-1 py-0.5 rounded">/api/retell/call-ended</code>
+                  </p>
+                </CardContent>
+              </Card>
             )}
 
           {/* Chat Analytics Charts */}
