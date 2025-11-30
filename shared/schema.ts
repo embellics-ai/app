@@ -172,7 +172,7 @@ export const widgetConfigs = pgTable('widget_configs', {
   retellAgentId: text('retell_agent_id'), // Tenant-specific Retell AI agent ID for chat widget
   whatsappAgentId: text('whatsapp_agent_id'), // Tenant-specific Retell AI agent ID for WhatsApp
   retellApiKey: text('retell_api_key'), // Tenant's own Retell AI API key for account-wide analytics (all voice agents)
-  greeting: text('greeting').default('Hi'),
+  greeting: text('greeting').default('Hi! How can I help you today?'),
   allowedDomains: text('allowed_domains').array(), // Array of allowed domains
   primaryColor: text('primary_color').default('#9b7ddd'), // Main theme color (buttons, header)
   textColor: text('text_color').default('#ffffff'), // Text color on primary background
