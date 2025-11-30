@@ -739,10 +739,7 @@ export const voiceAnalytics = pgTable(
   },
   (table) => ({
     // Indexes for fast lookups
-    tenantCallIdx: uniqueIndex('voice_analytics_tenant_call_idx').on(
-      table.tenantId,
-      table.callId,
-    ),
+    tenantCallIdx: uniqueIndex('voice_analytics_tenant_call_idx').on(table.tenantId, table.callId),
     tenantAgentIdx: uniqueIndex('voice_analytics_tenant_agent_idx').on(
       table.tenantId,
       table.agentId,

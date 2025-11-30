@@ -2234,19 +2234,23 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Get chat analytics summary
         const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
-
         console.log('[Analytics Overview] Chat summary result:', chatSummary);
 
-        // TODO: Add voice call analytics when available
-        // const voiceSummary = await storage.getVoiceCallSummary(tenantId, filters);
+        // Get voice analytics summary
+        const voiceSummary = await storage.getVoiceAnalyticsSummary(tenantId, filters);
+        console.log('[Analytics Overview] Voice summary result:', voiceSummary);
 
         res.json({
           chat: chatSummary,
-          // voice: voiceSummary,
+          voice: voiceSummary,
           combined: {
-            totalInteractions: chatSummary.totalChats, // + voiceSummary.totalCalls
-            totalCost: chatSummary.totalCost, // + voiceSummary.totalCost
-            averageCost: chatSummary.averageCost,
+            totalInteractions: chatSummary.totalChats + voiceSummary.totalCalls,
+            totalCost: chatSummary.totalCost + voiceSummary.totalCost,
+            averageCost:
+              chatSummary.totalChats + voiceSummary.totalCalls > 0
+                ? (chatSummary.totalCost + voiceSummary.totalCost) /
+                  (chatSummary.totalChats + voiceSummary.totalCalls)
+                : 0,
           },
         });
       } catch (error) {
@@ -2412,6 +2416,86 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('Error fetching cost analytics:', error);
         res.status(500).json({ error: 'Failed to fetch cost analytics' });
+      }
+    },
+  );
+
+  // ============================================
+  // VOICE ANALYTICS API ENDPOINTS (Platform Admin)
+  // ============================================
+
+  /**
+   * Get list of voice call sessions with filters
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/calls',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId } = req.params;
+        const { startDate, endDate, agentId, sentiment, callStatus, limit } = req.query;
+
+        console.log('[Analytics Calls] Querying for tenant:', tenantId);
+        console.log('[Analytics Calls] Filters:', {
+          startDate,
+          endDate,
+          agentId,
+          sentiment,
+          callStatus,
+          limit,
+        });
+
+        const filters = {
+          startDate: startDate ? new Date(startDate as string) : undefined,
+          endDate: endDate ? new Date(endDate as string) : undefined,
+          agentId: agentId as string | undefined,
+          sentiment: sentiment as string | undefined,
+          callStatus: callStatus as string | undefined,
+          limit: limit ? parseInt(limit as string) : 100,
+        };
+
+        const calls = await storage.getVoiceAnalyticsByTenant(tenantId, filters);
+
+        console.log('[Analytics Calls] Found calls:', calls.length);
+        if (calls.length > 0) {
+          console.log('[Analytics Calls] First call sample:', {
+            id: calls[0].id,
+            tenantId: calls[0].tenantId,
+            callId: calls[0].callId,
+            agentId: calls[0].agentId,
+          });
+        }
+
+        res.json(calls);
+      } catch (error) {
+        console.error('Error fetching voice analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch voice analytics' });
+      }
+    },
+  );
+
+  /**
+   * Get detailed analytics for a specific voice call
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/analytics/calls/:callId',
+    requireAuth,
+    requirePlatformAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const { tenantId, callId } = req.params;
+
+        const call = await storage.getVoiceAnalytics(callId);
+
+        if (!call || call.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Call not found' });
+        }
+
+        res.json(call);
+      } catch (error) {
+        console.error('Error fetching call details:', error);
+        res.status(500).json({ error: 'Failed to fetch call details' });
       }
     },
   );
