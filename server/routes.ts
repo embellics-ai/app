@@ -23,16 +23,6 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/**
- * Escapes a string for safe insertion into a single-quoted JavaScript string literal.
- * Prevents injection attacks by escaping both backslashes and single quotes.
- * @param str - The string to escape
- * @returns The escaped string safe for use in JavaScript code
- */
-function escapeJsString(str: string): string {
-  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
 import {
   encrypt,
   decrypt,
@@ -63,6 +53,16 @@ import {
 import { inviteUser } from './services/inviteService';
 import { registerClient, broadcastToTenant } from './websocket';
 import type { WebSocket } from 'ws';
+
+/**
+ * Escapes a string for safe insertion into a single-quoted JavaScript string literal.
+ * Prevents injection attacks by escaping both backslashes and single quotes.
+ * @param str - The string to escape
+ * @returns The escaped string safe for use in JavaScript code
+ */
+function escapeJsString(str: string): string {
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
 
 // NOTE: The system uses tenant-specific Retell Agent IDs from widget_configs.retellAgentId
 // Platform Admins configure these via: PATCH /api/platform/tenants/:tenantId/retell-api-key
