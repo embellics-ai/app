@@ -880,6 +880,22 @@ export async function registerRoutes(app: Express): Promise<void> {
               }
             }
 
+            // Mask WhatsApp Agent ID if configured
+            let maskedWhatsappAgentId = '';
+            if (widgetConfig?.whatsappAgentId) {
+              const underscoreIndex = widgetConfig.whatsappAgentId.indexOf('_');
+              if (
+                underscoreIndex !== -1 &&
+                widgetConfig.whatsappAgentId.length > underscoreIndex + 8
+              ) {
+                const visiblePart = widgetConfig.whatsappAgentId.substring(0, underscoreIndex + 9);
+                maskedWhatsappAgentId = `${visiblePart}********`;
+              } else {
+                // Fallback if format is unexpected
+                maskedWhatsappAgentId = `${widgetConfig.whatsappAgentId.substring(0, 12)}********`;
+              }
+            }
+
             return {
               id: tenant.id,
               name: tenant.name,
@@ -889,8 +905,10 @@ export async function registerRoutes(app: Express): Promise<void> {
               status: tenant.status,
               hasRetellApiKey: !!widgetConfig?.retellApiKey,
               hasRetellAgentId: !!widgetConfig?.retellAgentId,
+              hasWhatsappAgentId: !!widgetConfig?.whatsappAgentId,
               maskedRetellApiKey,
               maskedAgentId,
+              maskedWhatsappAgentId,
               createdAt: tenant.createdAt,
             };
           }),
@@ -912,7 +930,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
-        const { retellApiKey, retellAgentId } = req.body;
+        const { retellApiKey, retellAgentId, whatsappAgentId } = req.body;
 
         // Validate Retell API key format if provided
         if (retellApiKey && retellApiKey !== '__KEEP_EXISTING__') {
@@ -927,7 +945,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
         }
 
-        // Validate Retell Agent ID format if provided
+        // Validate Retell Agent ID format if provided (for widget chat)
         if (retellAgentId) {
           if (typeof retellAgentId !== 'string') {
             return res.status(400).json({ error: 'Retell Agent ID must be a string' });
@@ -937,6 +955,20 @@ export async function registerRoutes(app: Express): Promise<void> {
             return res.status(400).json({
               error:
                 'Invalid Retell Agent ID format. Agent IDs must start with "agent_". Did you accidentally provide an API key instead?',
+            });
+          }
+        }
+
+        // Validate WhatsApp Agent ID format if provided
+        if (whatsappAgentId) {
+          if (typeof whatsappAgentId !== 'string') {
+            return res.status(400).json({ error: 'WhatsApp Agent ID must be a string' });
+          }
+
+          if (!whatsappAgentId.trim().startsWith('agent_')) {
+            return res.status(400).json({
+              error:
+                'Invalid WhatsApp Agent ID format. Agent IDs must start with "agent_". Did you accidentally provide an API key instead?',
             });
           }
         }
@@ -961,15 +993,20 @@ export async function registerRoutes(app: Express): Promise<void> {
           updateData.retellApiKey = retellApiKey.trim();
         }
 
-        // Include retellAgentId if provided
+        // Include retellAgentId (widget chat agent) if provided
         if (retellAgentId) {
           updateData.retellAgentId = retellAgentId.trim();
+        }
+
+        // Include whatsappAgentId if provided
+        if (whatsappAgentId) {
+          updateData.whatsappAgentId = whatsappAgentId.trim();
         }
 
         // Check if we have anything to update
         if (Object.keys(updateData).length === 0) {
           return res.status(400).json({
-            error: 'No updates provided. Please provide either API key or Agent ID.',
+            error: 'No updates provided. Please provide API key, Agent ID, or WhatsApp Agent ID.',
           });
         }
 

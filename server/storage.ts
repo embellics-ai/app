@@ -512,7 +512,10 @@ export class MemStorage implements IStorage {
   }
 
   async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
-    const config = Array.from(this.widgetConfigs.values()).find((c) => c.retellAgentId === agentId);
+    // Check both widget agent ID and WhatsApp agent ID
+    const config = Array.from(this.widgetConfigs.values()).find(
+      (c) => c.retellAgentId === agentId || c.whatsappAgentId === agentId,
+    );
     if (!config) return undefined;
 
     // Decrypt the Retell API key if it exists
@@ -544,6 +547,7 @@ export class MemStorage implements IStorage {
       id,
       tenantId: encryptedConfig.tenantId,
       retellAgentId: encryptedConfig.retellAgentId ?? null,
+      whatsappAgentId: encryptedConfig.whatsappAgentId ?? null,
       retellApiKey: encryptedConfig.retellApiKey ?? null,
       greeting: encryptedConfig.greeting ?? 'Hi! How can I help you today?',
       allowedDomains: encryptedConfig.allowedDomains ?? null,
@@ -1578,10 +1582,13 @@ export class DbStorage implements IStorage {
   }
 
   async getWidgetConfigByAgentId(agentId: string): Promise<WidgetConfig | undefined> {
+    // Check both widget agent ID and WhatsApp agent ID
     const result = await this.db
       .select()
       .from(widgetConfigs)
-      .where(eq(widgetConfigs.retellAgentId, agentId));
+      .where(
+        or(eq(widgetConfigs.retellAgentId, agentId), eq(widgetConfigs.whatsappAgentId, agentId)),
+      );
 
     const config = result[0];
     if (!config) return undefined;
@@ -1640,7 +1647,7 @@ export class DbStorage implements IStorage {
     }
 
     console.log(
-      `[Storage] updateWidgetConfig - tenantId: ${tenantId}, retellAgentId: ${updatesToApply.retellAgentId || 'not in updates'}`,
+      `[Storage] updateWidgetConfig - tenantId: ${tenantId}, retellAgentId: ${updatesToApply.retellAgentId || 'not in updates'}, whatsappAgentId: ${updatesToApply.whatsappAgentId || 'not in updates'}`,
     );
 
     const result = await this.db
@@ -1653,7 +1660,7 @@ export class DbStorage implements IStorage {
     if (!config) return undefined;
 
     console.log(
-      `[Storage] updateWidgetConfig - Saved to DB, retellAgentId: ${config.retellAgentId || 'null'}`,
+      `[Storage] updateWidgetConfig - Saved to DB, retellAgentId: ${config.retellAgentId || 'null'}, whatsappAgentId: ${config.whatsappAgentId || 'null'}`,
     );
 
     // Decrypt the API key for immediate use

@@ -113,6 +113,7 @@ export default function PlatformAdminPage() {
   });
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [whatsappAgentId, setWhatsappAgentId] = useState<string>('');
   const [selectedIntegrationTenant, setSelectedIntegrationTenant] = useState<{
     id: string;
     name: string;
@@ -313,6 +314,7 @@ export default function PlatformAdminPage() {
       setEditApiKeyDialog({ open: false, tenant: null });
       setApiKeyInput('');
       setSelectedAgentId('');
+      setWhatsappAgentId('');
     },
     onError: (error: any) => {
       toast({
@@ -576,6 +578,7 @@ export default function PlatformAdminPage() {
                                     // Clear inputs - users should only enter new values
                                     setApiKeyInput('');
                                     setSelectedAgentId('');
+                                    setWhatsappAgentId('');
                                   }}
                                   data-testid={`button-edit-api-key-${tenant.id}`}
                                 >
@@ -994,6 +997,7 @@ export default function PlatformAdminPage() {
               setEditApiKeyDialog({ open: false, tenant: null });
               setApiKeyInput('');
               setSelectedAgentId('');
+              setWhatsappAgentId('');
             }
           }}
         >
@@ -1046,7 +1050,7 @@ export default function PlatformAdminPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="retell-agent-id">Retell Chat Agent ID</Label>
+                <Label htmlFor="retell-agent-id">Retell Widget Chat Agent ID</Label>
                 {editApiKeyDialog.tenant?.hasRetellAgentId && (
                   <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
                     <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -1067,7 +1071,7 @@ export default function PlatformAdminPage() {
                   placeholder={
                     editApiKeyDialog.tenant?.hasRetellAgentId
                       ? 'Enter new agent ID to update'
-                      : 'Enter Retell Chat Agent ID (optional)'
+                      : 'Enter Retell Widget Chat Agent ID (optional)'
                   }
                   value={selectedAgentId}
                   onChange={(e) => setSelectedAgentId(e.target.value)}
@@ -1077,7 +1081,43 @@ export default function PlatformAdminPage() {
                 <p className="text-xs text-muted-foreground">
                   {editApiKeyDialog.tenant?.hasRetellAgentId
                     ? 'Enter a new agent ID to update, or leave empty to keep existing.'
-                    : "The agent ID to use for this tenant's chat widget. This will be used for end-user chat interactions."}
+                    : "The agent ID to use for this tenant's web chat widget."}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-agent-id">WhatsApp Chat Agent ID</Label>
+                {editApiKeyDialog.tenant?.hasWhatsappAgentId && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900/50 transition-colors">
+                    <Key className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="font-mono text-sm font-medium text-green-900 dark:text-green-100">
+                      {editApiKeyDialog.tenant.maskedWhatsappAgentId || 'Configured (hidden)'}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                    >
+                      Current
+                    </Badge>
+                  </div>
+                )}
+                <Input
+                  id="whatsapp-agent-id"
+                  type="text"
+                  placeholder={
+                    editApiKeyDialog.tenant?.hasWhatsappAgentId
+                      ? 'Enter new WhatsApp agent ID to update'
+                      : 'Enter WhatsApp Agent ID (optional)'
+                  }
+                  value={whatsappAgentId}
+                  onChange={(e) => setWhatsappAgentId(e.target.value)}
+                  data-testid="input-whatsapp-agent-id"
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {editApiKeyDialog.tenant?.hasWhatsappAgentId
+                    ? 'Enter a new agent ID to update, or leave empty to keep existing.'
+                    : "The agent ID to use for this tenant's WhatsApp integration."}
                 </p>
               </div>
             </div>
@@ -1088,6 +1128,7 @@ export default function PlatformAdminPage() {
                   setEditApiKeyDialog({ open: false, tenant: null });
                   setApiKeyInput('');
                   setSelectedAgentId('');
+                  setWhatsappAgentId('');
                 }}
                 data-testid="button-cancel-api-key"
               >
@@ -1108,17 +1149,22 @@ export default function PlatformAdminPage() {
                       payload.retellApiKey = '__KEEP_EXISTING__';
                     }
 
-                    // Send agent ID if user entered a value
+                    // Send widget agent ID if user entered a value
                     if (selectedAgentId.trim()) {
                       payload.retellAgentId = selectedAgentId.trim();
+                    }
+
+                    // Send WhatsApp agent ID if user entered a value
+                    if (whatsappAgentId.trim()) {
+                      payload.whatsappAgentId = whatsappAgentId.trim();
                     }
 
                     updateRetellApiKeyMutation.mutate(payload);
                   }
                 }}
                 disabled={
-                  // Enable if user typed anything in either field, or if saving
-                  (!apiKeyInput.trim() && !selectedAgentId.trim()) ||
+                  // Enable if user typed anything in any field, or if saving
+                  (!apiKeyInput.trim() && !selectedAgentId.trim() && !whatsappAgentId.trim()) ||
                   updateRetellApiKeyMutation.isPending
                 }
                 data-testid="button-save-api-key"
