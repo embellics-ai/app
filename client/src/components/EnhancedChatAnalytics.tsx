@@ -112,6 +112,25 @@ export default function EnhancedChatAnalytics({
     enabled: !!tenantId,
   });
 
+  // Fetch agent breakdown data (only when not filtering by specific agent)
+  const { data: agentBreakdown } = useQuery<
+    { agentId: string; agentName: string; count: number }[]
+  >({
+    queryKey: ['chat-agent-breakdown', tenantId, startDate, endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      });
+      const response = await apiRequest(
+        'GET',
+        `/api/platform/tenants/${tenantId}/analytics/chats/agent-breakdown?${params}`,
+      );
+      return await response.json();
+    },
+    enabled: !!tenantId && (!agentId || agentId === 'all'),
+  });
+
   if (isLoading || !timeSeriesData) {
     return <div className="text-center p-8">Loading analytics...</div>;
   }
@@ -460,6 +479,36 @@ export default function EnhancedChatAnalytics({
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        {/* Chats by Agent - Only show when not filtering by specific agent */}
+        {agentBreakdown && agentBreakdown.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Chats by Agent</CardTitle>
+              <CardDescription>Distribution of chats across agents</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={agentBreakdown} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="agentName" type="category" width={150} tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }}
+                  />
+                  <Legend />
+                  <Bar
+                    dataKey="count"
+                    fill={COLORS.primary}
+                    name="Chat Count"
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Sentiment Trend Over Time */}
         <Card>

@@ -1451,6 +1451,16 @@ export class MemStorage implements IStorage {
     }; // Stub
   }
 
+  async getChatAnalyticsAgentBreakdown(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+    },
+  ): Promise<{ agentId: string; agentName: string; count: number }[]> {
+    return []; // Stub
+  }
+
   async deleteOldChatAnalytics(olderThanDays: number): Promise<void> {
     // Stub
   }
@@ -3060,6 +3070,55 @@ export class DbStorage implements IStorage {
       messageCountStats,
       toolCallsStats,
     };
+  }
+
+  /**
+   * Get chat analytics agent breakdown
+   */
+  async getChatAnalyticsAgentBreakdown(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+    },
+  ): Promise<{ agentId: string; agentName: string; count: number }[]> {
+    const conditions = [eq(chatAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(chatAnalytics.endTimestamp, filters.endDate), isNull(chatAnalytics.endTimestamp))!,
+      );
+    }
+
+    const chats = await this.db
+      .select()
+      .from(chatAnalytics)
+      .where(and(...conditions));
+
+    // Group by agent
+    const agentMap = new Map<string, { agentName: string; count: number }>();
+
+    chats.forEach((chat) => {
+      const agentId = chat.agentId;
+      const agentName = chat.agentName || agentId;
+
+      if (!agentMap.has(agentId)) {
+        agentMap.set(agentId, { agentName, count: 0 });
+      }
+      agentMap.get(agentId)!.count++;
+    });
+
+    // Convert to array and sort by count descending
+    return Array.from(agentMap.entries())
+      .map(([agentId, data]) => ({
+        agentId,
+        agentName: data.agentName,
+        count: data.count,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
   /**
