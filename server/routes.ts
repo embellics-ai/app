@@ -1881,6 +1881,11 @@ export async function registerRoutes(app: Express): Promise<void> {
           description: z.string().optional(),
           isActive: z.boolean().default(true),
           authToken: z.string().optional(),
+          webhookType: z.enum(['event_listener', 'function_call']).default('event_listener'),
+          eventType: z.string().optional(),
+          functionName: z.string().optional(),
+          responseTimeout: z.number().min(1000).max(30000).optional(),
+          retryOnFailure: z.boolean().optional(),
         });
 
         const data = webhookSchema.parse(req.body);
@@ -1901,6 +1906,11 @@ export async function registerRoutes(app: Express): Promise<void> {
           description: data.description || null,
           isActive: data.isActive,
           authToken: data.authToken ? encrypt(data.authToken) : null,
+          webhookType: data.webhookType,
+          eventType: data.eventType || null,
+          functionName: data.functionName || null,
+          responseTimeout: data.responseTimeout || null,
+          retryOnFailure: data.retryOnFailure ?? false,
           createdBy: req.user!.userId,
         };
 
@@ -1943,6 +1953,11 @@ export async function registerRoutes(app: Express): Promise<void> {
           description: z.string().optional().nullable(),
           isActive: z.boolean().optional(),
           authToken: z.string().optional().nullable(),
+          webhookType: z.enum(['event_listener', 'function_call']).optional(),
+          eventType: z.string().optional().nullable(),
+          functionName: z.string().optional().nullable(),
+          responseTimeout: z.number().min(1000).max(30000).optional().nullable(),
+          retryOnFailure: z.boolean().optional(),
         });
 
         const data = webhookUpdateSchema.parse(req.body);
