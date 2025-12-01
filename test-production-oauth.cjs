@@ -14,17 +14,17 @@ function makeRequest(path, headers = {}) {
       hostname: PROD_URL,
       path: path,
       method: 'GET',
-      headers: headers
+      headers: headers,
     };
 
     const req = https.request(options, (res) => {
       let data = '';
-      res.on('data', (chunk) => data += chunk);
+      res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
         resolve({
           status: res.statusCode,
           headers: res.headers,
-          body: data
+          body: data,
         });
       });
     });
@@ -67,15 +67,14 @@ async function runTests() {
   console.log(`GET https://${PROD_URL}/api/proxy/${TENANT_ID}/whatsapp/test`);
   console.log(`Authorization: Bearer ${N8N_SECRET.substring(0, 20)}...`);
   try {
-    const result = await makeRequest(
-      `/api/proxy/${TENANT_ID}/whatsapp/test`,
-      { 'Authorization': `Bearer ${N8N_SECRET}` }
-    );
-    
+    const result = await makeRequest(`/api/proxy/${TENANT_ID}/whatsapp/test`, {
+      Authorization: `Bearer ${N8N_SECRET}`,
+    });
+
     console.log(`Status: ${result.status}`);
     const response = JSON.parse(result.body);
     console.log('Response:', JSON.stringify(response, null, 2));
-    
+
     if (result.status === 200 && response.connected) {
       console.log('\n✅ Proxy API is working!');
       console.log(`   WhatsApp connection: CONNECTED`);
@@ -97,15 +96,14 @@ async function runTests() {
   console.log(`GET https://${PROD_URL}/api/proxy/${TENANT_ID}/whatsapp/test`);
   console.log('Authorization: Bearer invalid_token_12345');
   try {
-    const result = await makeRequest(
-      `/api/proxy/${TENANT_ID}/whatsapp/test`,
-      { 'Authorization': 'Bearer invalid_token_12345' }
-    );
-    
+    const result = await makeRequest(`/api/proxy/${TENANT_ID}/whatsapp/test`, {
+      Authorization: 'Bearer invalid_token_12345',
+    });
+
     console.log(`Status: ${result.status}`);
     const response = JSON.parse(result.body);
     console.log('Response:', JSON.stringify(response, null, 2));
-    
+
     if (result.status === 401) {
       console.log('\n✅ Authentication is working correctly!');
       console.log('   Invalid tokens are rejected');

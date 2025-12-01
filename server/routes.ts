@@ -6046,7 +6046,7 @@ export async function registerRoutes(app: Express): Promise<void> {
    * Initiate WhatsApp OAuth authorization
    * GET /api/platform/tenants/:tenantId/oauth/whatsapp/authorize
    *
-   * Redirects user to Meta's OAuth authorization page
+   * Redirects user to Meta's OAuth authorization page using tenant's configured OAuth app
    */
   app.get(
     '/api/platform/tenants/:tenantId/oauth/whatsapp/authorize',
@@ -6054,12 +6054,17 @@ export async function registerRoutes(app: Express): Promise<void> {
       try {
         const { tenantId } = req.params;
 
-        // WhatsApp Business API OAuth parameters
-        // For WhatsApp Cloud API, we use the Access Token from the Business Manager
-        // This is a simplified flow - in production, you'd redirect to Facebook Login
-        // Reference: https://developers.facebook.com/docs/whatsapp/business-management-api/get-started
+        // Get tenant's OAuth credential configuration
+        const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+        
+        if (!credential || !credential.clientId) {
+          return res.status(400).json({ 
+            error: 'WhatsApp OAuth app not configured',
+            message: 'Please configure your WhatsApp App ID and App Secret first'
+          });
+        }
 
-        const clientId = process.env.WHATSAPP_APP_ID; // Your Facebook App ID
+        const clientId = credential.clientId;
         const redirectUri = `${process.env.APP_URL || 'http://localhost:3000'}/api/platform/oauth/callback/whatsapp`;
         const state = Buffer.from(JSON.stringify({ tenantId })).toString('base64');
 
@@ -6106,11 +6111,22 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Decode state to get tenant ID
       const { tenantId } = JSON.parse(Buffer.from(state as string, 'base64').toString());
 
+      // Get tenant's OAuth credential configuration
+      const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+      
+      if (!credential || !credential.clientId || !credential.clientSecret) {
+        console.error('[OAuth] Tenant OAuth app not configured for callback');
+        return res.redirect(`/?oauth_error=app_not_configured`);
+      }
+
+      // Decrypt clientSecret for token exchange
+      const clientSecret = decrypt(credential.clientSecret);
+
       // Exchange authorization code for access token
       const tokenUrl = 'https://graph.facebook.com/v21.0/oauth/access_token';
       const params = new URLSearchParams({
-        client_id: process.env.WHATSAPP_APP_ID!,
-        client_secret: process.env.WHATSAPP_APP_SECRET!,
+        client_id: credential.clientId,
+        client_secret: clientSecret,
         code: code as string,
         redirect_uri: `${process.env.APP_URL || 'http://localhost:3000'}/api/platform/oauth/callback/whatsapp`,
       });
@@ -6130,39 +6146,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       console.log('[OAuth] Successfully obtained WhatsApp access token for tenant:', tenantId);
 
-      // Encrypt sensitive data before storing
+      // Encrypt access token before storing
       const encryptedAccessToken = encrypt(tokenData.access_token);
-      const encryptedClientSecret = encrypt(process.env.WHATSAPP_APP_SECRET!);
 
       // Calculate token expiry (default to 60 days if not provided)
       const expiresIn = tokenData.expires_in || 60 * 24 * 60 * 60; // 60 days in seconds
       const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
 
-      // Check if credential already exists
-      const existingCredential = await storage.getOAuthCredential(tenantId, 'whatsapp');
-
-      if (existingCredential) {
-        // Update existing credential
-        await storage.updateOAuthCredential(existingCredential.id, {
-          accessToken: encryptedAccessToken,
-          tokenExpiry,
-          isActive: true,
-        });
-        console.log('[OAuth] Updated existing WhatsApp credential for tenant:', tenantId);
-      } else {
-        // Create new credential
-        await storage.createOAuthCredential({
-          tenantId,
-          provider: 'whatsapp',
-          clientId: process.env.WHATSAPP_APP_ID!,
-          clientSecret: encryptedClientSecret,
-          accessToken: encryptedAccessToken,
-          tokenExpiry,
-          scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
-          isActive: true,
-        });
-        console.log('[OAuth] Created new WhatsApp credential for tenant:', tenantId);
-      }
+      // Update existing credential with new access token
+      await storage.updateOAuthCredential(credential.id, {
+        accessToken: encryptedAccessToken,
+        tokenExpiry,
+        isActive: true,
+      });
+      console.log('[OAuth] Updated WhatsApp access token for tenant:', tenantId);
 
       // Redirect back to integration management page with success
       res.redirect('/?oauth_success=whatsapp');
