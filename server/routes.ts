@@ -2096,7 +2096,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     const { functionName } = req.params;
 
     try {
-      console.log(`[Function Proxy] === ${functionName} called ===`);
+      console.log('[Function Proxy] Function called:', functionName);
       console.log('[Function Proxy] Request body:', JSON.stringify(req.body, null, 2));
 
       // Extract agent_id from request (Retell sends this in the function call)
@@ -2113,7 +2113,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Lookup tenant from agent configuration
       const widgetConfig = await storage.getWidgetConfigByAgentId(agent_id);
       if (!widgetConfig) {
-        console.error(`[Function Proxy] No widget config found for agent_id: ${agent_id}`);
+        console.error('[Function Proxy] No widget config found for agent_id:', agent_id);
         return res.status(404).json({
           error: 'Agent not found',
           message: 'No configuration found for this agent',
@@ -2121,7 +2121,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       const tenantId = widgetConfig.tenantId;
-      console.log(`[Function Proxy] Resolved tenant: ${tenantId}`);
+      console.log('[Function Proxy] Resolved tenant:', tenantId);
 
       // Get tenant details for enrichment
       const tenant = await storage.getTenant(tenantId);
@@ -2130,7 +2130,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       const webhook = await storage.getWebhookByFunction(tenantId, functionName);
       if (!webhook) {
         console.error(
-          `[Function Proxy] No webhook configured for function: ${functionName} (tenant: ${tenantId})`,
+          '[Function Proxy] No webhook configured for function:',
+          functionName,
+          'tenant:',
+          tenantId,
         );
         return res.status(404).json({
           error: 'Function not configured',
@@ -2138,7 +2141,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         });
       }
 
-      console.log(`[Function Proxy] Routing to workflow: ${webhook.workflowName}`);
+      console.log('[Function Proxy] Routing to workflow:', webhook.workflowName);
 
       // Enrich payload with tenant context for N8N
       const enrichedPayload = {
@@ -2168,7 +2171,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Forward to N8N with timeout
       const timeout = webhook.responseTimeout || 10000; // Default 10s
-      console.log(`[Function Proxy] Forwarding with ${timeout}ms timeout`);
+      console.log('[Function Proxy] Forwarding with timeout (ms):', timeout);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -2184,11 +2187,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         clearTimeout(timeoutId);
 
         const duration = Date.now() - startTime;
-        console.log(`[Function Proxy] Response received in ${duration}ms`);
+        console.log('[Function Proxy] Response received in (ms):', duration);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`[Function Proxy] N8N returned ${response.status}:`, errorText);
+          console.error('[Function Proxy] N8N returned status:', response.status, errorText);
           await storage.incrementWebhookStats(webhook.id, false);
 
           return res.status(response.status).json({
@@ -2212,7 +2215,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         const duration = Date.now() - startTime;
 
         if (fetchError.name === 'AbortError') {
-          console.error(`[Function Proxy] Timeout after ${duration}ms`);
+          console.error('[Function Proxy] Timeout after (ms):', duration);
           await storage.incrementWebhookStats(webhook.id, false);
 
           return res.status(504).json({
@@ -2231,7 +2234,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      console.error(`[Function Proxy] Error after ${duration}ms:`, error);
+      console.error('[Function Proxy] Error after (ms):', duration, error);
 
       res.status(500).json({
         error: 'Internal server error',
