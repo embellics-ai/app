@@ -527,6 +527,22 @@ export const n8nWebhooks = pgTable(
     workflowName: text('workflow_name').notNull(),
     // e.g., "contact_form", "booking_request", "support_ticket"
 
+    // Webhook type: determines how this webhook is used
+    webhookType: text('webhook_type').notNull().default('event_listener'),
+    // Values: 'event_listener' | 'function_call'
+    // - event_listener: Receives async events from Retell (chat_analyzed, call_analyzed, etc.)
+    // - function_call: Called synchronously by Retell agents during conversations
+
+    // For event_listener type: which event(s) trigger this webhook
+    eventType: text('event_type'),
+    // Values: 'chat_analyzed', 'call_analyzed', 'chat_started', 'chat_ended', '*' (all events)
+    // Required for event_listener, null for function_call
+
+    // For function_call type: the function name used in Retell agent config
+    functionName: text('function_name'),
+    // e.g., 'get_booking_details', 'create_booking', 'cancel_appointment'
+    // Required for function_call, null for event_listener
+
     webhookUrl: text('webhook_url').notNull(),
     // e.g., "https://n8n.hostinger.com/webhook/tenant123/contact"
 
@@ -537,6 +553,13 @@ export const n8nWebhooks = pgTable(
 
     // Webhook-specific auth (optional - if different from tenant-level)
     authToken: text('auth_token'), // ENCRYPTED - Optional per-webhook auth
+
+    // For function_call type: timeout in milliseconds
+    responseTimeout: integer('response_timeout').default(10000),
+    // How long to wait for N8N to respond (function calls only)
+
+    // For function_call type: whether to retry on failure
+    retryOnFailure: boolean('retry_on_failure').default(false),
 
     // Usage tracking
     lastCalledAt: timestamp('last_called_at'),
@@ -552,6 +575,10 @@ export const n8nWebhooks = pgTable(
     uniqueTenantWorkflow: uniqueIndex('unique_tenant_workflow_idx').on(
       table.tenantId,
       table.workflowName,
+    ),
+    uniqueTenantFunction: uniqueIndex('unique_tenant_function_idx').on(
+      table.tenantId,
+      table.functionName,
     ),
   }),
 );

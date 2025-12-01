@@ -230,6 +230,10 @@ export interface IStorage {
   getN8nWebhooksByTenant(tenantId: string): Promise<N8nWebhook[]>;
   getN8nWebhookByName(tenantId: string, workflowName: string): Promise<N8nWebhook | undefined>;
   getActiveN8nWebhooks(tenantId: string): Promise<N8nWebhook[]>;
+  // NEW: Get webhook by function name (for function call routing)
+  getWebhookByFunction(tenantId: string, functionName: string): Promise<N8nWebhook | undefined>;
+  // NEW: Get webhooks by event type (for event listener routing)
+  getWebhooksByEvent(tenantId: string, eventType: string): Promise<N8nWebhook[]>;
   createN8nWebhook(webhook: InsertN8nWebhook): Promise<N8nWebhook>;
   updateN8nWebhook(id: string, updates: Partial<InsertN8nWebhook>): Promise<N8nWebhook | undefined>;
   incrementWebhookStats(id: string, success: boolean): Promise<void>;
@@ -1312,6 +1316,17 @@ export class MemStorage implements IStorage {
 
   async deleteN8nWebhook(id: string, tenantId: string): Promise<void> {
     // Stub
+  }
+
+  async getWebhookByFunction(
+    tenantId: string,
+    functionName: string,
+  ): Promise<N8nWebhook | undefined> {
+    return undefined; // Stub
+  }
+
+  async getWebhooksByEvent(tenantId: string, eventType: string): Promise<N8nWebhook[]> {
+    return []; // Stub
   }
 
   // Webhook Analytics stubs
@@ -2591,6 +2606,49 @@ export class DbStorage implements IStorage {
     await this.db
       .delete(n8nWebhooks)
       .where(and(eq(n8nWebhooks.id, id), eq(n8nWebhooks.tenantId, tenantId)));
+  }
+
+  /**
+   * Get webhook by function name (for function call routing)
+   * Returns the active webhook configured to handle a specific function for a tenant
+   */
+  async getWebhookByFunction(
+    tenantId: string,
+    functionName: string,
+  ): Promise<N8nWebhook | undefined> {
+    const result = await this.db
+      .select()
+      .from(n8nWebhooks)
+      .where(
+        and(
+          eq(n8nWebhooks.tenantId, tenantId),
+          eq(n8nWebhooks.functionName, functionName),
+          eq(n8nWebhooks.webhookType, 'function_call'),
+          eq(n8nWebhooks.isActive, true),
+        ),
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  /**
+   * Get webhooks by event type (for event listener routing)
+   * Returns all active webhooks that should be triggered by a specific event
+   * Also includes webhooks with eventType='*' (all events)
+   */
+  async getWebhooksByEvent(tenantId: string, eventType: string): Promise<N8nWebhook[]> {
+    return await this.db
+      .select()
+      .from(n8nWebhooks)
+      .where(
+        and(
+          eq(n8nWebhooks.tenantId, tenantId),
+          eq(n8nWebhooks.webhookType, 'event_listener'),
+          eq(n8nWebhooks.isActive, true),
+          or(eq(n8nWebhooks.eventType, eventType), eq(n8nWebhooks.eventType, '*')),
+        ),
+      )
+      .orderBy(n8nWebhooks.workflowName);
   }
 
   // ============================================
