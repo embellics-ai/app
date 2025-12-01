@@ -447,6 +447,10 @@ export default function IntegrationManagement({
             <Webhook className="w-4 h-4 mr-2" />
             N8N Webhooks
           </TabsTrigger>
+          <TabsTrigger value="oauth">
+            <Zap className="w-4 h-4 mr-2" />
+            OAuth Connections
+          </TabsTrigger>
         </TabsList>
 
         {/* WhatsApp Tab */}
@@ -942,6 +946,37 @@ export default function IntegrationManagement({
             <WebhookAnalyticsDashboard tenantId={tenantId} tenantName={tenantName} />
           </div>
         </TabsContent>
+
+        {/* OAuth Connections Tab */}
+        <TabsContent value="oauth">
+          <Card>
+            <CardHeader>
+              <CardTitle>OAuth Connections</CardTitle>
+              <CardDescription>
+                Connect third-party services securely with OAuth. Your credentials are encrypted
+                and never exposed to N8N workflows.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* WhatsApp OAuth Card */}
+              <OAuthConnectionCard
+                tenantId={tenantId}
+                provider="whatsapp"
+                title="WhatsApp Business API"
+                description="Connect your WhatsApp Business Account to send messages through N8N workflows without exposing your access token."
+                icon={<MessageSquare className="w-6 h-6" />}
+              />
+
+              {/* Future: Add more OAuth providers here */}
+              <Alert>
+                <Bell className="h-4 w-4" />
+                <AlertDescription>
+                  More OAuth providers (Google Sheets, Slack, etc.) will be available soon.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Webhook Dialog */}
@@ -1229,5 +1264,231 @@ export default function IntegrationManagement({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// OAuth Connection Card Component
+function OAuthConnectionCard({
+  tenantId,
+  provider,
+  title,
+  description,
+  icon,
+}: {
+  tenantId: string;
+  provider: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+}) {
+  const { toast } = useToast();
+  const [testing, setTesting] = useState(false);
+
+  // Fetch OAuth credential status
+  const { data: oauthStatus, isLoading } = useQuery({
+    queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        `/api/platform/tenants/${tenantId}/oauth/${provider}`,
+      );
+      return await response.json();
+    },
+  });
+
+  // Delete OAuth credential mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest(
+        'DELETE',
+        `/api/platform/tenants/${tenantId}/oauth/${provider}`,
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Disconnected',
+        description: `${title} has been disconnected successfully`,
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to disconnect',
+        description: error.message || 'An error occurred',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Test connection function
+  const testConnection = async () => {
+    setTesting(true);
+    try {
+      const response = await fetch(`/api/proxy/${tenantId}/${provider}/test`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_N8N_WEBHOOK_SECRET || ''}`,
+        },
+      });
+      const result = await response.json();
+
+      if (result.connected) {
+        toast({
+          title: 'Connection successful',
+          description: `Connected to ${result.phoneNumber || result.verifiedName || provider}`,
+        });
+      } else {
+        toast({
+          title: 'Connection failed',
+          description: result.message || 'Unable to connect',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Connection test failed',
+        description: error.message || 'An error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  // Connect function - redirect to OAuth authorization
+  const handleConnect = () => {
+    window.location.href = `/api/platform/tenants/${tenantId}/oauth/${provider}/authorize`;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isConnected = oauthStatus?.connected || false;
+  const tokenExpiry = oauthStatus?.tokenExpiry ? new Date(oauthStatus.tokenExpiry) : null;
+  const isExpired = tokenExpiry && tokenExpiry < new Date();
+  const daysUntilExpiry = tokenExpiry
+    ? Math.ceil((tokenExpiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-4">
+            <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
+            <div className="space-y-1">
+              <h3 className="font-semibold">{title}</h3>
+              <p className="text-sm text-muted-foreground">{description}</p>
+
+              {isConnected && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={isExpired ? 'destructive' : 'default'}>
+                      {isExpired ? 'Expired' : 'Connected'}
+                    </Badge>
+                    {tokenExpiry && !isExpired && (
+                      <span className="text-xs text-muted-foreground">
+                        Expires in {daysUntilExpiry} days
+                      </span>
+                    )}
+                  </div>
+
+                  {oauthStatus.lastUsedAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Last used: {new Date(oauthStatus.lastUsedAt).toLocaleDateString()}
+                    </p>
+                  )}
+
+                  {isExpired && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription className="text-sm">
+                        Your access token has expired. Please reconnect to continue using this
+                        integration.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            {!isConnected ? (
+              <Button onClick={handleConnect} size="sm">
+                <Zap className="w-4 h-4 mr-2" />
+                Connect
+              </Button>
+            ) : (
+              <>
+                <Button onClick={testConnection} disabled={testing || Boolean(isExpired)} size="sm" variant="outline">
+                  {testing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Power className="w-4 h-4 mr-2" />
+                      Test Connection
+                    </>
+                  )}
+                </Button>
+                {isExpired && (
+                  <Button onClick={handleConnect} size="sm">
+                    <Zap className="w-4 h-4 mr-2" />
+                    Reconnect
+                  </Button>
+                )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <PowerOff className="w-4 h-4 mr-2" />
+                      Disconnect
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Disconnect {title}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will remove your OAuth credentials. N8N workflows using this
+                        connection will stop working until you reconnect.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => disconnectMutation.mutate()}
+                        disabled={disconnectMutation.isPending}
+                      >
+                        {disconnectMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Disconnecting...
+                          </>
+                        ) : (
+                          'Disconnect'
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

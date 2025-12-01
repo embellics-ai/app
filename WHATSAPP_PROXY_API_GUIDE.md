@@ -35,15 +35,18 @@ The secret is stored in `.env.local` as `N8N_WEBHOOK_SECRET`.
 Send a WhatsApp message through the tenant's authenticated account.
 
 **Parameters:**
+
 - `tenantId` (path) - UUID of the tenant
 
 **Headers:**
+
 ```
 Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 Content-Type: application/json
 ```
 
 **Request Body (Text Message):**
+
 ```json
 {
   "messaging_product": "whatsapp",
@@ -56,6 +59,7 @@ Content-Type: application/json
 ```
 
 **Request Body (Template Message):**
+
 ```json
 {
   "messaging_product": "whatsapp",
@@ -71,6 +75,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "messaging_product": "whatsapp",
@@ -89,6 +94,7 @@ Content-Type: application/json
 ```
 
 **Error Response:**
+
 ```json
 {
   "error": "Failed to send WhatsApp message",
@@ -103,14 +109,17 @@ Content-Type: application/json
 Fetch all message templates for the tenant's WhatsApp Business Account.
 
 **Parameters:**
+
 - `tenantId` (path) - UUID of the tenant
 
 **Headers:**
+
 ```
 Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 ```
 
 **Response:**
+
 ```json
 {
   "data": [
@@ -139,15 +148,18 @@ Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 Download media URL for incoming WhatsApp messages.
 
 **Parameters:**
+
 - `tenantId` (path) - UUID of the tenant
 - `mediaId` (path) - Media ID from WhatsApp webhook
 
 **Headers:**
+
 ```
 Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 ```
 
 **Response:**
+
 ```json
 {
   "url": "https://lookaside.fbsbx.com/...",
@@ -165,14 +177,17 @@ Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 Test the WhatsApp connection and retrieve phone number information.
 
 **Parameters:**
+
 - `tenantId` (path) - UUID of the tenant
 
 **Headers:**
+
 ```
 Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 ```
 
 **Response:**
+
 ```json
 {
   "connected": true,
@@ -183,6 +198,7 @@ Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 ```
 
 **Error Response:**
+
 ```json
 {
   "connected": false,
@@ -278,21 +294,25 @@ Authorization: Bearer YOUR_N8N_WEBHOOK_SECRET
 ## Security Features
 
 ### 1. N8N Authentication
+
 - All requests must include `N8N_WEBHOOK_SECRET` in Authorization header
 - Invalid or missing secret returns 401 Unauthorized
 - Secret is validated before any database queries
 
 ### 2. Tenant Isolation
+
 - Each request is scoped to a specific tenant ID
 - OAuth credentials are fetched per tenant
 - No cross-tenant data leakage possible
 
 ### 3. Token Encryption
+
 - Access tokens stored encrypted in database
 - Decrypted only in memory during API calls
 - Automatic token expiry checking
 
 ### 4. Audit Trail
+
 - Last used timestamp updated on each request
 - All requests logged with tenant ID
 - Failed authentication attempts logged
@@ -325,40 +345,48 @@ Currently, Meta's WhatsApp Business API uses long-lived tokens (60 days) without
 ### Common Errors
 
 **401 Unauthorized**
+
 ```json
 {
   "error": "Invalid authorization token"
 }
 ```
+
 - **Cause:** Wrong or missing N8N_WEBHOOK_SECRET
 - **Solution:** Check Authorization header format and secret value
 
 **500 Token Expired**
+
 ```json
 {
   "error": "Failed to send WhatsApp message",
   "message": "WhatsApp token expired. Please reconnect your WhatsApp account."
 }
 ```
+
 - **Cause:** OAuth token expired (after 60 days)
 - **Solution:** Reconnect WhatsApp via OAuth flow in UI
 
 **500 Credential Not Found**
+
 ```json
 {
   "error": "Failed to send WhatsApp message",
   "message": "WhatsApp credential not found or inactive"
 }
 ```
+
 - **Cause:** Tenant hasn't connected WhatsApp yet
 - **Solution:** Complete OAuth connection in Integration Management
 
 **500 Configuration Missing**
+
 ```json
 {
   "error": "WhatsApp phone number ID not configured"
 }
 ```
+
 - **Cause:** Missing metadata in OAuth credential
 - **Solution:** Ensure WHATSAPP_PHONE_NUMBER_ID is set or add to credential metadata
 
@@ -373,6 +401,7 @@ curl -X GET \
 ```
 
 Expected response:
+
 ```json
 {
   "connected": true,
@@ -436,6 +465,7 @@ curl -X POST \
 ```
 
 **Benefits:**
+
 - ✅ No OAuth tokens exposed in N8N workflows
 - ✅ Centralized token management
 - ✅ Automatic token expiry handling
@@ -457,6 +487,7 @@ WHATSAPP_BUSINESS_ACCOUNT_ID=your_business_account_id
 ### Update N8N Workflows
 
 Replace all URLs in N8N workflows:
+
 - From: `http://localhost:3000/api/proxy/...`
 - To: `https://embellics-app.onrender.com/api/proxy/...`
 
@@ -475,6 +506,7 @@ curl -X GET \
 ### Issue: "Invalid authorization token"
 
 **Check:**
+
 1. Authorization header format: `Bearer YOUR_SECRET`
 2. Secret matches `.env.local` exactly
 3. No extra whitespace in secret
@@ -482,6 +514,7 @@ curl -X GET \
 ### Issue: "WhatsApp credential not found"
 
 **Check:**
+
 1. Tenant has completed OAuth flow
 2. Check database: `SELECT * FROM oauth_credentials WHERE tenant_id = 'TENANT_ID'`
 3. Credential `is_active = true`
@@ -489,6 +522,7 @@ curl -X GET \
 ### Issue: "Token expired"
 
 **Solution:**
+
 1. Go to Integration Management in UI
 2. Disconnect WhatsApp
 3. Reconnect WhatsApp (new OAuth flow)
@@ -497,12 +531,14 @@ curl -X GET \
 ### Issue: "Phone number ID not configured"
 
 **Solution:**
+
 1. Add to credential metadata during OAuth callback, OR
 2. Set `WHATSAPP_PHONE_NUMBER_ID` in environment variables
 
 ## Next Steps
 
 After completing Phase 4:
+
 1. **Phase 5:** Build UI for OAuth connection management
 2. **Phase 6:** Test end-to-end OAuth flow
 3. **Phase 7:** Update all N8N workflows to use proxy endpoints
@@ -511,6 +547,7 @@ After completing Phase 4:
 ## Support
 
 For issues or questions:
+
 1. Check logs: `[Proxy]` prefix in console
 2. Verify database: `oauth_credentials` table
 3. Test with curl commands above

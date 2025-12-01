@@ -6411,7 +6411,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Get business account ID from credential metadata or environment
         const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
         const businessAccountId =
-          (credential?.metadata as any)?.businessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+          (credential?.metadata as any)?.businessAccountId ||
+          process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 
         if (!businessAccountId) {
           throw new Error('WhatsApp business account ID not configured');
