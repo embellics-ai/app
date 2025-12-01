@@ -7,6 +7,7 @@ This document describes the implementation of dynamic N8N webhook routing for mu
 ## Problem Statement
 
 **Before:**
+
 - Single hardcoded N8N webhook URL (`process.env.N8N_WEBHOOK_URL`)
 - Not scalable for multiple clients/tenants
 - N8N webhooks exposed directly to Retell AI
@@ -14,6 +15,7 @@ This document describes the implementation of dynamic N8N webhook routing for mu
 - Credentials stored in N8N workflows (security concern)
 
 **After:**
+
 - Each tenant can configure multiple N8N webhooks
 - Two webhook types: Event Listeners (async) and Function Calls (sync)
 - Platform acts as secure proxy, hiding N8N URLs from Retell
@@ -78,12 +80,12 @@ CREATE TABLE n8n_webhooks (
 );
 
 -- Indexes for fast lookups
-CREATE UNIQUE INDEX unique_tenant_function_idx 
-  ON n8n_webhooks(tenant_id, function_name) 
+CREATE UNIQUE INDEX unique_tenant_function_idx
+  ON n8n_webhooks(tenant_id, function_name)
   WHERE webhook_type = 'function_call' AND function_name IS NOT NULL;
 
-CREATE INDEX idx_n8n_webhooks_tenant_event 
-  ON n8n_webhooks(tenant_id, event_type) 
+CREATE INDEX idx_n8n_webhooks_tenant_event
+  ON n8n_webhooks(tenant_id, event_type)
   WHERE webhook_type = 'event_listener';
 ```
 
@@ -96,6 +98,7 @@ CREATE INDEX idx_n8n_webhooks_tenant_event
 **Purpose:** Routes Retell custom function calls to tenant-specific N8N webhooks
 
 **Request from Retell:**
+
 ```json
 {
   "agent_id": "agent_1234567890abcdef",
@@ -108,6 +111,7 @@ CREATE INDEX idx_n8n_webhooks_tenant_event
 ```
 
 **Forwarded to N8N:**
+
 ```json
 {
   "function": "get_booking_details",
@@ -129,6 +133,7 @@ CREATE INDEX idx_n8n_webhooks_tenant_event
 ```
 
 **N8N Response (returned to Retell):**
+
 ```json
 {
   "booking_id": "12345",
@@ -140,6 +145,7 @@ CREATE INDEX idx_n8n_webhooks_tenant_event
 ```
 
 **Features:**
+
 - Tenant identification from agent_id
 - Webhook lookup by function name
 - Timeout handling (configurable, default 10s)
@@ -149,10 +155,12 @@ CREATE INDEX idx_n8n_webhooks_tenant_event
 ### 2. Event Webhook Handlers
 
 **Endpoints:**
+
 - `POST /api/retell/chat-analyzed` - Chat analytics events
 - `POST /api/retell/call-ended` - Voice call analytics events
 
 **Updates:**
+
 - Removed hardcoded `process.env.N8N_WEBHOOK_URL`
 - Added dynamic webhook lookup using `getWebhooksByEvent()`
 - Forward to ALL matching webhooks for tenant + event type
@@ -160,6 +168,7 @@ CREATE INDEX idx_n8n_webhooks_tenant_event
 - Enriched payloads with tenant context
 
 **Payload to N8N:**
+
 ```json
 {
   "event": "chat_analyzed",
@@ -195,7 +204,7 @@ const webhook = await storage.getWebhookByFunction(tenantId, 'get_booking_detail
 
 ### getWebhooksByEvent(tenantId, eventType)
 
-Finds all webhooks for event routing (supports wildcard '*').
+Finds all webhooks for event routing (supports wildcard '\*').
 
 ```typescript
 const webhooks = await storage.getWebhooksByEvent(tenantId, 'chat_analyzed');
@@ -203,8 +212,9 @@ const webhooks = await storage.getWebhooksByEvent(tenantId, 'chat_analyzed');
 ```
 
 **Matching Logic:**
+
 - Exact match: eventType = 'chat_analyzed' matches 'chat_analyzed'
-- Wildcard: eventType = '*' matches ALL events
+- Wildcard: eventType = '\*' matches ALL events
 - Returns all active webhooks matching either condition
 
 ### incrementWebhookStats(webhookId, success)
@@ -212,7 +222,7 @@ const webhooks = await storage.getWebhooksByEvent(tenantId, 'chat_analyzed');
 Updates webhook statistics after each call.
 
 ```typescript
-await storage.incrementWebhookStats(webhook.id, true);  // Success
+await storage.incrementWebhookStats(webhook.id, true); // Success
 await storage.incrementWebhookStats(webhook.id, false); // Failure
 ```
 
@@ -273,6 +283,7 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
 ### Webhook Creation Form
 
 **Fields:**
+
 1. **Workflow Name** (required, unique per tenant)
 2. **Webhook Type** (dropdown)
    - Event Listener (Async)
@@ -282,7 +293,7 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
    - call_analyzed
    - chat_started
    - chat_ended
-   - * (all events)
+   - - (all events)
 4. **Function Name** (if Function Call)
    - Text input (e.g., get_booking_details)
 5. **Webhook URL** (required)
@@ -295,6 +306,7 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
 ### Webhooks List Table
 
 **Columns:**
+
 - Workflow Name
 - Type (badge with icon)
   - 🔔 Event: event_type
@@ -330,27 +342,33 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
 ### From Old System (Single Webhook)
 
 **Step 1:** Identify current N8N workflows
+
 - What events are they listening for?
 - What functions are they implementing?
 
 **Step 2:** Create Event Listener webhooks
+
 - For each analytics workflow, create event_listener
 - Set appropriate event type (chat_analyzed, call_analyzed)
 
 **Step 3:** Create Function Call webhooks
+
 - For each custom function in Retell, create function_call
 - Match function names exactly with Retell configuration
 
 **Step 4:** Update Retell Configuration
+
 - Update custom function URLs to: `https://your-domain.com/api/functions/{functionName}`
 - Keep webhook URLs the same (platform handles them)
 
 **Step 5:** Test
+
 - Test event forwarding (check N8N receives events)
 - Test function calls (check Retell gets responses)
 - Verify statistics are being tracked
 
 **Step 6:** Remove Old Environment Variable
+
 - Delete `N8N_WEBHOOK_URL` from .env files
 - All routing is now database-driven
 
@@ -399,6 +417,7 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
 ## Monitoring & Analytics
 
 ### Webhook Statistics (Per Webhook)
+
 - Total calls
 - Successful calls
 - Failed calls
@@ -406,6 +425,7 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
 - Success rate percentage
 
 ### Platform Logs
+
 ```
 [Function Proxy] === get_booking_details called ===
 [Function Proxy] Resolved tenant: tenant_abc123
@@ -425,15 +445,18 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
 ## Files Changed
 
 ### Backend
+
 - `shared/schema.ts` - Updated n8nWebhooks table schema
 - `migrations/0009_add_webhook_types.sql` - Database migration
 - `server/storage.ts` - Added getWebhookByFunction, getWebhooksByEvent
 - `server/routes.ts` - Function proxy endpoint, updated event handlers
 
 ### Frontend
+
 - `client/src/components/IntegrationManagement.tsx` - Webhook type UI
 
 ### Documentation
+
 - `function-proxy-endpoint.ts` - Reference implementation
 - `N8N_WEBHOOK_ROUTING_IMPLEMENTATION.md` - This document
 
@@ -449,7 +472,7 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
    - `npm run db:push` to apply schema changes
 
 2. **Update Existing Webhooks**
-   - All existing webhooks default to event_listener with eventType='*'
+   - All existing webhooks default to event_listener with eventType='\*'
    - Review and update as needed
 
 3. **Configure Retell Agents**
@@ -471,15 +494,18 @@ await storage.incrementWebhookStats(webhook.id, false); // Failure
 ### SWC Has 20+ Workflows:
 
 **12 Chat Workflows:**
+
 - Event listeners: chat_analyzed webhooks for different analytics
 - Function calls: customer lookup, booking status, etc.
 
 **8 Voice Workflows:**
+
 - Event listeners: call_analyzed webhooks for call analytics
 - Function calls: create booking, check availability, cancel appointment, etc.
 
 **Configuration:**
 All 20 webhooks can coexist in the platform:
+
 - Each has unique workflow_name
 - Event listeners can share event types (multiple webhooks for same event)
 - Function calls have unique function_name (1:1 mapping)

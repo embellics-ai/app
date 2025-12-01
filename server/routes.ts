@@ -2072,7 +2072,7 @@ export async function registerRoutes(app: Express): Promise<void> {
    * Function Proxy Endpoint
    * Routes Retell AI custom function calls to tenant-specific N8N workflows
    * Public endpoint - no auth, but requires valid agent_id in request
-   * 
+   *
    * Usage: Configure in Retell agent as custom function URL:
    * https://your-domain.com/api/functions/{functionName}
    */
@@ -2329,13 +2329,13 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Forward to tenant-specific N8N webhooks configured for this event
       const eventWebhooks = await storage.getWebhooksByEvent(tenantId, 'chat_analyzed');
-      
+
       if (eventWebhooks.length > 0) {
         console.log(`[Retell Webhook] Forwarding to ${eventWebhooks.length} N8N webhook(s)`);
-        
+
         // Get tenant name for enrichment
         const tenant = await storage.getTenant(tenantId);
-        
+
         // Enrich payload with tenant context for N8N
         const enrichedPayload = {
           event: 'chat_analyzed',
@@ -2516,13 +2516,13 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Forward to tenant-specific N8N webhooks configured for this event
       const eventWebhooks = await storage.getWebhooksByEvent(tenantId, 'call_analyzed');
-      
+
       if (eventWebhooks.length > 0) {
         console.log(`[Retell Voice Webhook] Forwarding to ${eventWebhooks.length} N8N webhook(s)`);
-        
+
         // Get tenant name for enrichment
         const tenant = await storage.getTenant(tenantId);
-        
+
         // Enrich payload with tenant context for N8N
         const enrichedPayload = {
           event: 'call_analyzed',
