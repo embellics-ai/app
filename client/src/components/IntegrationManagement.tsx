@@ -953,8 +953,8 @@ export default function IntegrationManagement({
             <CardHeader>
               <CardTitle>OAuth Connections</CardTitle>
               <CardDescription>
-                Connect third-party services securely with OAuth. Your credentials are encrypted
-                and never exposed to N8N workflows.
+                Connect third-party services securely with OAuth. Your credentials are encrypted and
+                never exposed to N8N workflows.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1432,7 +1432,12 @@ function OAuthConnectionCard({
               </Button>
             ) : (
               <>
-                <Button onClick={testConnection} disabled={testing || Boolean(isExpired)} size="sm" variant="outline">
+                <Button
+                  onClick={testConnection}
+                  disabled={testing || Boolean(isExpired)}
+                  size="sm"
+                  variant="outline"
+                >
                   {testing ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1462,8 +1467,8 @@ function OAuthConnectionCard({
                     <AlertDialogHeader>
                       <AlertDialogTitle>Disconnect {title}?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will remove your OAuth credentials. N8N workflows using this
-                        connection will stop working until you reconnect.
+                        This will remove your OAuth credentials. N8N workflows using this connection
+                        will stop working until you reconnect.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
