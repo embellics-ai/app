@@ -49,6 +49,8 @@ import {
   Webhook,
   Eye,
   EyeOff,
+  Zap,
+  Bell,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -112,6 +114,11 @@ const webhookSchema = z.object({
   description: z.string().optional(),
   isActive: z.boolean().default(true),
   authToken: z.string().optional(),
+  webhookType: z.enum(['event_listener', 'function_call']).default('event_listener'),
+  eventType: z.string().optional(), // For event_listener type
+  functionName: z.string().optional(), // For function_call type
+  responseTimeout: z.number().min(1000).max(30000).default(10000).optional(), // For function_call
+  retryOnFailure: z.boolean().default(false).optional(),
 });
 
 type WhatsAppConfig = z.infer<typeof whatsappConfigSchema>;
@@ -219,6 +226,11 @@ export default function IntegrationManagement({
       description: '',
       isActive: true,
       authToken: '',
+      webhookType: 'event_listener',
+      eventType: 'chat_analyzed',
+      functionName: '',
+      responseTimeout: 10000,
+      retryOnFailure: false,
     },
   });
 
@@ -918,6 +930,7 @@ export default function IntegrationManagement({
                       <TableHeader>
                         <TableRow>
                           <TableHead>Workflow Name</TableHead>
+                          <TableHead>Type</TableHead>
                           <TableHead>URL</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Stats</TableHead>
@@ -928,6 +941,19 @@ export default function IntegrationManagement({
                         {webhooks.map((webhook: any) => (
                           <TableRow key={webhook.id}>
                             <TableCell className="font-medium">{webhook.workflowName}</TableCell>
+                            <TableCell>
+                              {webhook.webhookType === 'function_call' ? (
+                                <Badge variant="outline" className="bg-blue-50">
+                                  <Zap className="w-3 h-3 mr-1" />
+                                  Function: {webhook.functionName}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-purple-50">
+                                  <Bell className="w-3 h-3 mr-1" />
+                                  Event: {webhook.eventType || '*'}
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                               {webhook.webhookUrl}
                             </TableCell>
@@ -962,6 +988,11 @@ export default function IntegrationManagement({
                                       description: webhook.description || '',
                                       isActive: webhook.isActive,
                                       authToken: '',
+                                      webhookType: webhook.webhookType || 'event_listener',
+                                      eventType: webhook.eventType || 'chat_analyzed',
+                                      functionName: webhook.functionName || '',
+                                      responseTimeout: webhook.responseTimeout || 10000,
+                                      retryOnFailure: webhook.retryOnFailure || false,
                                     });
                                     setWebhookDialog({ open: true, webhook });
                                   }}
@@ -1089,6 +1120,136 @@ export default function IntegrationManagement({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={webhookForm.control}
+                name="webhookType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Webhook Type</FormLabel>
+                    <FormControl>
+                      <select
+                        {...field}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          // Reset conditional fields when type changes
+                          if (e.target.value === 'event_listener') {
+                            webhookForm.setValue('functionName', '');
+                            webhookForm.setValue('eventType', 'chat_analyzed');
+                          } else {
+                            webhookForm.setValue('eventType', '');
+                          }
+                        }}
+                      >
+                        <option value="event_listener">Event Listener (Async)</option>
+                        <option value="function_call">Function Call (Sync)</option>
+                      </select>
+                    </FormControl>
+                    <FormDescription>
+                      Event listeners receive async notifications. Function calls are called during
+                      conversations and must respond.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {webhookForm.watch('webhookType') === 'event_listener' && (
+                <FormField
+                  control={webhookForm.control}
+                  name="eventType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Type</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <option value="chat_analyzed">Chat Analyzed</option>
+                          <option value="call_analyzed">Call Analyzed</option>
+                          <option value="chat_started">Chat Started</option>
+                          <option value="chat_ended">Chat Ended</option>
+                          <option value="*">All Events (*)</option>
+                        </select>
+                      </FormControl>
+                      <FormDescription>
+                        Which Retell event should trigger this webhook?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {webhookForm.watch('webhookType') === 'function_call' && (
+                <>
+                  <FormField
+                    control={webhookForm.control}
+                    name="functionName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Function Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="get_booking_details"
+                            disabled={!!webhookDialog.webhook}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Exact function name as configured in Retell agent (e.g.,
+                          get_booking_details, create_booking)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={webhookForm.control}
+                    name="responseTimeout"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Response Timeout (ms)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            min={1000}
+                            max={30000}
+                            step={1000}
+                            onChange={(e) => field.onChange(parseInt(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Maximum wait time for N8N response (1000-30000ms)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={webhookForm.control}
+                    name="retryOnFailure"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel>Retry on Failure</FormLabel>
+                          <FormDescription>
+                            Automatically retry if N8N webhook fails
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
 
               <FormField
                 control={webhookForm.control}
