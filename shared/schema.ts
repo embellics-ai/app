@@ -828,6 +828,63 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 
+// ============================================
+// OAUTH CREDENTIALS (Multi-tenant OAuth token storage)
+// ============================================
+
+export const oauthCredentials = pgTable(
+  'oauth_credentials',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // OAuth Provider
+    provider: text('provider').notNull(), // 'whatsapp', 'google_sheets', 'gmail', etc.
+
+    // OAuth Application Credentials
+    clientId: text('client_id').notNull(),
+    clientSecret: text('client_secret').notNull(), // Encrypted
+
+    // OAuth Tokens
+    accessToken: text('access_token'), // Encrypted, nullable until first auth
+    refreshToken: text('refresh_token'), // Encrypted
+    tokenExpiry: timestamp('token_expiry'), // When access_token expires
+    scopes: text('scopes').array(), // Array of granted scopes
+
+    // Provider-specific metadata
+    metadata: jsonb('metadata'), // Additional provider-specific data
+
+    // Status
+    isActive: boolean('is_active').default(true).notNull(),
+
+    // Audit
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    lastUsedAt: timestamp('last_used_at'), // Track last API call
+  },
+  (table) => ({
+    // Unique: one credential per tenant per provider
+    tenantProviderIdx: uniqueIndex('oauth_credentials_tenant_provider_idx').on(
+      table.tenantId,
+      table.provider,
+    ),
+  }),
+);
+
+export const insertOAuthCredentialSchema = createInsertSchema(oauthCredentials).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+});
+
+export type InsertOAuthCredential = z.infer<typeof insertOAuthCredentialSchema>;
+export type OAuthCredential = typeof oauthCredentials.$inferSelect;
+
 // Settings Schema (keeping for backward compatibility)
 export const settingsSchema = z.object({
   apiKey: z.string().optional(),
