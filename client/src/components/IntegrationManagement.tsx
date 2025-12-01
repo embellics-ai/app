@@ -51,6 +51,8 @@ import {
   EyeOff,
   Zap,
   Bell,
+  Settings,
+  Check,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -1283,6 +1285,9 @@ function OAuthConnectionCard({
 }) {
   const { toast } = useToast();
   const [testing, setTesting] = useState(false);
+  const [configuring, setConfiguring] = useState(false);
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
 
   // Fetch OAuth credential status
   const { data: oauthStatus, isLoading } = useQuery({
@@ -1293,6 +1298,40 @@ function OAuthConnectionCard({
         `/api/platform/tenants/${tenantId}/oauth/${provider}`,
       );
       return await response.json();
+    },
+  });
+
+  // Configure OAuth app mutation
+  const configureMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest(
+        'POST',
+        `/api/platform/tenants/${tenantId}/oauth/${provider}/configure`,
+        {
+          clientId,
+          clientSecret,
+        },
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Configured successfully',
+        description: 'Your OAuth app credentials have been saved. You can now connect.',
+      });
+      setConfiguring(false);
+      setClientId('');
+      setClientSecret('');
+      queryClient.invalidateQueries({
+        queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Configuration failed',
+        description: error.message || 'An error occurred',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -1375,12 +1414,136 @@ function OAuthConnectionCard({
     );
   }
 
+  const isConfigured = oauthStatus?.configured || false;
   const isConnected = oauthStatus?.connected || false;
   const tokenExpiry = oauthStatus?.tokenExpiry ? new Date(oauthStatus.tokenExpiry) : null;
   const isExpired = tokenExpiry && tokenExpiry < new Date();
   const daysUntilExpiry = tokenExpiry
     ? Math.ceil((tokenExpiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null;
+
+  // Show configuration form if not configured
+  if (!isConfigured && !configuring) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
+              <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
+              <div className="space-y-1">
+                <h3 className="font-semibold">{title}</h3>
+                <p className="text-sm text-muted-foreground">{description}</p>
+                <Alert className="mt-3">
+                  <AlertDescription className="text-sm">
+                    Configure your OAuth app credentials first. Get these from your{' '}
+                    {provider === 'whatsapp' ? 'Meta Developer' : 'provider'} account.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </div>
+            <Button onClick={() => setConfiguring(true)} size="sm">
+              <Settings className="w-4 h-4 mr-2" />
+              Configure
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show configuration form
+  if (configuring) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex items-start space-x-4">
+              <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h3 className="font-semibold">{title} - Configuration</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Enter your OAuth app credentials from{' '}
+                    {provider === 'whatsapp' ? 'Meta Developer Portal' : 'provider settings'}.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium">App ID / Client ID</label>
+                    <Input
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      placeholder={provider === 'whatsapp' ? 'Your Facebook App ID' : 'Your Client ID'}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">App Secret / Client Secret</label>
+                    <Input
+                      type="password"
+                      value={clientSecret}
+                      onChange={(e) => setClientSecret(e.target.value)}
+                      placeholder={provider === 'whatsapp' ? 'Your Facebook App Secret' : 'Your Client Secret'}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {provider === 'whatsapp' && (
+                    <Alert>
+                      <AlertDescription className="text-xs">
+                        Get these from:{' '}
+                        <a
+                          href="https://developers.facebook.com/apps/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          Meta Developer Portal → Your App → Settings → Basic
+                        </a>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={() => configureMutation.mutate()}
+                    disabled={!clientId || !clientSecret || configureMutation.isPending}
+                    size="sm"
+                  >
+                    {configureMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Save Configuration
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setConfiguring(false);
+                      setClientId('');
+                      setClientSecret('');
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

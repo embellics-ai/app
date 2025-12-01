@@ -6193,12 +6193,18 @@ export async function registerRoutes(app: Express): Promise<void> {
         if (!credential) {
           return res.json({
             connected: false,
+            configured: false,
             provider,
           });
         }
 
+        // Check if app is configured (has clientId and clientSecret)
+        const isConfigured = Boolean(credential.clientId && credential.clientSecret);
+        const isConnected = Boolean(credential.accessToken && credential.isActive);
+
         res.json({
-          connected: true,
+          connected: isConnected,
+          configured: isConfigured,
           provider: credential.provider,
           isActive: credential.isActive,
           tokenExpiry: credential.tokenExpiry,
@@ -6251,6 +6257,73 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('[OAuth] Error deleting credential:', error);
         res.status(500).json({ error: 'Failed to delete credential' });
+      }
+    },
+  );
+
+  /**
+   * Configure OAuth app credentials for a tenant
+   * POST /api/platform/tenants/:tenantId/oauth/:provider/configure
+   *
+   * Allows tenant to set their OAuth App ID and App Secret before connecting
+   */
+  app.post(
+    '/api/platform/tenants/:tenantId/oauth/:provider/configure',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId, provider } = req.params;
+        const { clientId, clientSecret } = req.body;
+
+        // Verify user has access to this tenant
+        const userTenantId = assertTenant(req, res);
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+
+        // Validate input
+        if (!clientId || !clientSecret) {
+          return res.status(400).json({ 
+            error: 'Missing required fields',
+            message: 'Both App ID and App Secret are required'
+          });
+        }
+
+        // Encrypt the client secret
+        const encryptedClientSecret = encrypt(clientSecret);
+
+        // Check if credential already exists
+        const existingCredential = await storage.getOAuthCredential(tenantId, provider);
+
+        if (existingCredential) {
+          // Update existing credential's app configuration
+          await storage.updateOAuthCredential(existingCredential.id, {
+            clientId,
+            clientSecret: encryptedClientSecret,
+          });
+          console.log('[OAuth] Updated app configuration for tenant:', tenantId, 'provider:', provider);
+        } else {
+          // Create new credential with app configuration (but no tokens yet)
+          await storage.createOAuthCredential({
+            tenantId,
+            provider,
+            clientId,
+            clientSecret: encryptedClientSecret,
+            scopes: provider === 'whatsapp' 
+              ? ['whatsapp_business_management', 'whatsapp_business_messaging']
+              : [],
+            isActive: false, // Not active until OAuth flow completes
+          });
+          console.log('[OAuth] Created app configuration for tenant:', tenantId, 'provider:', provider);
+        }
+
+        res.json({ 
+          success: true,
+          message: 'OAuth app configured successfully. You can now connect.'
+        });
+      } catch (error) {
+        console.error('[OAuth] Error configuring app credentials:', error);
+        res.status(500).json({ error: 'Failed to configure OAuth app' });
       }
     },
   );
