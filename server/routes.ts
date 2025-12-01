@@ -6050,16 +6050,9 @@ export async function registerRoutes(app: Express): Promise<void> {
    */
   app.get(
     '/api/platform/tenants/:tenantId/oauth/whatsapp/authorize',
-    requireAuth,
-    async (req: AuthenticatedRequest, res: Response) => {
+    async (req: Request, res: Response) => {
       try {
         const { tenantId } = req.params;
-
-        // Verify user has access to this tenant
-        const userTenantId = assertTenant(req, res);
-        if (!userTenantId || userTenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant' });
-        }
 
         // WhatsApp Business API OAuth parameters
         // For WhatsApp Cloud API, we use the Access Token from the Business Manager
