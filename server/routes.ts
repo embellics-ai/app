@@ -6250,12 +6250,324 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         await storage.deleteOAuthCredential(credential.id);
 
-        console.log('[OAuth] Deleted OAuth credential for tenant:', tenantId, 'provider:', provider);
+        console.log(
+          '[OAuth] Deleted OAuth credential for tenant:',
+          tenantId,
+          'provider:',
+          provider,
+        );
 
         res.json({ success: true });
       } catch (error) {
         console.error('[OAuth] Error deleting credential:', error);
         res.status(500).json({ error: 'Failed to delete credential' });
+      }
+    },
+  );
+
+  // ============================================
+  // WHATSAPP PROXY API ENDPOINTS
+  // ============================================
+
+  /**
+   * Middleware to validate N8N webhook secret
+   * Ensures only authorized N8N instances can call proxy APIs
+   */
+  const validateN8NSecret = (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    const expectedSecret = process.env.N8N_WEBHOOK_SECRET;
+
+    if (!expectedSecret) {
+      console.error('[Proxy] N8N_WEBHOOK_SECRET not configured');
+      return res.status(500).json({ error: 'Proxy authentication not configured' });
+    }
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing authorization header' });
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    if (token !== expectedSecret) {
+      console.warn('[Proxy] Invalid N8N webhook secret attempted');
+      return res.status(401).json({ error: 'Invalid authorization token' });
+    }
+
+    next();
+  };
+
+  /**
+   * Helper function to get and decrypt WhatsApp access token
+   * Automatically refreshes token if expired (future enhancement)
+   */
+  async function getWhatsAppAccessToken(tenantId: string): Promise<string> {
+    const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+
+    if (!credential || !credential.isActive) {
+      throw new Error('WhatsApp credential not found or inactive');
+    }
+
+    // Check if token is expired
+    if (credential.tokenExpiry && new Date() >= new Date(credential.tokenExpiry)) {
+      console.warn('[Proxy] WhatsApp token expired for tenant:', tenantId);
+      // TODO: Implement token refresh logic when Meta supports refresh tokens
+      throw new Error('WhatsApp token expired. Please reconnect your WhatsApp account.');
+    }
+
+    // Decrypt the access token
+    if (!credential.accessToken) {
+      throw new Error('WhatsApp access token not found');
+    }
+    const accessToken = decrypt(credential.accessToken);
+
+    // Update last used timestamp
+    await storage.markOAuthCredentialUsed(credential.id);
+
+    return accessToken;
+  }
+
+  /**
+   * Send WhatsApp message
+   * POST /api/proxy/:tenantId/whatsapp/send
+   *
+   * Proxies WhatsApp send message requests from N8N
+   * Body: { to, type, template, text, etc. }
+   */
+  app.post(
+    '/api/proxy/:tenantId/whatsapp/send',
+    validateN8NSecret,
+    async (req: Request, res: Response) => {
+      try {
+        const { tenantId } = req.params;
+        const messageData = req.body;
+
+        console.log('[Proxy] WhatsApp send request for tenant:', tenantId);
+
+        // Get decrypted access token from database
+        const accessToken = await getWhatsAppAccessToken(tenantId);
+
+        // Get phone number ID from credential metadata or use environment default
+        const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+        const phoneNumberId =
+          (credential?.metadata as any)?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+        if (!phoneNumberId) {
+          throw new Error('WhatsApp phone number ID not configured');
+        }
+
+        // Send message to WhatsApp Business API
+        const whatsappUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
+
+        const response = await fetch(whatsappUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(messageData),
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          console.error('[Proxy] WhatsApp API error:', responseData);
+          return res.status(response.status).json({
+            error: 'WhatsApp API request failed',
+            details: responseData,
+          });
+        }
+
+        console.log('[Proxy] WhatsApp message sent successfully:', responseData.messages?.[0]?.id);
+
+        res.json(responseData);
+      } catch (error) {
+        console.error('[Proxy] Error sending WhatsApp message:', error);
+        res.status(500).json({
+          error: 'Failed to send WhatsApp message',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+  );
+
+  /**
+   * Get WhatsApp message templates
+   * GET /api/proxy/:tenantId/whatsapp/templates
+   *
+   * Proxies WhatsApp templates request from N8N
+   */
+  app.get(
+    '/api/proxy/:tenantId/whatsapp/templates',
+    validateN8NSecret,
+    async (req: Request, res: Response) => {
+      try {
+        const { tenantId } = req.params;
+
+        console.log('[Proxy] WhatsApp templates request for tenant:', tenantId);
+
+        // Get decrypted access token from database
+        const accessToken = await getWhatsAppAccessToken(tenantId);
+
+        // Get business account ID from credential metadata or environment
+        const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+        const businessAccountId =
+          (credential?.metadata as any)?.businessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+
+        if (!businessAccountId) {
+          throw new Error('WhatsApp business account ID not configured');
+        }
+
+        // Fetch templates from WhatsApp Business API
+        const whatsappUrl = `https://graph.facebook.com/v21.0/${businessAccountId}/message_templates`;
+
+        const response = await fetch(whatsappUrl, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          console.error('[Proxy] WhatsApp API error:', responseData);
+          return res.status(response.status).json({
+            error: 'WhatsApp API request failed',
+            details: responseData,
+          });
+        }
+
+        console.log(
+          '[Proxy] WhatsApp templates fetched successfully:',
+          responseData.data?.length || 0,
+          'templates',
+        );
+
+        res.json(responseData);
+      } catch (error) {
+        console.error('[Proxy] Error fetching WhatsApp templates:', error);
+        res.status(500).json({
+          error: 'Failed to fetch WhatsApp templates',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+  );
+
+  /**
+   * Get WhatsApp media (for handling incoming media in webhooks)
+   * GET /api/proxy/:tenantId/whatsapp/media/:mediaId
+   *
+   * Proxies WhatsApp media download request from N8N
+   */
+  app.get(
+    '/api/proxy/:tenantId/whatsapp/media/:mediaId',
+    validateN8NSecret,
+    async (req: Request, res: Response) => {
+      try {
+        const { tenantId, mediaId } = req.params;
+
+        console.log('[Proxy] WhatsApp media request for tenant:', tenantId, 'media:', mediaId);
+
+        // Get decrypted access token from database
+        const accessToken = await getWhatsAppAccessToken(tenantId);
+
+        // Fetch media URL from WhatsApp Business API
+        const whatsappUrl = `https://graph.facebook.com/v21.0/${mediaId}`;
+
+        const response = await fetch(whatsappUrl, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          console.error('[Proxy] WhatsApp API error:', responseData);
+          return res.status(response.status).json({
+            error: 'WhatsApp API request failed',
+            details: responseData,
+          });
+        }
+
+        console.log('[Proxy] WhatsApp media URL fetched successfully');
+
+        res.json(responseData);
+      } catch (error) {
+        console.error('[Proxy] Error fetching WhatsApp media:', error);
+        res.status(500).json({
+          error: 'Failed to fetch WhatsApp media',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+  );
+
+  /**
+   * Test WhatsApp connection
+   * GET /api/proxy/:tenantId/whatsapp/test
+   *
+   * Tests WhatsApp connection by fetching phone number info
+   */
+  app.get(
+    '/api/proxy/:tenantId/whatsapp/test',
+    validateN8NSecret,
+    async (req: Request, res: Response) => {
+      try {
+        const { tenantId } = req.params;
+
+        console.log('[Proxy] WhatsApp connection test for tenant:', tenantId);
+
+        // Get decrypted access token from database
+        const accessToken = await getWhatsAppAccessToken(tenantId);
+
+        // Get phone number ID from credential metadata or environment
+        const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+        const phoneNumberId =
+          (credential?.metadata as any)?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+        if (!phoneNumberId) {
+          throw new Error('WhatsApp phone number ID not configured');
+        }
+
+        // Fetch phone number info from WhatsApp Business API
+        const whatsappUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}`;
+
+        const response = await fetch(whatsappUrl, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          console.error('[Proxy] WhatsApp API error:', responseData);
+          return res.status(response.status).json({
+            error: 'WhatsApp API request failed',
+            details: responseData,
+            connected: false,
+          });
+        }
+
+        console.log('[Proxy] WhatsApp connection test successful');
+
+        res.json({
+          connected: true,
+          phoneNumber: responseData.display_phone_number,
+          verifiedName: responseData.verified_name,
+          quality: responseData.quality_rating,
+        });
+      } catch (error) {
+        console.error('[Proxy] Error testing WhatsApp connection:', error);
+        res.status(500).json({
+          connected: false,
+          error: 'Failed to test WhatsApp connection',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
     },
   );
