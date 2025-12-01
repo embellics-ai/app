@@ -1,11 +1,15 @@
-// Add this code to server/routes.ts before the existing Retell webhook handlers
-// Location: Before "// RETELL AI WEBHOOKS" section
-
-// ============================================
-// RETELL FUNCTION PROXY ENDPOINTS
-// ============================================
-
 /**
+ * REFERENCE IMPLEMENTATION - Function Proxy Endpoint
+ * 
+ * This is a reference implementation that has been integrated into server/routes.ts
+ * This file serves as documentation and reference for the implementation.
+ * 
+ * Location in server/routes.ts: Before "// RETELL AI WEBHOOKS" section
+ * 
+ * ============================================
+ * RETELL FUNCTION PROXY ENDPOINTS
+ * ============================================
+ * 
  * Function Proxy Endpoint
  * Acts as a secure proxy between Retell AI agents and tenant-specific N8N webhooks
  *
@@ -26,7 +30,15 @@
  * - Centralized monitoring and error handling
  * - No credentials stored in Retell or N8N
  */
-app.post('/api/functions/:functionName', async (req, res) => {
+
+import type { Request, Response } from 'express';
+
+// This is a reference implementation - the actual code is in server/routes.ts
+// Type definitions are illustrative
+type Storage = any;
+
+export function createFunctionProxyEndpoint(app: any, storage: Storage) {
+  app.post('/api/functions/:functionName', async (req: Request, res: Response) => {
   const startTime = Date.now();
   const { functionName } = req.params;
   const { metadata, ...functionParams } = req.body;
@@ -172,4 +184,5 @@ app.post('/api/functions/:functionName', async (req, res) => {
       message: error.message,
     });
   }
-});
+  });
+}
