@@ -6037,6 +6037,228 @@ export async function registerRoutes(app: Express): Promise<void> {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.sendStatus(200);
   });
+
+  // ============================================
+  // OAUTH CREDENTIAL MANAGEMENT ENDPOINTS
+  // ============================================
+
+  /**
+   * Initiate WhatsApp OAuth authorization
+   * GET /api/platform/tenants/:tenantId/oauth/whatsapp/authorize
+   *
+   * Redirects user to Meta's OAuth authorization page
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/oauth/whatsapp/authorize',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Verify user has access to this tenant
+        const userTenantId = assertTenant(req, res);
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+
+        // WhatsApp Business API OAuth parameters
+        // For WhatsApp Cloud API, we use the Access Token from the Business Manager
+        // This is a simplified flow - in production, you'd redirect to Facebook Login
+        // Reference: https://developers.facebook.com/docs/whatsapp/business-management-api/get-started
+
+        const clientId = process.env.WHATSAPP_APP_ID; // Your Facebook App ID
+        const redirectUri = `${process.env.APP_URL || 'http://localhost:3000'}/api/platform/oauth/callback/whatsapp`;
+        const state = Buffer.from(JSON.stringify({ tenantId })).toString('base64');
+
+        // Scopes for WhatsApp Business API
+        const scopes = ['whatsapp_business_management', 'whatsapp_business_messaging'].join(',');
+
+        const authUrl =
+          `https://www.facebook.com/v21.0/dialog/oauth?` +
+          `client_id=${clientId}` +
+          `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+          `&state=${state}` +
+          `&scope=${scopes}` +
+          `&response_type=code`;
+
+        console.log('[OAuth] WhatsApp authorization initiated for tenant:', tenantId);
+
+        res.redirect(authUrl);
+      } catch (error) {
+        console.error('[OAuth] Error initiating WhatsApp authorization:', error);
+        res.status(500).json({ error: 'Failed to initiate authorization' });
+      }
+    },
+  );
+
+  /**
+   * Handle WhatsApp OAuth callback
+   * GET /api/platform/oauth/callback/whatsapp
+   *
+   * Receives authorization code from Meta and exchanges it for access token
+   */
+  app.get('/api/platform/oauth/callback/whatsapp', async (req: Request, res: Response) => {
+    try {
+      const { code, state, error: oauthError } = req.query;
+
+      if (oauthError) {
+        console.error('[OAuth] Authorization error:', oauthError);
+        return res.redirect(`/?oauth_error=${oauthError}`);
+      }
+
+      if (!code || !state) {
+        return res.status(400).json({ error: 'Missing authorization code or state' });
+      }
+
+      // Decode state to get tenant ID
+      const { tenantId } = JSON.parse(Buffer.from(state as string, 'base64').toString());
+
+      // Exchange authorization code for access token
+      const tokenUrl = 'https://graph.facebook.com/v21.0/oauth/access_token';
+      const params = new URLSearchParams({
+        client_id: process.env.WHATSAPP_APP_ID!,
+        client_secret: process.env.WHATSAPP_APP_SECRET!,
+        code: code as string,
+        redirect_uri: `${process.env.APP_URL || 'http://localhost:3000'}/api/platform/oauth/callback/whatsapp`,
+      });
+
+      const tokenResponse = await fetch(`${tokenUrl}?${params.toString()}`);
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        console.error('[OAuth] Token exchange failed:', errorData);
+        throw new Error('Failed to exchange authorization code for token');
+      }
+
+      const tokenData = (await tokenResponse.json()) as {
+        access_token: string;
+        token_type: string;
+        expires_in?: number;
+      };
+
+      console.log('[OAuth] Successfully obtained WhatsApp access token for tenant:', tenantId);
+
+      // Encrypt sensitive data before storing
+      const encryptedAccessToken = encrypt(tokenData.access_token);
+      const encryptedClientSecret = encrypt(process.env.WHATSAPP_APP_SECRET!);
+
+      // Calculate token expiry (default to 60 days if not provided)
+      const expiresIn = tokenData.expires_in || 60 * 24 * 60 * 60; // 60 days in seconds
+      const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+
+      // Check if credential already exists
+      const existingCredential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+
+      if (existingCredential) {
+        // Update existing credential
+        await storage.updateOAuthCredential(existingCredential.id, {
+          accessToken: encryptedAccessToken,
+          tokenExpiry,
+          isActive: true,
+        });
+        console.log('[OAuth] Updated existing WhatsApp credential for tenant:', tenantId);
+      } else {
+        // Create new credential
+        await storage.createOAuthCredential({
+          tenantId,
+          provider: 'whatsapp',
+          clientId: process.env.WHATSAPP_APP_ID!,
+          clientSecret: encryptedClientSecret,
+          accessToken: encryptedAccessToken,
+          tokenExpiry,
+          scopes: ['whatsapp_business_management', 'whatsapp_business_messaging'],
+          isActive: true,
+        });
+        console.log('[OAuth] Created new WhatsApp credential for tenant:', tenantId);
+      }
+
+      // Redirect back to integration management page with success
+      res.redirect('/?oauth_success=whatsapp');
+    } catch (error) {
+      console.error('[OAuth] Error handling WhatsApp callback:', error);
+      res.redirect('/?oauth_error=token_exchange_failed');
+    }
+  });
+
+  /**
+   * Get OAuth credential status for a tenant
+   * GET /api/platform/tenants/:tenantId/oauth/:provider
+   *
+   * Returns connection status without exposing credentials
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/oauth/:provider',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId, provider } = req.params;
+
+        // Verify user has access to this tenant
+        const userTenantId = assertTenant(req, res);
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+
+        const credential = await storage.getOAuthCredential(tenantId, provider);
+
+        if (!credential) {
+          return res.json({
+            connected: false,
+            provider,
+          });
+        }
+
+        res.json({
+          connected: true,
+          provider: credential.provider,
+          isActive: credential.isActive,
+          tokenExpiry: credential.tokenExpiry,
+          scopes: credential.scopes,
+          lastUsedAt: credential.lastUsedAt,
+          createdAt: credential.createdAt,
+        });
+      } catch (error) {
+        console.error('[OAuth] Error fetching credential status:', error);
+        res.status(500).json({ error: 'Failed to fetch credential status' });
+      }
+    },
+  );
+
+  /**
+   * Disconnect OAuth credential for a tenant
+   * DELETE /api/platform/tenants/:tenantId/oauth/:provider
+   *
+   * Removes stored OAuth credential
+   */
+  app.delete(
+    '/api/platform/tenants/:tenantId/oauth/:provider',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId, provider } = req.params;
+
+        // Verify user has access to this tenant
+        const userTenantId = assertTenant(req, res);
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+
+        const credential = await storage.getOAuthCredential(tenantId, provider);
+
+        if (!credential) {
+          return res.status(404).json({ error: 'OAuth credential not found' });
+        }
+
+        await storage.deleteOAuthCredential(credential.id);
+
+        console.log('[OAuth] Deleted OAuth credential for tenant:', tenantId, 'provider:', provider);
+
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[OAuth] Error deleting credential:', error);
+        res.status(500).json({ error: 'Failed to delete credential' });
+      }
+    },
+  );
 }
 
 // Helper function to get response from Retell AI agent
