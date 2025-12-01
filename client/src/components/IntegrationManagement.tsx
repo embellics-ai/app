@@ -1050,7 +1050,7 @@ export default function IntegrationManagement({
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{webhookDialog.webhook ? 'Edit' : 'Add'} Webhook</DialogTitle>
             <DialogDescription>
@@ -1098,7 +1098,9 @@ export default function IntegrationManagement({
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="https://n8n.hostinger.com/webhook/tenant-id/workflow"
+                        type="url"
+                        autoComplete="off"
+                        placeholder="https://n8n.example.com/webhook/your-tenant/workflow-name"
                       />
                     </FormControl>
                     <FormDescription>Full URL to the N8N webhook endpoint</FormDescription>
