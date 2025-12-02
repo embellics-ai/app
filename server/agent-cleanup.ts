@@ -9,6 +9,7 @@ const CLEANUP_INTERVAL = 60 * 1000; // Run every 1 minute
  */
 export function startAgentCleanupJob(storage: IStorage) {
   console.log('[Agent Cleanup] Starting background job (runs every 60 seconds)');
+  const startTime = Date.now();
 
   const cleanupStaleAgents = async () => {
     try {
@@ -43,7 +44,11 @@ export function startAgentCleanupJob(storage: IStorage) {
         console.log(`[Agent Cleanup] Updated ${updatedCount} agent(s) to offline`);
       }
     } catch (error) {
-      console.error('[Agent Cleanup] Error during cleanup:', error);
+      // Silently ignore errors during startup (migrations may not be complete yet)
+      // Only log errors after the first minute
+      if (Date.now() - startTime > 60000) {
+        console.error('[Agent Cleanup] Error during cleanup:', error);
+      }
     }
   };
 
