@@ -4,10 +4,41 @@ const OFFLINE_THRESHOLD = 2 * 60 * 1000; // 2 minutes in milliseconds
 const CLEANUP_INTERVAL = 60 * 1000; // Run every 1 minute
 
 /**
+ * Wait for database to be ready (migrations completed)
+ */
+async function waitForDatabase(storage: IStorage, maxAttempts = 30): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      // Try to query tenants table - if it works, database is ready
+      await storage.getAllTenants();
+      console.log('[Agent Cleanup] Database ready');
+      return true;
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        console.error('[Agent Cleanup] Database not ready after maximum attempts');
+        return false;
+      }
+      // Wait 1 second before retrying
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  return false;
+}
+
+/**
  * Background job that monitors agent last_seen timestamps and marks agents
  * as offline if they haven't sent a heartbeat in the last 2 minutes.
  */
-export function startAgentCleanupJob(storage: IStorage) {
+export async function startAgentCleanupJob(storage: IStorage) {
+  console.log('[Agent Cleanup] Waiting for database to be ready...');
+
+  // Wait for database to be ready before starting cleanup
+  const isReady = await waitForDatabase(storage);
+  if (!isReady) {
+    console.error('[Agent Cleanup] Failed to start - database not ready');
+    return () => {}; // Return empty cleanup function
+  }
+
   console.log('[Agent Cleanup] Starting background job (runs every 60 seconds)');
 
   const cleanupStaleAgents = async () => {

@@ -5,6 +5,8 @@ vite.config.ts.*
 *.tar.gz
 .env
 .env.local
+.env.*.backup
+.env.prod
 dist/
 build/
 *.log
@@ -21,15 +23,29 @@ docs/widget-simple-test.html
 
 # Ignore debug/test scripts (keep production scripts only)
 check-*.ts
+check-*.cjs
 verify-*.ts
 fix-*.ts
 show-*.ts
 create-test-*.ts
 regenerate-*.ts
 cleanup-*.ts
+clean-*.cjs
 update-*.ts
 *-test-*.ts
 *.mjs
 test-*.sql
 debug-*.sql
+diagnose-*.cjs
+reset-*.cjs
+
+# Database utility scripts (development only)
+clean-dev-database.cjs
+clean-prod-database.cjs
+reset-migrations.cjs
+diagnose-prod-db.cjs
+
+# Environment backups
+.env.*.backup
+.env.prod
 

@@ -51,6 +51,8 @@ import {
   EyeOff,
   Zap,
   Bell,
+  Settings,
+  Check,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -446,6 +448,10 @@ export default function IntegrationManagement({
           <TabsTrigger value="n8n">
             <Webhook className="w-4 h-4 mr-2" />
             N8N Webhooks
+          </TabsTrigger>
+          <TabsTrigger value="oauth">
+            <Zap className="w-4 h-4 mr-2" />
+            OAuth Connections
           </TabsTrigger>
         </TabsList>
 
@@ -942,6 +948,37 @@ export default function IntegrationManagement({
             <WebhookAnalyticsDashboard tenantId={tenantId} tenantName={tenantName} />
           </div>
         </TabsContent>
+
+        {/* OAuth Connections Tab */}
+        <TabsContent value="oauth">
+          <Card>
+            <CardHeader>
+              <CardTitle>OAuth Connections</CardTitle>
+              <CardDescription>
+                Connect third-party services securely with OAuth. Your credentials are encrypted and
+                never exposed to N8N workflows.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* WhatsApp OAuth Card */}
+              <OAuthConnectionCard
+                tenantId={tenantId}
+                provider="whatsapp"
+                title="WhatsApp Business API"
+                description="Connect your WhatsApp Business Account to send messages through N8N workflows without exposing your access token."
+                icon={<MessageSquare className="w-6 h-6" />}
+              />
+
+              {/* Future: Add more OAuth providers here */}
+              <Alert>
+                <Bell className="h-4 w-4" />
+                <AlertDescription>
+                  More OAuth providers (Google Sheets, Slack, etc.) will be available soon.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Webhook Dialog */}
@@ -1229,5 +1266,401 @@ export default function IntegrationManagement({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// OAuth Connection Card Component
+function OAuthConnectionCard({
+  tenantId,
+  provider,
+  title,
+  description,
+  icon,
+}: {
+  tenantId: string;
+  provider: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+}) {
+  const { toast } = useToast();
+  const [testing, setTesting] = useState(false);
+  const [configuring, setConfiguring] = useState(false);
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+
+  // Fetch OAuth credential status
+  const { data: oauthStatus, isLoading } = useQuery({
+    queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        `/api/platform/tenants/${tenantId}/oauth/${provider}`,
+      );
+      return await response.json();
+    },
+  });
+
+  // Configure OAuth app mutation
+  const configureMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest(
+        'POST',
+        `/api/platform/tenants/${tenantId}/oauth/${provider}/configure`,
+        {
+          clientId,
+          clientSecret,
+        },
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Configured successfully',
+        description: 'Your OAuth app credentials have been saved. You can now connect.',
+      });
+      setConfiguring(false);
+      setClientId('');
+      setClientSecret('');
+      queryClient.invalidateQueries({
+        queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Configuration failed',
+        description: error.message || 'An error occurred',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete OAuth credential mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest(
+        'DELETE',
+        `/api/platform/tenants/${tenantId}/oauth/${provider}`,
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Disconnected',
+        description: `${title} has been disconnected successfully`,
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to disconnect',
+        description: error.message || 'An error occurred',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Test connection function
+  const testConnection = async () => {
+    setTesting(true);
+    try {
+      const response = await fetch(`/api/proxy/${tenantId}/${provider}/test`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_N8N_WEBHOOK_SECRET || ''}`,
+        },
+      });
+      const result = await response.json();
+
+      if (result.connected) {
+        toast({
+          title: 'Connection successful',
+          description: `Connected to ${result.phoneNumber || result.verifiedName || provider}`,
+        });
+      } else {
+        toast({
+          title: 'Connection failed',
+          description: result.message || 'Unable to connect',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Connection test failed',
+        description: error.message || 'An error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  // Connect function - redirect to OAuth authorization
+  const handleConnect = () => {
+    window.location.href = `/api/platform/tenants/${tenantId}/oauth/${provider}/authorize`;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isConfigured = oauthStatus?.configured || false;
+  const isConnected = oauthStatus?.connected || false;
+  const tokenExpiry = oauthStatus?.tokenExpiry ? new Date(oauthStatus.tokenExpiry) : null;
+  const isExpired = tokenExpiry && tokenExpiry < new Date();
+  const daysUntilExpiry = tokenExpiry
+    ? Math.ceil((tokenExpiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  // Show configuration form if not configured
+  if (!isConfigured && !configuring) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
+              <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
+              <div className="space-y-1">
+                <h3 className="font-semibold">{title}</h3>
+                <p className="text-sm text-muted-foreground">{description}</p>
+                <Alert className="mt-3">
+                  <AlertDescription className="text-sm">
+                    Configure your OAuth app credentials first. Get these from your{' '}
+                    {provider === 'whatsapp' ? 'Meta Developer' : 'provider'} account.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </div>
+            <Button onClick={() => setConfiguring(true)} size="sm">
+              <Settings className="w-4 h-4 mr-2" />
+              Configure
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show configuration form
+  if (configuring) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex items-start space-x-4">
+              <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h3 className="font-semibold">{title} - Configuration</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Enter your OAuth app credentials from{' '}
+                    {provider === 'whatsapp' ? 'Meta Developer Portal' : 'provider settings'}.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium">App ID / Client ID</label>
+                    <Input
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      placeholder={
+                        provider === 'whatsapp' ? 'Your Facebook App ID' : 'Your Client ID'
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">App Secret / Client Secret</label>
+                    <Input
+                      type="password"
+                      value={clientSecret}
+                      onChange={(e) => setClientSecret(e.target.value)}
+                      placeholder={
+                        provider === 'whatsapp' ? 'Your Facebook App Secret' : 'Your Client Secret'
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {provider === 'whatsapp' && (
+                    <Alert>
+                      <AlertDescription className="text-xs">
+                        Get these from:{' '}
+                        <a
+                          href="https://developers.facebook.com/apps/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          Meta Developer Portal → Your App → Settings → Basic
+                        </a>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={() => configureMutation.mutate()}
+                    disabled={!clientId || !clientSecret || configureMutation.isPending}
+                    size="sm"
+                  >
+                    {configureMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Save Configuration
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setConfiguring(false);
+                      setClientId('');
+                      setClientSecret('');
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-4">
+            <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
+            <div className="space-y-1">
+              <h3 className="font-semibold">{title}</h3>
+              <p className="text-sm text-muted-foreground">{description}</p>
+
+              {isConnected && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={isExpired ? 'destructive' : 'default'}>
+                      {isExpired ? 'Expired' : 'Connected'}
+                    </Badge>
+                    {tokenExpiry && !isExpired && (
+                      <span className="text-xs text-muted-foreground">
+                        Expires in {daysUntilExpiry} days
+                      </span>
+                    )}
+                  </div>
+
+                  {oauthStatus.lastUsedAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Last used: {new Date(oauthStatus.lastUsedAt).toLocaleDateString()}
+                    </p>
+                  )}
+
+                  {isExpired && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription className="text-sm">
+                        Your access token has expired. Please reconnect to continue using this
+                        integration.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            {!isConnected ? (
+              <Button onClick={handleConnect} size="sm">
+                <Zap className="w-4 h-4 mr-2" />
+                Connect
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={testConnection}
+                  disabled={testing || Boolean(isExpired)}
+                  size="sm"
+                  variant="outline"
+                >
+                  {testing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Power className="w-4 h-4 mr-2" />
+                      Test Connection
+                    </>
+                  )}
+                </Button>
+                {isExpired && (
+                  <Button onClick={handleConnect} size="sm">
+                    <Zap className="w-4 h-4 mr-2" />
+                    Reconnect
+                  </Button>
+                )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <PowerOff className="w-4 h-4 mr-2" />
+                      Disconnect
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Disconnect {title}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will remove your OAuth credentials. N8N workflows using this connection
+                        will stop working until you reconnect.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => disconnectMutation.mutate()}
+                        disabled={disconnectMutation.isPending}
+                      >
+                        {disconnectMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Disconnecting...
+                          </>
+                        ) : (
+                          'Disconnect'
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
