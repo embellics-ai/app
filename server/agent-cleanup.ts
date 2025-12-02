@@ -19,7 +19,7 @@ async function waitForDatabase(storage: IStorage, maxAttempts = 30): Promise<boo
         return false;
       }
       // Wait 1 second before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
   return false;
@@ -31,7 +31,7 @@ async function waitForDatabase(storage: IStorage, maxAttempts = 30): Promise<boo
  */
 export async function startAgentCleanupJob(storage: IStorage) {
   console.log('[Agent Cleanup] Waiting for database to be ready...');
-  
+
   // Wait for database to be ready before starting cleanup
   const isReady = await waitForDatabase(storage);
   if (!isReady) {
