@@ -1582,10 +1582,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         // Validate WhatsApp config
         const whatsappConfigSchema = z.object({
           enabled: z.boolean(),
-          phoneNumberId: z.string().min(1).optional(),
-          businessAccountId: z.string().min(1).optional(),
-          accessToken: z.string().min(1).optional(),
-          webhookVerifyToken: z.string().min(1).optional(),
+          phoneNumberId: z.string().optional(),
+          businessAccountId: z.string().optional(),
+          accessToken: z.string().optional(),
+          webhookVerifyToken: z.string().optional(),
           phoneNumber: z.string().optional(),
         });
 
@@ -2305,14 +2305,18 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Determine tenant ID and chat type from metadata or by looking up the agent configuration
       let tenantId = chat.metadata?.tenant_id || payload.tenant_id;
 
-      if (!tenantId && chatData.agentId) {
-        // Try to find tenant by looking up the agent configuration
+      // Always look up widget config to infer chat type, even if we have tenantId from metadata
+      if (chatData.agentId) {
         const widgetConfig = await storage.getWidgetConfigByAgentId(chatData.agentId);
         if (widgetConfig) {
-          tenantId = widgetConfig.tenantId;
-          
+          // Use widget config tenantId if we don't have one from metadata
+          if (!tenantId) {
+            tenantId = widgetConfig.tenantId;
+          }
+
           // Infer chat type based on which agent ID matched
-          if (!chatData.chatType) {
+          // Override generic types like 'api_chat' with specific types
+          if (!chatData.chatType || chatData.chatType === 'api_chat') {
             if (chatData.agentId === widgetConfig.whatsappAgentId) {
               chatData.chatType = 'whatsapp';
               console.log('[Retell Webhook] Inferred chat type: whatsapp');

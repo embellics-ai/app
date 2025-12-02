@@ -513,7 +513,8 @@ export default function PlatformAdminPage() {
                           <TableHead>Email</TableHead>
                           <TableHead>Phone</TableHead>
                           <TableHead>Retell API Key</TableHead>
-                          <TableHead>Agent ID</TableHead>
+                          <TableHead>Web Chat Agent ID</TableHead>
+                          <TableHead>WhatsApp Agent ID</TableHead>
                           <TableHead className="w-[120px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -566,6 +567,24 @@ export default function PlatformAdminPage() {
                                 <Badge
                                   variant="secondary"
                                   data-testid={`badge-agent-id-not-configured-${tenant.id}`}
+                                >
+                                  Not Set
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {tenant.hasWhatsappAgentId ? (
+                                <Badge
+                                  variant="default"
+                                  data-testid={`badge-whatsapp-agent-id-configured-${tenant.id}`}
+                                >
+                                  <Key className="w-3 h-3 mr-1" />
+                                  Configured
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="secondary"
+                                  data-testid={`badge-whatsapp-agent-id-not-configured-${tenant.id}`}
                                 >
                                   Not Set
                                 </Badge>
@@ -1091,14 +1110,14 @@ export default function PlatformAdminPage() {
               <div className="space-y-2">
                 <Label htmlFor="whatsapp-agent-id">WhatsApp Chat Agent ID</Label>
                 {editApiKeyDialog.tenant?.hasWhatsappAgentId && (
-                  <div className="flex items-center gap-2 px-3 py-2.5 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900/50 transition-colors">
-                    <Key className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="font-mono text-sm font-medium text-green-900 dark:text-green-100">
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/50 transition-colors">
+                    <Key className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span className="font-mono text-sm font-medium text-purple-900 dark:text-purple-100">
                       {editApiKeyDialog.tenant.maskedWhatsappAgentId || 'Configured (hidden)'}
                     </span>
                     <Badge
                       variant="secondary"
-                      className="ml-auto bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+                      className="ml-auto bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
                     >
                       Current
                     </Badge>
