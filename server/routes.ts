@@ -6614,13 +6614,16 @@ export async function registerRoutes(app: Express): Promise<void> {
       const token = req.query['hub.verify_token'];
       const challenge = req.query['hub.challenge'];
 
-      console.log('[WhatsApp Webhook] Verification request:', { mode, token: token ? '***' : undefined });
+      console.log('[WhatsApp Webhook] Verification request:', {
+        mode,
+        token: token ? '***' : undefined,
+      });
 
       // Check if a token and mode were sent
       if (mode === 'subscribe' && token) {
         // Verify token matches (you should set WHATSAPP_VERIFY_TOKEN in env)
         const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'embellics_whatsapp_verify_2025';
-        
+
         if (token === verifyToken) {
           console.log('[WhatsApp Webhook] Verification successful');
           return res.status(200).send(challenge);
@@ -6673,7 +6676,12 @@ export async function registerRoutes(app: Express): Promise<void> {
           const phoneNumberId = metadata.phone_number_id;
           const displayPhoneNumber = metadata.display_phone_number;
 
-          console.log('[WhatsApp Webhook] Message from phone:', displayPhoneNumber, 'ID:', phoneNumberId);
+          console.log(
+            '[WhatsApp Webhook] Message from phone:',
+            displayPhoneNumber,
+            'ID:',
+            phoneNumberId,
+          );
 
           // Find tenant by phone number ID
           const tenants = await storage.getAllTenants();
@@ -6699,9 +6707,12 @@ export async function registerRoutes(app: Express): Promise<void> {
 
           // Get tenant's N8N webhook configured for WhatsApp messages
           const webhooks = await storage.getWebhooksByEvent(targetTenant.id, 'whatsapp_message');
-          
+
           if (webhooks.length === 0) {
-            console.log('[WhatsApp Webhook] No N8N webhook configured for tenant:', targetTenant.id);
+            console.log(
+              '[WhatsApp Webhook] No N8N webhook configured for tenant:',
+              targetTenant.id,
+            );
             continue;
           }
 
