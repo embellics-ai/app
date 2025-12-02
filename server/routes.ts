@@ -6542,6 +6542,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       try {
         const { tenantId, mediaId } = req.params;
 
+        // Validate mediaId to prevent SSRF attacks (must be alphanumeric with dashes/underscores)
+        if (!/^[A-Za-z0-9_-]+$/.test(mediaId)) {
+          return res.status(400).json({
+            error: 'Invalid media ID format',
+          });
+        }
+
         console.log('[Proxy] WhatsApp media request for tenant:', tenantId, 'media:', mediaId);
 
         // Get decrypted access token from database
