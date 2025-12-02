@@ -2283,7 +2283,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         agentId: chat.agent_id,
         agentName: chat.agent_name || null,
         agentVersion: chat.agent_version || null,
-        chatType: chat.chat_type || null,
+        chatType: chat.chat_type || null, // Will be inferred below if null
         chatStatus: chat.chat_status || null,
         startTimestamp,
         endTimestamp,
@@ -2302,22 +2302,24 @@ export async function registerRoutes(app: Express): Promise<void> {
         },
       };
 
-      // Determine tenant ID from metadata or by looking up the agent configuration
+      // Determine tenant ID and chat type from metadata or by looking up the agent configuration
       let tenantId = chat.metadata?.tenant_id || payload.tenant_id;
 
       if (!tenantId && chatData.agentId) {
-        // Try to find tenant by widget agent ID
+        // Try to find tenant by looking up the agent configuration
         const widgetConfig = await storage.getWidgetConfigByAgentId(chatData.agentId);
         if (widgetConfig) {
           tenantId = widgetConfig.tenantId;
-        }
-        
-        // If not found in widget configs, try WhatsApp agent ID
-        if (!tenantId) {
-          const whatsappTenant = await storage.getTenantByWhatsAppAgentId(chatData.agentId);
-          if (whatsappTenant) {
-            tenantId = whatsappTenant.id;
-            console.log('[Retell Webhook] Found tenant by WhatsApp agent ID:', tenantId);
+          
+          // Infer chat type based on which agent ID matched
+          if (!chatData.chatType) {
+            if (chatData.agentId === widgetConfig.whatsappAgentId) {
+              chatData.chatType = 'whatsapp';
+              console.log('[Retell Webhook] Inferred chat type: whatsapp');
+            } else if (chatData.agentId === widgetConfig.retellAgentId) {
+              chatData.chatType = 'web_chat';
+              console.log('[Retell Webhook] Inferred chat type: web_chat');
+            }
           }
         }
       }
@@ -2325,7 +2327,8 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (!tenantId) {
         console.error(
           '[Retell Webhook] Could not determine tenant_id from payload or agent configuration',
-          'Agent ID:', chatData.agentId
+          'Agent ID:',
+          chatData.agentId,
         );
         return res.status(400).json({
           error:
