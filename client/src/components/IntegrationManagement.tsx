@@ -1474,7 +1474,9 @@ function OAuthConnectionCard({
                     <Input
                       value={clientId}
                       onChange={(e) => setClientId(e.target.value)}
-                      placeholder={provider === 'whatsapp' ? 'Your Facebook App ID' : 'Your Client ID'}
+                      placeholder={
+                        provider === 'whatsapp' ? 'Your Facebook App ID' : 'Your Client ID'
+                      }
                       className="mt-1"
                     />
                   </div>
@@ -1485,7 +1487,9 @@ function OAuthConnectionCard({
                       type="password"
                       value={clientSecret}
                       onChange={(e) => setClientSecret(e.target.value)}
-                      placeholder={provider === 'whatsapp' ? 'Your Facebook App Secret' : 'Your Client Secret'}
+                      placeholder={
+                        provider === 'whatsapp' ? 'Your Facebook App Secret' : 'Your Client Secret'
+                      }
                       className="mt-1"
                     />
                   </div>

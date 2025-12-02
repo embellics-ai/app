@@ -20,7 +20,7 @@ console.log('================================\n');
 async function testOAuthStatus() {
   console.log('Test 1: Check OAuth Connection Status');
   console.log('--------------------------------------');
-  
+
   try {
     const url = `${BASE_URL}/api/platform/tenants/${TENANT_ID}/oauth/whatsapp`;
     console.log(`GET ${url}`);
@@ -36,36 +36,36 @@ async function testOAuthStatus() {
 async function testProxyAuth() {
   console.log('\nTest 2: Test Proxy API Authentication');
   console.log('--------------------------------------');
-  
+
   return new Promise((resolve) => {
     const url = new URL(`${BASE_URL}/api/proxy/${TENANT_ID}/whatsapp/test`);
-    
+
     const options = {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${N8N_SECRET}`
-      }
+        Authorization: `Bearer ${N8N_SECRET}`,
+      },
     };
-    
+
     console.log(`GET ${url}`);
     console.log(`Authorization: Bearer ${N8N_SECRET?.substring(0, 20)}...`);
-    
+
     const client = url.protocol === 'https:' ? https : http;
-    
+
     const req = client.request(url, options, (res) => {
       let data = '';
-      
+
       res.on('data', (chunk) => {
         data += chunk;
       });
-      
+
       res.on('end', () => {
         console.log(`\nStatus: ${res.statusCode}`);
-        
+
         try {
           const json = JSON.parse(data);
           console.log('Response:', JSON.stringify(json, null, 2));
-          
+
           if (res.statusCode === 200 && json.connected) {
             console.log('\n✅ Proxy API is working!');
             console.log('   WhatsApp connection: CONNECTED');
@@ -86,12 +86,12 @@ async function testProxyAuth() {
         }
       });
     });
-    
+
     req.on('error', (error) => {
       console.error('\n❌ Request failed:', error.message);
       resolve(false);
     });
-    
+
     req.end();
   });
 }
@@ -100,36 +100,36 @@ async function testProxyAuth() {
 async function testInvalidAuth() {
   console.log('\nTest 3: Test Invalid Auth Token');
   console.log('--------------------------------');
-  
+
   return new Promise((resolve) => {
     const url = new URL(`${BASE_URL}/api/proxy/${TENANT_ID}/whatsapp/test`);
-    
+
     const options = {
       method: 'GET',
       headers: {
-        'Authorization': 'Bearer invalid_token_12345'
-      }
+        Authorization: 'Bearer invalid_token_12345',
+      },
     };
-    
+
     console.log(`GET ${url}`);
     console.log(`Authorization: Bearer invalid_token_12345`);
-    
+
     const client = url.protocol === 'https:' ? https : http;
-    
+
     const req = client.request(url, options, (res) => {
       let data = '';
-      
+
       res.on('data', (chunk) => {
         data += chunk;
       });
-      
+
       res.on('end', () => {
         console.log(`\nStatus: ${res.statusCode}`);
-        
+
         try {
           const json = JSON.parse(data);
           console.log('Response:', JSON.stringify(json, null, 2));
-          
+
           if (res.statusCode === 401) {
             console.log('\n✅ Authentication is working correctly!');
             console.log('   Invalid tokens are rejected');
@@ -144,12 +144,12 @@ async function testInvalidAuth() {
         }
       });
     });
-    
+
     req.on('error', (error) => {
       console.error('\n❌ Request failed:', error.message);
       resolve(false);
     });
-    
+
     req.end();
   });
 }
@@ -159,15 +159,15 @@ async function runTests() {
   await testOAuthStatus();
   const test2 = await testProxyAuth();
   const test3 = await testInvalidAuth();
-  
+
   console.log('\n================================');
   console.log('📊 Test Summary');
   console.log('================================\n');
-  
+
   console.log('Test 1: OAuth Status Endpoint - ℹ️  Requires browser login');
   console.log(`Test 2: Proxy API Test Connection - ${test2 ? '✅ PASS' : '⚠️  No credential'}`);
   console.log(`Test 3: Invalid Auth Rejection - ${test3 ? '✅ PASS' : '❌ FAIL'}`);
-  
+
   console.log('\n💡 Next Steps:');
   console.log('1. Go to http://localhost:3000');
   console.log('2. Log in as admin');

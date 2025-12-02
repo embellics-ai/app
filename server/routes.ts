@@ -6056,11 +6056,11 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Get tenant's OAuth credential configuration
         const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
-        
+
         if (!credential || !credential.clientId) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: 'WhatsApp OAuth app not configured',
-            message: 'Please configure your WhatsApp App ID and App Secret first'
+            message: 'Please configure your WhatsApp App ID and App Secret first',
           });
         }
 
@@ -6113,7 +6113,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Get tenant's OAuth credential configuration
       const credential = await storage.getOAuthCredential(tenantId, 'whatsapp');
-      
+
       if (!credential || !credential.clientId || !credential.clientSecret) {
         console.error('[OAuth] Tenant OAuth app not configured for callback');
         return res.redirect(`/?oauth_error=app_not_configured`);
@@ -6283,9 +6283,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Validate input
         if (!clientId || !clientSecret) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: 'Missing required fields',
-            message: 'Both App ID and App Secret are required'
+            message: 'Both App ID and App Secret are required',
           });
         }
 
@@ -6301,7 +6301,12 @@ export async function registerRoutes(app: Express): Promise<void> {
             clientId,
             clientSecret: encryptedClientSecret,
           });
-          console.log('[OAuth] Updated app configuration for tenant:', tenantId, 'provider:', provider);
+          console.log(
+            '[OAuth] Updated app configuration for tenant:',
+            tenantId,
+            'provider:',
+            provider,
+          );
         } else {
           // Create new credential with app configuration (but no tokens yet)
           await storage.createOAuthCredential({
@@ -6309,17 +6314,23 @@ export async function registerRoutes(app: Express): Promise<void> {
             provider,
             clientId,
             clientSecret: encryptedClientSecret,
-            scopes: provider === 'whatsapp' 
-              ? ['whatsapp_business_management', 'whatsapp_business_messaging']
-              : [],
+            scopes:
+              provider === 'whatsapp'
+                ? ['whatsapp_business_management', 'whatsapp_business_messaging']
+                : [],
             isActive: false, // Not active until OAuth flow completes
           });
-          console.log('[OAuth] Created app configuration for tenant:', tenantId, 'provider:', provider);
+          console.log(
+            '[OAuth] Created app configuration for tenant:',
+            tenantId,
+            'provider:',
+            provider,
+          );
         }
 
-        res.json({ 
+        res.json({
           success: true,
-          message: 'OAuth app configured successfully. You can now connect.'
+          message: 'OAuth app configured successfully. You can now connect.',
         });
       } catch (error) {
         console.error('[OAuth] Error configuring app credentials:', error);
