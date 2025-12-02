@@ -2306,16 +2306,26 @@ export async function registerRoutes(app: Express): Promise<void> {
       let tenantId = chat.metadata?.tenant_id || payload.tenant_id;
 
       if (!tenantId && chatData.agentId) {
-        // Try to find tenant by agent ID (useful for WhatsApp and other integrations)
+        // Try to find tenant by widget agent ID
         const widgetConfig = await storage.getWidgetConfigByAgentId(chatData.agentId);
         if (widgetConfig) {
           tenantId = widgetConfig.tenantId;
+        }
+        
+        // If not found in widget configs, try WhatsApp agent ID
+        if (!tenantId) {
+          const whatsappTenant = await storage.getTenantByWhatsAppAgentId(chatData.agentId);
+          if (whatsappTenant) {
+            tenantId = whatsappTenant.id;
+            console.log('[Retell Webhook] Found tenant by WhatsApp agent ID:', tenantId);
+          }
         }
       }
 
       if (!tenantId) {
         console.error(
           '[Retell Webhook] Could not determine tenant_id from payload or agent configuration',
+          'Agent ID:', chatData.agentId
         );
         return res.status(400).json({
           error:

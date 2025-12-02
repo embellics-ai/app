@@ -82,6 +82,7 @@ export interface IStorage {
   // Tenant methods
   getTenant(id: string): Promise<Tenant | undefined>;
   getTenantByEmail(email: string): Promise<Tenant | undefined>;
+  getTenantByWhatsAppAgentId(agentId: string): Promise<Tenant | undefined>;
   getAllTenants(): Promise<Tenant[]>;
   createTenant(tenant: InsertTenant): Promise<Tenant>;
   updateTenant(id: string, updates: Partial<InsertTenant>): Promise<Tenant | undefined>;
@@ -401,6 +402,20 @@ export class MemStorage implements IStorage {
 
   async getTenantByEmail(email: string): Promise<Tenant | undefined> {
     return Array.from(this.tenants.values()).find((t) => t.email === email);
+  }
+
+  async getTenantByWhatsAppAgentId(agentId: string): Promise<Tenant | undefined> {
+    // Find tenant by checking tenant_integrations for matching whatsapp agent ID
+    const integration = Array.from(this.tenantIntegrations.values()).find((ti) => {
+      const config = ti.whatsappConfig as any;
+      return config?.whatsapp_agent_id === agentId;
+    });
+    
+    if (integration) {
+      return this.tenants.get(integration.tenantId);
+    }
+    
+    return undefined;
   }
 
   async getAllTenants(): Promise<Tenant[]> {
@@ -1675,6 +1690,18 @@ export class DbStorage implements IStorage {
   async getTenantByEmail(email: string): Promise<Tenant | undefined> {
     const result = await this.db.select().from(tenants).where(eq(tenants.email, email));
     return result[0];
+  }
+
+  async getTenantByWhatsAppAgentId(agentId: string): Promise<Tenant | undefined> {
+    // Find tenant by checking tenant_integrations for matching whatsapp agent ID
+    const result = await this.db
+      .select({ tenant: tenants })
+      .from(tenantIntegrations)
+      .innerJoin(tenants, eq(tenantIntegrations.tenantId, tenants.id))
+      .where(sql`${tenantIntegrations.whatsappConfig}->>'whatsapp_agent_id' = ${agentId}`)
+      .limit(1);
+    
+    return result[0]?.tenant;
   }
 
   async getAllTenants(): Promise<Tenant[]> {
