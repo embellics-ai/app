@@ -1114,6 +1114,7 @@ export default function IntegrationManagement({
                           <option value="call_analyzed">Call Analyzed</option>
                           <option value="chat_started">Chat Started</option>
                           <option value="chat_ended">Chat Ended</option>
+                          <option value="whatsapp_message">WhatsApp Message</option>
                           <option value="*">All Events (*)</option>
                         </select>
                       </FormControl>
