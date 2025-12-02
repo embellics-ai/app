@@ -35,7 +35,6 @@ debug-*.sql
 
 # Database utility scripts (development only)
 clean-prod-database.cjs
-drop-migrations-table.cjs
 reset-migrations.cjs
 diagnose-prod-db.cjs
 
