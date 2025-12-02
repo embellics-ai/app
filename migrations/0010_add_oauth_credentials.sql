@@ -2,8 +2,11 @@
 -- Purpose: Store encrypted OAuth tokens per tenant for WhatsApp, Google Sheets, etc.
 -- This enables secure credential proxy so N8N workflows don't need direct OAuth access
 
+-- Drop the table if it exists (for clean migration on fresh/partial databases)
+DROP TABLE IF EXISTS oauth_credentials CASCADE;
+
 -- Create oauth_credentials table
-CREATE TABLE IF NOT EXISTS oauth_credentials (
+CREATE TABLE oauth_credentials (
   id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   
