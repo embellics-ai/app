@@ -33,3 +33,12 @@ update-*.ts
 test-*.sql
 debug-*.sql
 
+# Database utility scripts (development only)
+clean-prod-database.cjs
+reset-migrations.cjs
+diagnose-prod-db.cjs
+
+# Environment backups
+.env.*.backup
+.env.prod
+

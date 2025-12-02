@@ -98,8 +98,8 @@ app.use((req, res, next) => {
   // Initialize database with platform owner if needed
   await initializeDatabase();
 
-  // Start agent cleanup background job
-  const stopCleanupJob = startAgentCleanupJob(storage);
+  // Start agent cleanup background job (waits for database to be ready)
+  const stopCleanupJob = await startAgentCleanupJob(storage);
 
   // Graceful shutdown handler
   process.on('SIGTERM', () => {
