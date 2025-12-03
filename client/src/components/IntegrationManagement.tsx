@@ -450,10 +450,6 @@ export default function IntegrationManagement({
             <Webhook className="w-4 h-4 mr-2" />
             N8N Webhooks
           </TabsTrigger>
-          <TabsTrigger value="oauth">
-            <Zap className="w-4 h-4 mr-2" />
-            OAuth Connections
-          </TabsTrigger>
           <TabsTrigger value="external-apis">
             <Settings className="w-4 h-4 mr-2" />
             External APIs
@@ -954,37 +950,6 @@ export default function IntegrationManagement({
           </div>
         </TabsContent>
 
-        {/* OAuth Connections Tab */}
-        <TabsContent value="oauth">
-          <Card>
-            <CardHeader>
-              <CardTitle>OAuth Connections</CardTitle>
-              <CardDescription>
-                Connect third-party services securely with OAuth. Your credentials are encrypted and
-                never exposed to N8N workflows.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* WhatsApp OAuth Card */}
-              <OAuthConnectionCard
-                tenantId={tenantId}
-                provider="whatsapp"
-                title="WhatsApp Business API"
-                description="Connect your WhatsApp Business Account to send messages through N8N workflows without exposing your access token."
-                icon={<MessageSquare className="w-6 h-6" />}
-              />
-
-              {/* Future: Add more OAuth providers here */}
-              <Alert>
-                <Bell className="h-4 w-4" />
-                <AlertDescription>
-                  More OAuth providers (Google Sheets, Slack, etc.) will be available soon.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* External APIs Tab */}
         <TabsContent value="external-apis">
           <ExternalAPIsTab tenantId={tenantId} />
@@ -1288,6 +1253,9 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingApi, setEditingApi] = useState<any>(null);
 
+  // Helper function to get the base URL - simply use current origin
+  const getBaseUrl = () => window.location.origin;
+
   // Simple form state
   const [formData, setFormData] = useState({
     serviceName: '',
@@ -1482,92 +1450,92 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
             </TableHeader>
             <TableBody>
               {apis.map((api: any) => {
-                const proxyUrl = `https://embellics-app.onrender.com/api/proxy/${tenantId}/http/${api.serviceName}/ENDPOINT_PATH`;
+                const proxyUrl = `${getBaseUrl()}/api/proxy/${tenantId}/http/${api.serviceName}/ENDPOINT_PATH`;
                 return (
-                <TableRow key={api.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{api.displayName}</div>
-                      <div className="text-sm text-muted-foreground">{api.serviceName}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">{api.baseUrl}</code>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{api.authType}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {api.isActive ? (
-                      <Badge className="bg-green-500">Active</Badge>
-                    ) : (
-                      <Badge variant="secondary">Inactive</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{api.totalCalls || 0} calls</div>
-                      <div className="text-muted-foreground">
-                        {api.successfulCalls || 0} success / {api.failedCalls || 0} failed
+                  <TableRow key={api.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{api.displayName}</div>
+                        <div className="text-sm text-muted-foreground">{api.serviceName}</div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(proxyUrl);
-                        toast({
-                          title: 'Copied!',
-                          description: 'Proxy URL copied to clipboard',
-                        });
-                      }}
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy URL
-                    </Button>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(api)}>
-                        <Edit className="w-4 h-4" />
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">{api.baseUrl}</code>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{api.authType}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {api.isActive ? (
+                        <Badge className="bg-green-500">Active</Badge>
+                      ) : (
+                        <Badge variant="secondary">Inactive</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>{api.totalCalls || 0} calls</div>
+                        <div className="text-muted-foreground">
+                          {api.successfulCalls || 0} success / {api.failedCalls || 0} failed
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(proxyUrl);
+                          toast({
+                            title: 'Copied!',
+                            description: 'Proxy URL copied to clipboard',
+                          });
+                        }}
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy URL
                       </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete {api.displayName}?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete this API configuration. N8N workflows
-                              using this API will stop working.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteMutation.mutate(api.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Deleting...
-                                </>
-                              ) : (
-                                'Delete'
-                              )}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(api)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete {api.displayName}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete this API configuration. N8N workflows
+                                using this API will stop working.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteMutation.mutate(api.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                {deleteMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  'Delete'
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>
@@ -1655,15 +1623,30 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
               {formData.authType === 'bearer' && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Bearer Token</label>
+                  {editingApi && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-950 rounded-md border border-purple-200 dark:border-purple-800 mb-2">
+                      <Settings className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span className="text-sm font-mono text-purple-700 dark:text-purple-300">
+                        {editingApi.serviceName}_********
+                      </span>
+                      <Badge variant="secondary" className="ml-auto">
+                        Current
+                      </Badge>
+                    </div>
+                  )}
                   <Input
                     value={formData.credentials.token || ''}
                     onChange={(e) => updateCredential('token', e.target.value)}
                     type="password"
-                    placeholder="Enter your bearer token"
-                    required
+                    placeholder={
+                      editingApi ? 'Enter new token to update' : 'Enter your bearer token'
+                    }
+                    required={!editingApi}
                   />
                   <p className="text-xs text-muted-foreground">
-                    The bearer token for authentication
+                    {editingApi
+                      ? 'Enter a new token to update, or leave empty to keep existing.'
+                      : 'The bearer token for authentication'}
                   </p>
                 </div>
               )}
@@ -1765,13 +1748,13 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
               <Alert>
                 <Settings className="h-4 w-4" />
                 <AlertDescription>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div>
-                      <strong>Proxy Endpoint URL:</strong>
+                      <strong>Proxy Endpoint URL (This Tenant):</strong>
                     </div>
                     <div className="flex items-center gap-2">
-                      <code className="text-xs bg-muted px-2 py-1 rounded flex-1">
-                        https://embellics-app.onrender.com/api/proxy/{tenantId}/http/
+                      <code className="text-xs bg-muted px-2 py-1 rounded flex-1 break-all">
+                        {getBaseUrl()}/api/proxy/{tenantId}/http/
                         {formData.serviceName || 'SERVICE_NAME'}/ENDPOINT_PATH
                       </code>
                       <Button
@@ -1779,11 +1762,11 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const url = `https://embellics-app.onrender.com/api/proxy/${tenantId}/http/${formData.serviceName || 'SERVICE_NAME'}/ENDPOINT_PATH`;
+                          const url = `${getBaseUrl()}/api/proxy/${tenantId}/http/${formData.serviceName || 'SERVICE_NAME'}/ENDPOINT_PATH`;
                           navigator.clipboard.writeText(url);
                           toast({
                             title: 'Copied!',
-                            description: 'Proxy URL copied to clipboard',
+                            description: 'Static proxy URL copied to clipboard',
                           });
                         }}
                       >
@@ -1791,7 +1774,36 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Use this URL in your workflows to call this API securely
+                      Use this for single-tenant workflows
+                    </p>
+
+                    <div className="border-t pt-3">
+                      <strong>Dynamic URL (Multi-Tenant):</strong>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs bg-muted px-2 py-1 rounded flex-1 break-all">
+                        {getBaseUrl()}/api/proxy/{`{{ tenantId }}`}/http/
+                        {formData.serviceName || 'SERVICE_NAME'}/{`{{ endpoint }}`}
+                      </code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = `${getBaseUrl()}/api/proxy/{{ tenantId }}/http/${formData.serviceName || 'SERVICE_NAME'}/{{ endpoint }}`;
+                          navigator.clipboard.writeText(url);
+                          toast({
+                            title: 'Copied!',
+                            description: 'Dynamic N8N expression copied to clipboard',
+                          });
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Use this to get tenantId and endpoint from previous node (e.g., from webhook
+                      body)
                     </p>
                   </div>
                 </AlertDescription>
@@ -1818,402 +1830,6 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
             </form>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
-  );
-}
-
-// OAuth Connection Card Component
-function OAuthConnectionCard({
-  tenantId,
-  provider,
-  title,
-  description,
-  icon,
-}: {
-  tenantId: string;
-  provider: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-}) {
-  const { toast } = useToast();
-  const [testing, setTesting] = useState(false);
-  const [configuring, setConfiguring] = useState(false);
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
-
-  // Fetch OAuth credential status
-  const { data: oauthStatus, isLoading } = useQuery({
-    queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
-    queryFn: async () => {
-      const response = await apiRequest(
-        'GET',
-        `/api/platform/tenants/${tenantId}/oauth/${provider}`,
-      );
-      return await response.json();
-    },
-  });
-
-  // Configure OAuth app mutation
-  const configureMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest(
-        'POST',
-        `/api/platform/tenants/${tenantId}/oauth/${provider}/configure`,
-        {
-          clientId,
-          clientSecret,
-        },
-      );
-      return await response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Configured successfully',
-        description: 'Your OAuth app credentials have been saved. You can now connect.',
-      });
-      setConfiguring(false);
-      setClientId('');
-      setClientSecret('');
-      queryClient.invalidateQueries({
-        queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Configuration failed',
-        description: error.message || 'An error occurred',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Delete OAuth credential mutation
-  const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest(
-        'DELETE',
-        `/api/platform/tenants/${tenantId}/oauth/${provider}`,
-      );
-      return await response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Disconnected',
-        description: `${title} has been disconnected successfully`,
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/platform/tenants/${tenantId}/oauth/${provider}`],
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Failed to disconnect',
-        description: error.message || 'An error occurred',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Test connection function
-  const testConnection = async () => {
-    setTesting(true);
-    try {
-      const response = await fetch(`/api/proxy/${tenantId}/${provider}/test`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_N8N_WEBHOOK_SECRET || ''}`,
-        },
-      });
-      const result = await response.json();
-
-      if (result.connected) {
-        toast({
-          title: 'Connection successful',
-          description: `Connected to ${result.phoneNumber || result.verifiedName || provider}`,
-        });
-      } else {
-        toast({
-          title: 'Connection failed',
-          description: result.message || 'Unable to connect',
-          variant: 'destructive',
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Connection test failed',
-        description: error.message || 'An error occurred',
-        variant: 'destructive',
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  // Connect function - redirect to OAuth authorization
-  const handleConnect = () => {
-    window.location.href = `/api/platform/tenants/${tenantId}/oauth/${provider}/authorize`;
-  };
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const isConfigured = oauthStatus?.configured || false;
-  const isConnected = oauthStatus?.connected || false;
-  const tokenExpiry = oauthStatus?.tokenExpiry ? new Date(oauthStatus.tokenExpiry) : null;
-  const isExpired = tokenExpiry && tokenExpiry < new Date();
-  const daysUntilExpiry = tokenExpiry
-    ? Math.ceil((tokenExpiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-    : null;
-
-  // Show configuration form if not configured
-  if (!isConfigured && !configuring) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
-              <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
-              <div className="space-y-1">
-                <h3 className="font-semibold">{title}</h3>
-                <p className="text-sm text-muted-foreground">{description}</p>
-                <Alert className="mt-3">
-                  <AlertDescription className="text-sm">
-                    Configure your OAuth app credentials first. Get these from your{' '}
-                    {provider === 'whatsapp' ? 'Meta Developer' : 'provider'} account.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            </div>
-            <Button onClick={() => setConfiguring(true)} size="sm">
-              <Settings className="w-4 h-4 mr-2" />
-              Configure
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Show configuration form
-  if (configuring) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div className="flex items-start space-x-4">
-              <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
-              <div className="flex-1 space-y-4">
-                <div>
-                  <h3 className="font-semibold">{title} - Configuration</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Enter your OAuth app credentials from{' '}
-                    {provider === 'whatsapp' ? 'Meta Developer Portal' : 'provider settings'}.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium">App ID / Client ID</label>
-                    <Input
-                      value={clientId}
-                      onChange={(e) => setClientId(e.target.value)}
-                      placeholder={
-                        provider === 'whatsapp' ? 'Your Facebook App ID' : 'Your Client ID'
-                      }
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">App Secret / Client Secret</label>
-                    <Input
-                      type="password"
-                      value={clientSecret}
-                      onChange={(e) => setClientSecret(e.target.value)}
-                      placeholder={
-                        provider === 'whatsapp' ? 'Your Facebook App Secret' : 'Your Client Secret'
-                      }
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {provider === 'whatsapp' && (
-                    <Alert>
-                      <AlertDescription className="text-xs">
-                        Get these from:{' '}
-                        <a
-                          href="https://developers.facebook.com/apps/"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline"
-                        >
-                          Meta Developer Portal → Your App → Settings → Basic
-                        </a>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={() => configureMutation.mutate()}
-                    disabled={!clientId || !clientSecret || configureMutation.isPending}
-                    size="sm"
-                  >
-                    {configureMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Save Configuration
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setConfiguring(false);
-                      setClientId('');
-                      setClientSecret('');
-                    }}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-4">
-            <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
-            <div className="space-y-1">
-              <h3 className="font-semibold">{title}</h3>
-              <p className="text-sm text-muted-foreground">{description}</p>
-
-              {isConnected && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={isExpired ? 'destructive' : 'default'}>
-                      {isExpired ? 'Expired' : 'Connected'}
-                    </Badge>
-                    {tokenExpiry && !isExpired && (
-                      <span className="text-xs text-muted-foreground">
-                        Expires in {daysUntilExpiry} days
-                      </span>
-                    )}
-                  </div>
-
-                  {oauthStatus.lastUsedAt && (
-                    <p className="text-xs text-muted-foreground">
-                      Last used: {new Date(oauthStatus.lastUsedAt).toLocaleDateString()}
-                    </p>
-                  )}
-
-                  {isExpired && (
-                    <Alert variant="destructive" className="mt-2">
-                      <AlertDescription className="text-sm">
-                        Your access token has expired. Please reconnect to continue using this
-                        integration.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col space-y-2">
-            {!isConnected ? (
-              <Button onClick={handleConnect} size="sm">
-                <Zap className="w-4 h-4 mr-2" />
-                Connect
-              </Button>
-            ) : (
-              <>
-                <Button
-                  onClick={testConnection}
-                  disabled={testing || Boolean(isExpired)}
-                  size="sm"
-                  variant="outline"
-                >
-                  {testing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Testing...
-                    </>
-                  ) : (
-                    <>
-                      <Power className="w-4 h-4 mr-2" />
-                      Test Connection
-                    </>
-                  )}
-                </Button>
-                {isExpired && (
-                  <Button onClick={handleConnect} size="sm">
-                    <Zap className="w-4 h-4 mr-2" />
-                    Reconnect
-                  </Button>
-                )}
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                      <PowerOff className="w-4 h-4 mr-2" />
-                      Disconnect
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Disconnect {title}?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove your OAuth credentials. N8N workflows using this connection
-                        will stop working until you reconnect.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => disconnectMutation.mutate()}
-                        disabled={disconnectMutation.isPending}
-                      >
-                        {disconnectMutation.isPending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Disconnecting...
-                          </>
-                        ) : (
-                          'Disconnect'
-                        )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
