@@ -2633,20 +2633,25 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // ============================================
-  // CHAT ANALYTICS API ENDPOINTS (Platform Admin)
+  // CHAT ANALYTICS API ENDPOINTS (Platform Admin + Client Admin)
   // ============================================
 
   /**
    * Get combined analytics overview (voice + chat)
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/overview',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId } = req.query;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
@@ -2682,15 +2687,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   /**
    * Get list of chat sessions with filters
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/chats',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId, sentiment, chatStatus, limit } = req.query;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
@@ -2714,15 +2724,20 @@ export async function registerRoutes(app: Express): Promise<void> {
   /**
    * Get time-series chat analytics for visualizations
    * IMPORTANT: This must come BEFORE the /:chatId route
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/chats/time-series',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId, groupBy } = req.query;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
@@ -2744,15 +2759,20 @@ export async function registerRoutes(app: Express): Promise<void> {
   /**
    * Get agent breakdown for chat analytics
    * IMPORTANT: This must come BEFORE the /:chatId route
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/chats/agent-breakdown',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
         const { startDate, endDate } = req.query;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         console.log('[Analytics Agent Breakdown] Querying for tenant:', tenantId);
 
@@ -2777,14 +2797,19 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   /**
    * Get detailed analytics for a specific chat session
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/chats/:chatId',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId, chatId } = req.params;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         const chat = await storage.getChatAnalytics(chatId);
 
@@ -2808,15 +2833,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   /**
    * Get sentiment analysis breakdown
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/sentiment',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId } = req.query;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
@@ -2841,15 +2871,20 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   /**
    * Get cost tracking analytics
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/costs',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId } = req.query;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         const filters = {
           startDate: startDate ? new Date(startDate as string) : undefined,
@@ -2885,20 +2920,25 @@ export async function registerRoutes(app: Express): Promise<void> {
   );
 
   // ============================================
-  // VOICE ANALYTICS API ENDPOINTS (Platform Admin)
+  // VOICE ANALYTICS API ENDPOINTS (Platform Admin + Client Admin)
   // ============================================
 
   /**
    * Get list of voice call sessions with filters
+   * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
    */
   app.get(
     '/api/platform/tenants/:tenantId/analytics/calls',
     requireAuth,
-    requirePlatformAdmin,
     async (req: AuthenticatedRequest, res) => {
       try {
         const { tenantId } = req.params;
         const { startDate, endDate, agentId, sentiment, callStatus, limit } = req.query;
+
+        // Authorization: Platform admin can access any tenant, client admin only their own
+        if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+        }
 
         console.log('[Analytics Calls] Querying for tenant:', tenantId);
         console.log('[Analytics Calls] Filters:', {
