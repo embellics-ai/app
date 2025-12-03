@@ -885,6 +885,92 @@ export const insertOAuthCredentialSchema = createInsertSchema(oauthCredentials).
 export type InsertOAuthCredential = z.infer<typeof insertOAuthCredentialSchema>;
 export type OAuthCredential = typeof oauthCredentials.$inferSelect;
 
+// ============================================
+// EXTERNAL API CONFIGURATIONS
+// ============================================
+
+/**
+ * External API Configurations
+ * Stores credentials and settings for ANY external API that N8N needs to call
+ * Examples: Google Calendar, Stripe, SendGrid, custom APIs, etc.
+ */
+export const externalApiConfigs = pgTable(
+  'external_api_configs',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Service identification
+    serviceName: text('service_name').notNull(),
+    // e.g., 'google_calendar', 'stripe', 'sendgrid', 'custom_crm'
+    // Used in proxy URL: /api/proxy/:tenantId/http/:serviceName/*
+
+    displayName: text('display_name').notNull(),
+    // User-friendly name shown in UI
+
+    baseUrl: text('base_url').notNull(),
+    // Base URL for the API, e.g., 'https://api.stripe.com'
+    // Proxy will append the endpoint path from N8N request
+
+    // Authentication configuration
+    authType: text('auth_type').notNull(),
+    // Values: 'bearer', 'api_key', 'basic', 'oauth2', 'custom_header', 'none'
+
+    // Encrypted credentials (JSON object structure varies by authType)
+    encryptedCredentials: text('encrypted_credentials'),
+    // For bearer: { "token": "sk_live_..." }
+    // For api_key: { "key": "abc123", "headerName": "X-API-Key" }
+    // For basic: { "username": "user", "password": "pass" }
+    // For oauth2: { "accessToken": "...", "refreshToken": "...", "expiresAt": "..." }
+    // For custom_header: { "headerName": "X-Custom-Auth", "headerValue": "..." }
+
+    // Additional headers (JSON object)
+    customHeaders: jsonb('custom_headers'),
+    // { "Content-Type": "application/json", "X-Custom-Header": "value" }
+
+    // Optional description
+    description: text('description'),
+
+    // Status
+    isActive: boolean('is_active').default(true).notNull(),
+
+    // Usage tracking
+    lastUsedAt: timestamp('last_used_at'),
+    totalCalls: integer('total_calls').notNull().default(0),
+    successfulCalls: integer('successful_calls').notNull().default(0),
+    failedCalls: integer('failed_calls').notNull().default(0),
+
+    // Audit
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    createdBy: varchar('created_by').references(() => clientUsers.id),
+  },
+  (table) => ({
+    // Unique: one configuration per tenant per service name
+    tenantServiceIdx: uniqueIndex('external_api_configs_tenant_service_idx').on(
+      table.tenantId,
+      table.serviceName,
+    ),
+  }),
+);
+
+export const insertExternalApiConfigSchema = createInsertSchema(externalApiConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+  totalCalls: true,
+  successfulCalls: true,
+  failedCalls: true,
+});
+
+export type InsertExternalApiConfig = z.infer<typeof insertExternalApiConfigSchema>;
+export type ExternalApiConfig = typeof externalApiConfigs.$inferSelect;
+
 // Settings Schema (keeping for backward compatibility)
 export const settingsSchema = z.object({
   apiKey: z.string().optional(),

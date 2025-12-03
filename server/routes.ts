@@ -6242,8 +6242,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId, provider } = req.params;
 
         // Verify user has access to this tenant
-        const userTenantId = assertTenant(req, res);
-        if (!userTenantId || userTenantId !== tenantId) {
+        const userTenantId = assertTenant(req);
+        if (!userTenantId) {
+          return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+        }
+        if (userTenantId !== tenantId) {
           return res.status(403).json({ error: 'Access denied to this tenant' });
         }
 
@@ -6292,8 +6295,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { tenantId, provider } = req.params;
 
         // Verify user has access to this tenant
-        const userTenantId = assertTenant(req, res);
-        if (!userTenantId || userTenantId !== tenantId) {
+        const userTenantId = assertTenant(req);
+        if (!userTenantId) {
+          return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+        }
+        if (userTenantId !== tenantId) {
           return res.status(403).json({ error: 'Access denied to this tenant' });
         }
 
@@ -6335,8 +6341,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         const { clientId, clientSecret } = req.body;
 
         // Verify user has access to this tenant
-        const userTenantId = assertTenant(req, res);
-        if (!userTenantId || userTenantId !== tenantId) {
+        const userTenantId = assertTenant(req);
+        if (!userTenantId) {
+          return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+        }
+        if (userTenantId !== tenantId) {
           return res.status(403).json({ error: 'Access denied to this tenant' });
         }
 
@@ -6394,6 +6403,259 @@ export async function registerRoutes(app: Express): Promise<void> {
       } catch (error) {
         console.error('[OAuth] Error configuring app credentials:', error);
         res.status(500).json({ error: 'Failed to configure OAuth app' });
+      }
+    },
+  );
+
+  // ============================================
+  // EXTERNAL API CONFIGURATION ENDPOINTS
+  // ============================================
+
+  /**
+   * List external API configurations for a tenant
+   * GET /api/platform/tenants/:tenantId/external-apis
+   */
+  app.get(
+    '/api/platform/tenants/:tenantId/external-apis',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId } = req.params;
+
+        // Platform admins can access any tenant, regular users only their own
+        if (!req.user?.isPlatformAdmin) {
+          const userTenantId = assertTenant(req);
+          if (!userTenantId) {
+            return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+          }
+          if (userTenantId !== tenantId) {
+            return res.status(403).json({ error: 'Access denied to this tenant' });
+          }
+        }
+
+        const configs = await storage.listExternalApiConfigs(tenantId);
+
+        // Return safe configuration (mask credentials)
+        const safeConfigs = configs.map((config) => ({
+          id: config.id,
+          serviceName: config.serviceName,
+          displayName: config.displayName,
+          baseUrl: config.baseUrl,
+          authType: config.authType,
+          description: config.description,
+          isActive: config.isActive,
+          lastUsedAt: config.lastUsedAt,
+          totalCalls: config.totalCalls,
+          successfulCalls: config.successfulCalls,
+          failedCalls: config.failedCalls,
+          createdAt: config.createdAt,
+          updatedAt: config.updatedAt,
+          // Don't expose encrypted credentials or custom headers
+        }));
+
+        res.json(safeConfigs);
+      } catch (error) {
+        console.error('[External API] Error listing configurations:', error);
+        res.status(500).json({ error: 'Failed to list external API configurations' });
+      }
+    },
+  );
+
+  /**
+   * Create external API configuration
+   * POST /api/platform/tenants/:tenantId/external-apis
+   */
+  app.post(
+    '/api/platform/tenants/:tenantId/external-apis',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId } = req.params;
+        const {
+          serviceName,
+          displayName,
+          baseUrl,
+          authType,
+          credentials,
+          customHeaders,
+          description,
+        } = req.body;
+
+        // Platform admins can access any tenant, regular users only their own
+        if (!req.user?.isPlatformAdmin) {
+          const userTenantId = assertTenant(req);
+          if (!userTenantId) {
+            return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+          }
+          if (userTenantId !== tenantId) {
+            return res.status(403).json({ error: 'Access denied to this tenant' });
+          }
+        }
+
+        // Validate required fields
+        if (!serviceName || !displayName || !baseUrl || !authType) {
+          return res.status(400).json({
+            error: 'Missing required fields',
+            message: 'Service name, display name, base URL, and auth type are required',
+          });
+        }
+
+        // Check if service name already exists for this tenant
+        const existing = await storage.getExternalApiConfig(tenantId, serviceName);
+        if (existing) {
+          return res.status(400).json({
+            error: 'Service name already exists',
+            message: `Service '${serviceName}' is already configured for this tenant`,
+          });
+        }
+
+        // Encrypt credentials if provided
+        let encryptedCredentials = null;
+        if (credentials && authType !== 'none') {
+          encryptedCredentials = encrypt(JSON.stringify(credentials));
+        }
+
+        // Create configuration
+        const config = await storage.createExternalApiConfig({
+          tenantId,
+          serviceName,
+          displayName,
+          baseUrl,
+          authType,
+          encryptedCredentials,
+          customHeaders: customHeaders || null,
+          description: description || null,
+          isActive: true,
+          createdBy: req.user?.userId || null,
+        });
+
+        console.log('[External API] Created configuration:', serviceName, 'for tenant:', tenantId);
+
+        res.json({
+          id: config.id,
+          serviceName: config.serviceName,
+          displayName: config.displayName,
+          baseUrl: config.baseUrl,
+          authType: config.authType,
+          description: config.description,
+          isActive: config.isActive,
+          createdAt: config.createdAt,
+        });
+      } catch (error) {
+        console.error('[External API] Error creating configuration:', error);
+        res.status(500).json({ error: 'Failed to create external API configuration' });
+      }
+    },
+  );
+
+  /**
+   * Update external API configuration
+   * PUT /api/platform/tenants/:tenantId/external-apis/:id
+   */
+  app.put(
+    '/api/platform/tenants/:tenantId/external-apis/:id',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId, id } = req.params;
+        const {
+          displayName,
+          baseUrl,
+          authType,
+          credentials,
+          customHeaders,
+          description,
+          isActive,
+        } = req.body;
+
+        // Platform admins can access any tenant, regular users only their own
+        if (!req.user?.isPlatformAdmin) {
+          const userTenantId = assertTenant(req);
+          if (!userTenantId) {
+            return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+          }
+          if (userTenantId !== tenantId) {
+            return res.status(403).json({ error: 'Access denied to this tenant' });
+          }
+        }
+
+        // Prepare updates
+        const updates: any = {};
+        if (displayName !== undefined) updates.displayName = displayName;
+        if (baseUrl !== undefined) updates.baseUrl = baseUrl;
+        if (authType !== undefined) updates.authType = authType;
+        if (description !== undefined) updates.description = description;
+        if (isActive !== undefined) updates.isActive = isActive;
+
+        // Update credentials if provided
+        if (credentials !== undefined) {
+          if (authType === 'none') {
+            updates.encryptedCredentials = null;
+          } else {
+            updates.encryptedCredentials = encrypt(JSON.stringify(credentials));
+          }
+        }
+
+        // Update custom headers if provided
+        if (customHeaders !== undefined) {
+          updates.customHeaders = customHeaders;
+        }
+
+        const updated = await storage.updateExternalApiConfig(id, updates);
+
+        if (!updated) {
+          return res.status(404).json({ error: 'Configuration not found' });
+        }
+
+        console.log('[External API] Updated configuration:', id);
+
+        res.json({
+          id: updated.id,
+          serviceName: updated.serviceName,
+          displayName: updated.displayName,
+          baseUrl: updated.baseUrl,
+          authType: updated.authType,
+          description: updated.description,
+          isActive: updated.isActive,
+          updatedAt: updated.updatedAt,
+        });
+      } catch (error) {
+        console.error('[External API] Error updating configuration:', error);
+        res.status(500).json({ error: 'Failed to update external API configuration' });
+      }
+    },
+  );
+
+  /**
+   * Delete external API configuration
+   * DELETE /api/platform/tenants/:tenantId/external-apis/:id
+   */
+  app.delete(
+    '/api/platform/tenants/:tenantId/external-apis/:id',
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { tenantId, id } = req.params;
+
+        // Platform admins can access any tenant, regular users only their own
+        if (!req.user?.isPlatformAdmin) {
+          const userTenantId = assertTenant(req);
+          if (!userTenantId) {
+            return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+          }
+          if (userTenantId !== tenantId) {
+            return res.status(403).json({ error: 'Access denied to this tenant' });
+          }
+        }
+
+        await storage.deleteExternalApiConfig(id);
+
+        console.log('[External API] Deleted configuration:', id);
+
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[External API] Error deleting configuration:', error);
+        res.status(500).json({ error: 'Failed to delete external API configuration' });
       }
     },
   );
@@ -6640,6 +6902,279 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.error('[Proxy] Error fetching WhatsApp media:', error);
         res.status(500).json({
           error: 'Failed to fetch WhatsApp media',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+  );
+
+  // ============================================
+  // RETELL AI PROXY API ENDPOINTS
+  // ============================================
+
+  /**
+   * Helper function to get and decrypt Retell API key
+   */
+  async function getRetellApiKey(tenantId: string): Promise<string> {
+    const widgetConfig = await storage.getWidgetConfig(tenantId);
+
+    if (!widgetConfig || !widgetConfig.retellApiKey) {
+      throw new Error('Retell API key not found or inactive');
+    }
+
+    return widgetConfig.retellApiKey; // Already decrypted by storage layer
+  }
+
+  /**
+   * Retell AI API Proxy - Create Chat
+   * POST /api/proxy/:tenantId/retell/create-chat
+   *
+   * Proxies Retell AI create chat requests from N8N
+   * Body: Retell AI create chat request body
+   */
+  app.post(
+    '/api/proxy/:tenantId/retell/create-chat',
+    validateN8NSecret,
+    async (req: Request, res: Response) => {
+      try {
+        const { tenantId } = req.params;
+        const requestData = req.body;
+
+        console.log('[Proxy] Retell create-chat request for tenant:', tenantId);
+
+        // Get decrypted Retell API key from database
+        const apiKey = await getRetellApiKey(tenantId);
+
+        // Call Retell AI API
+        const retellUrl = 'https://api.retellai.com/create-chat';
+
+        const response = await fetch(retellUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData),
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          console.error('[Proxy] Retell API error:', responseData);
+          return res.status(response.status).json({
+            error: 'Retell API request failed',
+            details: responseData,
+          });
+        }
+
+        console.log('[Proxy] Retell chat created successfully:', responseData.chat_id);
+
+        res.json(responseData);
+      } catch (error) {
+        console.error('[Proxy] Error creating Retell chat:', error);
+        res.status(500).json({
+          error: 'Failed to create Retell chat',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+  );
+
+  /**
+   * Retell AI API Proxy - Generic endpoint
+   * POST /api/proxy/:tenantId/retell/*
+   *
+   * Proxies any Retell AI API request from N8N
+   */
+  app.post(
+    '/api/proxy/:tenantId/retell/:endpoint(*)',
+    validateN8NSecret,
+    async (req: Request, res: Response) => {
+      try {
+        const { tenantId, endpoint } = req.params;
+        const requestData = req.body;
+
+        console.log(`[Proxy] Retell API request for tenant: ${tenantId}, endpoint: ${endpoint}`);
+
+        // Get decrypted Retell API key from database
+        const apiKey = await getRetellApiKey(tenantId);
+
+        // Call Retell AI API
+        const retellUrl = `https://api.retellai.com/${endpoint}`;
+
+        const response = await fetch(retellUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData),
+        });
+
+        const responseData = await response.json();
+
+        if (!response.ok) {
+          console.error('[Proxy] Retell API error:', responseData);
+          return res.status(response.status).json({
+            error: 'Retell API request failed',
+            details: responseData,
+          });
+        }
+
+        console.log(`[Proxy] Retell API ${endpoint} successful`);
+
+        res.json(responseData);
+      } catch (error) {
+        console.error('[Proxy] Error calling Retell API:', error);
+        res.status(500).json({
+          error: 'Failed to call Retell API',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+  );
+
+  // ============================================
+  // GENERIC HTTP PROXY API ENDPOINTS
+  // ============================================
+
+  /**
+   * Generic HTTP Proxy
+   * POST /api/proxy/:tenantId/http/:serviceName/*
+   *
+   * Proxies ANY external API request from N8N using UI-configured credentials
+   * Examples: Google Calendar, Stripe, SendGrid, Custom CRM APIs, etc.
+   *
+   * Supported auth types:
+   * - bearer: Bearer token in Authorization header
+   * - api_key: API key in custom header (e.g., X-API-Key)
+   * - basic: Basic authentication (username:password)
+   * - oauth2: OAuth2 access token (future: auto-refresh)
+   * - custom_header: Any custom header (e.g., X-Custom-Auth)
+   * - none: No authentication
+   */
+  app.post(
+    '/api/proxy/:tenantId/http/:serviceName/:endpoint(*)',
+    validateN8NSecret,
+    async (req: Request, res: Response) => {
+      try {
+        const { tenantId, serviceName, endpoint } = req.params;
+        const requestData = req.body;
+
+        console.log(
+          `[Proxy] Generic HTTP request for tenant: ${tenantId}, service: ${serviceName}, endpoint: ${endpoint}`,
+        );
+
+        // Get external API configuration from database
+        const apiConfig = await storage.getExternalApiConfig(tenantId, serviceName);
+
+        if (!apiConfig || !apiConfig.isActive) {
+          console.error('[Proxy] External API configuration not found or inactive:', serviceName);
+          return res.status(404).json({
+            error: 'External API configuration not found',
+            message: `Service '${serviceName}' is not configured for this tenant`,
+          });
+        }
+
+        // Construct full URL
+        const baseUrl = apiConfig.baseUrl.endsWith('/')
+          ? apiConfig.baseUrl.slice(0, -1)
+          : apiConfig.baseUrl;
+        const endpointPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const fullUrl = `${baseUrl}${endpointPath}`;
+
+        console.log(`[Proxy] Calling external API: ${fullUrl}`);
+
+        // Prepare headers
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+
+        // Add authentication headers based on authType
+        if (apiConfig.encryptedCredentials) {
+          const credentials = JSON.parse(decrypt(apiConfig.encryptedCredentials));
+
+          switch (apiConfig.authType) {
+            case 'bearer':
+              if (credentials.token) {
+                headers['Authorization'] = `Bearer ${credentials.token}`;
+              }
+              break;
+
+            case 'api_key':
+              if (credentials.key && credentials.headerName) {
+                headers[credentials.headerName] = credentials.key;
+              }
+              break;
+
+            case 'basic':
+              if (credentials.username && credentials.password) {
+                const encodedAuth = Buffer.from(
+                  `${credentials.username}:${credentials.password}`,
+                ).toString('base64');
+                headers['Authorization'] = `Basic ${encodedAuth}`;
+              }
+              break;
+
+            case 'oauth2':
+              if (credentials.accessToken) {
+                headers['Authorization'] = `Bearer ${credentials.accessToken}`;
+                // TODO: Check expiry and refresh if needed
+              }
+              break;
+
+            case 'custom_header':
+              if (credentials.headerName && credentials.headerValue) {
+                headers[credentials.headerName] = credentials.headerValue;
+              }
+              break;
+
+            case 'none':
+              // No authentication
+              break;
+
+            default:
+              console.warn('[Proxy] Unknown auth type:', apiConfig.authType);
+          }
+        }
+
+        // Add custom headers from configuration
+        if (apiConfig.customHeaders) {
+          Object.entries(apiConfig.customHeaders as Record<string, string>).forEach(
+            ([key, value]) => {
+              headers[key] = value;
+            },
+          );
+        }
+
+        // Forward request to external API
+        const response = await fetch(fullUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestData),
+        });
+
+        const responseData = await response.json();
+
+        // Update usage statistics
+        await storage.incrementExternalApiStats(apiConfig.id, response.ok);
+
+        if (!response.ok) {
+          console.error('[Proxy] External API error:', responseData);
+          return res.status(response.status).json({
+            error: 'External API request failed',
+            details: responseData,
+            service: serviceName,
+          });
+        }
+
+        console.log(`[Proxy] External API call successful: ${serviceName}/${endpoint}`);
+
+        res.json(responseData);
+      } catch (error) {
+        console.error('[Proxy] Error calling external API:', error);
+        res.status(500).json({
+          error: 'Failed to call external API',
           message: error instanceof Error ? error.message : 'Unknown error',
         });
       }

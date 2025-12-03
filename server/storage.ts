@@ -43,6 +43,8 @@ import {
   type InsertVoiceAnalytics,
   type OAuthCredential,
   type InsertOAuthCredential,
+  type ExternalApiConfig,
+  type InsertExternalApiConfig,
   users,
   messages,
   conversations,
@@ -65,6 +67,7 @@ import {
   chatMessages,
   voiceAnalytics,
   oauthCredentials,
+  externalApiConfigs,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -347,6 +350,21 @@ export interface IStorage {
   ): Promise<void>;
   deleteOAuthCredential(id: string): Promise<void>;
   markOAuthCredentialUsed(id: string): Promise<void>;
+
+  // External API Configurations Methods
+  getExternalApiConfig(
+    tenantId: string,
+    serviceName: string,
+  ): Promise<ExternalApiConfig | undefined>;
+  listExternalApiConfigs(tenantId: string): Promise<ExternalApiConfig[]>;
+  createExternalApiConfig(config: InsertExternalApiConfig): Promise<ExternalApiConfig>;
+  updateExternalApiConfig(
+    id: string,
+    updates: Partial<InsertExternalApiConfig>,
+  ): Promise<ExternalApiConfig | undefined>;
+  deleteExternalApiConfig(id: string): Promise<void>;
+  markExternalApiConfigUsed(id: string): Promise<void>;
+  incrementExternalApiStats(id: string, success: boolean): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -1622,6 +1640,55 @@ export class MemStorage implements IStorage {
   }
 
   async markOAuthCredentialUsed(id: string): Promise<void> {
+    // Stub
+  }
+
+  // ============================================
+  // EXTERNAL API CONFIGURATIONS METHODS (STUBS)
+  // ============================================
+
+  async getExternalApiConfig(
+    tenantId: string,
+    serviceName: string,
+  ): Promise<ExternalApiConfig | undefined> {
+    return undefined; // Stub
+  }
+
+  async listExternalApiConfigs(tenantId: string): Promise<ExternalApiConfig[]> {
+    return []; // Stub
+  }
+
+  async createExternalApiConfig(config: InsertExternalApiConfig): Promise<ExternalApiConfig> {
+    const id = randomUUID();
+    return {
+      id,
+      ...config,
+      isActive: true,
+      lastUsedAt: null,
+      totalCalls: 0,
+      successfulCalls: 0,
+      failedCalls: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as ExternalApiConfig;
+  }
+
+  async updateExternalApiConfig(
+    id: string,
+    updates: Partial<InsertExternalApiConfig>,
+  ): Promise<ExternalApiConfig | undefined> {
+    return undefined; // Stub
+  }
+
+  async deleteExternalApiConfig(id: string): Promise<void> {
+    // Stub
+  }
+
+  async markExternalApiConfigUsed(id: string): Promise<void> {
+    // Stub
+  }
+
+  async incrementExternalApiStats(id: string, success: boolean): Promise<void> {
     // Stub
   }
 }
@@ -3509,6 +3576,105 @@ export class DbStorage implements IStorage {
       .update(oauthCredentials)
       .set({ lastUsedAt: new Date() })
       .where(eq(oauthCredentials.id, id));
+  }
+
+  // ============================================
+  // EXTERNAL API CONFIGURATIONS METHODS
+  // ============================================
+
+  /**
+   * Get external API configuration by tenant and service name
+   */
+  async getExternalApiConfig(
+    tenantId: string,
+    serviceName: string,
+  ): Promise<ExternalApiConfig | undefined> {
+    const [config] = await this.db
+      .select()
+      .from(externalApiConfigs)
+      .where(
+        and(
+          eq(externalApiConfigs.tenantId, tenantId),
+          eq(externalApiConfigs.serviceName, serviceName),
+        ),
+      )
+      .limit(1);
+    return config;
+  }
+
+  /**
+   * List all external API configurations for a tenant
+   */
+  async listExternalApiConfigs(tenantId: string): Promise<ExternalApiConfig[]> {
+    return await this.db
+      .select()
+      .from(externalApiConfigs)
+      .where(eq(externalApiConfigs.tenantId, tenantId))
+      .orderBy(desc(externalApiConfigs.createdAt));
+  }
+
+  /**
+   * Create a new external API configuration
+   * Note: encryptedCredentials should already be encrypted before calling
+   */
+  async createExternalApiConfig(config: InsertExternalApiConfig): Promise<ExternalApiConfig> {
+    const [created] = await this.db.insert(externalApiConfigs).values(config).returning();
+    return created!;
+  }
+
+  /**
+   * Update external API configuration
+   */
+  async updateExternalApiConfig(
+    id: string,
+    updates: Partial<InsertExternalApiConfig>,
+  ): Promise<ExternalApiConfig | undefined> {
+    const [updated] = await this.db
+      .update(externalApiConfigs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(externalApiConfigs.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Delete external API configuration
+   */
+  async deleteExternalApiConfig(id: string): Promise<void> {
+    await this.db.delete(externalApiConfigs).where(eq(externalApiConfigs.id, id));
+  }
+
+  /**
+   * Mark external API configuration as recently used
+   */
+  async markExternalApiConfigUsed(id: string): Promise<void> {
+    await this.db
+      .update(externalApiConfigs)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(externalApiConfigs.id, id));
+  }
+
+  /**
+   * Increment usage statistics for external API configuration
+   */
+  async incrementExternalApiStats(id: string, success: boolean): Promise<void> {
+    const config = await this.db
+      .select()
+      .from(externalApiConfigs)
+      .where(eq(externalApiConfigs.id, id))
+      .limit(1);
+
+    if (config[0]) {
+      await this.db
+        .update(externalApiConfigs)
+        .set({
+          totalCalls: config[0].totalCalls + 1,
+          successfulCalls: success ? config[0].successfulCalls + 1 : config[0].successfulCalls,
+          failedCalls: success ? config[0].failedCalls : config[0].failedCalls + 1,
+          lastUsedAt: new Date(),
+        })
+        .where(eq(externalApiConfigs.id, id));
+    }
   }
 }
 
