@@ -813,15 +813,8 @@ router.put(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tenantId, id } = req.params;
-      const {
-        displayName,
-        baseUrl,
-        authType,
-        credentials,
-        customHeaders,
-        description,
-        isActive,
-      } = req.body;
+      const { displayName, baseUrl, authType, credentials, customHeaders, description, isActive } =
+        req.body;
 
       // Platform admins can access any tenant, regular users only their own
       if (!req.user?.isPlatformAdmin) {

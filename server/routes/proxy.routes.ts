@@ -698,10 +698,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const webhooks = await storage.getWebhooksByEvent(targetTenant.id, 'whatsapp_message');
 
         if (webhooks.length === 0) {
-          console.log(
-            '[WhatsApp Webhook] No N8N webhook configured for tenant:',
-            targetTenant.id,
-          );
+          console.log('[WhatsApp Webhook] No N8N webhook configured for tenant:', targetTenant.id);
           continue;
         }
 

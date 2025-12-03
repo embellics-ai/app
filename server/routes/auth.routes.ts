@@ -633,30 +633,6 @@ router.post('/reset-password', async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/auth/complete-onboarding
- * Mark user's onboarding as complete
- */
-router.post('/complete-onboarding', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    const isPlatformAdmin = req.user!.isPlatformAdmin;
-
-    // Platform admins don't have a tenantId - that's okay
-    // Client admins and support staff should have a tenantId
-    if (!isPlatformAdmin) {
-      const tenantId = assertTenant(req, res);
-      if (!tenantId) return;
-    }
-
-    await storage.markOnboardingComplete(userId);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error completing onboarding:', error);
-    res.status(500).json({ error: 'Failed to complete onboarding' });
-  }
-});
-
-/**
  * POST /api/auth/accept-invitation
  * Accept user invitation and create account
  */

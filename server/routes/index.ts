@@ -37,7 +37,8 @@ import webhookRoutes from './webhook.routes';
 import conversationRoutes from './conversation.routes';
 import handoffRoutes from './handoff.routes';
 import widgetRoutes from './widget.routes';
-import miscRoutes from './misc.routes';
+import widgetTestRoutes from './widget-test.routes';
+import widgetConfigRoutes from './widget-config.routes';
 
 export async function registerModularRoutes(app: Express): Promise<void> {
   // ===== Phase 1: Extracted Modular Routes =====
@@ -79,14 +80,17 @@ export async function registerModularRoutes(app: Express): Promise<void> {
   // Widget embedding routes (public)
   app.use('/', widgetRoutes); // Uses /widget.js, /api/widget/*
 
-  // Miscellaneous routes (widget config, API keys, health)
-  app.use('/', miscRoutes); // Uses /api/widget-config, /api/api-keys, /api/health
+  // Widget test page routes (platform admin only)
+  app.use('/api/platform', widgetTestRoutes); // Uses /api/platform/widget-test-page
+
+  // Widget configuration routes (client admin)
+  app.use('/', widgetConfigRoutes); // Uses /api/widget-config, /api/api-keys, /api/health
 
   console.log(
     '[Router] ✅ Registered Phase 1 routes: auth, analytics, proxy, tenant, user, integration',
   );
   console.log(
-    '[Router] ✅ Registered Phase 2 routes: function, webhook, conversation, handoff, widget, misc',
+    '[Router] ✅ Registered Phase 2 routes: function, webhook, conversation, handoff, widget, widget-test, widget-config',
   );
   console.log('[Router] ✅ All modular routes registered successfully');
 }
