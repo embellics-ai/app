@@ -276,4 +276,41 @@ router.delete(
   },
 );
 
+/**
+ * Get single tenant by ID
+ *
+ * GET /api/tenants/:tenantId
+ */
+router.get('/:tenantId', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const userId = req.user!.userId;
+    const isPlatformAdmin = req.user!.isPlatformAdmin;
+    const userTenantId = req.user!.tenantId;
+
+    // Platform admins can access any tenant, regular users can only access their own
+    if (!isPlatformAdmin && userTenantId !== tenantId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const tenant = await storage.getTenant(tenantId);
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    // Return basic tenant information (no sensitive data like API keys)
+    res.json({
+      id: tenant.id,
+      name: tenant.name,
+      email: tenant.email,
+      phone: tenant.phone,
+      plan: tenant.plan,
+      status: tenant.status,
+    });
+  } catch (error) {
+    console.error('Get tenant error:', error);
+    res.status(500).json({ error: 'Failed to fetch tenant information' });
+  }
+});
+
 export default router;

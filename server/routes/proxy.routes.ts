@@ -587,4 +587,164 @@ router.post(
   },
 );
 
+// ===== WhatsApp Webhook Endpoints =====
+
+/**
+ * WhatsApp Webhook Verification (GET)
+ * Meta will call this endpoint to verify the webhook
+ *
+ * GET /api/whatsapp/webhook
+ */
+router.get('/webhook', async (req: Request, res: Response) => {
+  try {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    console.log('[WhatsApp Webhook] Verification request:', {
+      mode,
+      token: token ? '***' : undefined,
+    });
+
+    // Check if a token and mode were sent
+    if (mode === 'subscribe' && token) {
+      // Verify token matches (you should set WHATSAPP_VERIFY_TOKEN in env)
+      const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'embellics_whatsapp_verify_2025';
+
+      if (token === verifyToken) {
+        console.log('[WhatsApp Webhook] Verification successful');
+        return res.status(200).send(challenge);
+      } else {
+        console.error('[WhatsApp Webhook] Verification failed - token mismatch');
+        return res.status(403).send('Verification token mismatch');
+      }
+    }
+
+    res.status(403).send('Missing verification parameters');
+  } catch (error) {
+    console.error('[WhatsApp Webhook] Verification error:', error);
+    res.status(500).send('Verification failed');
+  }
+});
+
+/**
+ * WhatsApp Webhook Handler (POST)
+ * Receives messages from Meta WhatsApp Business API
+ * Routes to appropriate tenant's N8N workflow
+ *
+ * POST /api/whatsapp/webhook
+ */
+router.post('/webhook', async (req: Request, res: Response) => {
+  try {
+    console.log('[WhatsApp Webhook] Received webhook:', JSON.stringify(req.body, null, 2));
+
+    // Meta expects immediate 200 response
+    res.status(200).send('EVENT_RECEIVED');
+
+    const { entry } = req.body;
+    if (!entry || !Array.isArray(entry)) {
+      console.log('[WhatsApp Webhook] No entry data in webhook');
+      return;
+    }
+
+    // Process each entry
+    for (const item of entry) {
+      const changes = item.changes;
+      if (!changes || !Array.isArray(changes)) continue;
+
+      for (const change of changes) {
+        if (change.field !== 'messages') continue;
+
+        const value = change.value;
+        const metadata = value?.metadata;
+        const messages = value?.messages;
+
+        if (!metadata || !messages) continue;
+
+        // Extract phone number ID to identify tenant
+        const phoneNumberId = metadata.phone_number_id;
+        const displayPhoneNumber = metadata.display_phone_number;
+
+        console.log(
+          '[WhatsApp Webhook] Message from phone:',
+          displayPhoneNumber,
+          'ID:',
+          phoneNumberId,
+        );
+
+        // Find tenant by phone number ID
+        const tenants = await storage.getAllTenants();
+        let targetTenant = null;
+
+        for (const tenant of tenants) {
+          const integration = await storage.getTenantIntegration(tenant.id);
+          if (!integration?.whatsappConfig) continue;
+
+          const config = integration.whatsappConfig as any;
+          if (config.phoneNumberId === phoneNumberId) {
+            targetTenant = tenant;
+            break;
+          }
+        }
+
+        if (!targetTenant) {
+          console.error('[WhatsApp Webhook] No tenant found for phone number ID:', phoneNumberId);
+          continue;
+        }
+
+        console.log('[WhatsApp Webhook] Routing to tenant:', targetTenant.name, targetTenant.id);
+
+        // Get tenant's N8N webhook configured for WhatsApp messages
+        const webhooks = await storage.getWebhooksByEvent(targetTenant.id, 'whatsapp_message');
+
+        if (webhooks.length === 0) {
+          console.log(
+            '[WhatsApp Webhook] No N8N webhook configured for tenant:',
+            targetTenant.id,
+          );
+          continue;
+        }
+
+        // Forward to each configured N8N webhook
+        for (const webhook of webhooks) {
+          if (!webhook.isActive) continue;
+
+          console.log('[WhatsApp Webhook] Forwarding to N8N:', webhook.webhookUrl);
+
+          try {
+            const n8nResponse = await fetch(webhook.webhookUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                tenantId: targetTenant.id,
+                phoneNumberId,
+                displayPhoneNumber,
+                value,
+                rawWebhook: req.body,
+              }),
+            });
+
+            if (n8nResponse.ok) {
+              console.log('[WhatsApp Webhook] Successfully forwarded to N8N');
+            } else {
+              console.error(
+                '[WhatsApp Webhook] N8N webhook failed:',
+                n8nResponse.status,
+                await n8nResponse.text(),
+              );
+            }
+          } catch (webhookError) {
+            console.error('[WhatsApp Webhook] Error forwarding to N8N:', webhookError);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[WhatsApp Webhook] Processing error:', error);
+    // Don't send error response - Meta already got 200 OK
+  }
+});
+
 export default router;

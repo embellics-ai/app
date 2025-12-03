@@ -50,9 +50,11 @@ export async function registerModularRoutes(app: Express): Promise<void> {
 
   // Proxy routes (WhatsApp, Retell AI, External APIs)
   app.use('/api/proxy', proxyRoutes);
+  app.use('/api/whatsapp', proxyRoutes); // Also register WhatsApp webhooks at /api/whatsapp
 
   // Tenant management routes
   app.use('/api/platform/tenants', tenantRoutes);
+  app.use('/api/tenants', tenantRoutes); // Also register at /api/tenants for backward compatibility
 
   // User management routes (Platform Admin)
   app.use('/api/platform', userRoutes);
