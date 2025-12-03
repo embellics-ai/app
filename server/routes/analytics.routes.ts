@@ -24,88 +24,96 @@ const router = Router();
  * Get combined analytics overview (voice + chat)
  * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
  */
-router.get('/:tenantId/analytics/overview', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { tenantId } = req.params;
-    const { startDate, endDate, agentId } = req.query;
+router.get(
+  '/:tenantId/analytics/overview',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { startDate, endDate, agentId } = req.query;
 
-    console.log('[Analytics Overview] Request:', { tenantId, startDate, endDate, agentId });
+      console.log('[Analytics Overview] Request:', { tenantId, startDate, endDate, agentId });
 
-    // Authorization: Platform admin can access any tenant, client admin only their own
-    if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-      return res.status(403).json({ error: "Access denied to this tenant's analytics" });
+      // Authorization: Platform admin can access any tenant, client admin only their own
+      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Access denied to this tenant's analytics" });
+      }
+
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        agentId: agentId as string | undefined,
+      };
+
+      console.log('[Analytics Overview] Filters:', filters);
+
+      // Get chat analytics summary
+      const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
+      console.log('[Analytics Overview] Chat Summary:', chatSummary);
+
+      // Get voice analytics summary
+      const voiceSummary = await storage.getVoiceAnalyticsSummary(tenantId, filters);
+      console.log('[Analytics Overview] Voice Summary:', voiceSummary);
+
+      const response = {
+        chat: chatSummary,
+        voice: voiceSummary,
+        combined: {
+          totalInteractions: chatSummary.totalChats + voiceSummary.totalCalls,
+          totalCost: chatSummary.totalCost + voiceSummary.totalCost,
+          averageCost:
+            chatSummary.totalChats + voiceSummary.totalCalls > 0
+              ? (chatSummary.totalCost + voiceSummary.totalCost) /
+                (chatSummary.totalChats + voiceSummary.totalCalls)
+              : 0,
+        },
+      };
+
+      console.log('[Analytics Overview] Response:', response);
+      res.json(response);
+    } catch (error) {
+      console.error('Error fetching analytics overview:', error);
+      res.status(500).json({ error: 'Failed to fetch analytics overview' });
     }
-
-    const filters = {
-      startDate: startDate ? new Date(startDate as string) : undefined,
-      endDate: endDate ? new Date(endDate as string) : undefined,
-      agentId: agentId as string | undefined,
-    };
-
-    console.log('[Analytics Overview] Filters:', filters);
-
-    // Get chat analytics summary
-    const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
-    console.log('[Analytics Overview] Chat Summary:', chatSummary);
-
-    // Get voice analytics summary
-    const voiceSummary = await storage.getVoiceAnalyticsSummary(tenantId, filters);
-    console.log('[Analytics Overview] Voice Summary:', voiceSummary);
-
-    const response = {
-      chat: chatSummary,
-      voice: voiceSummary,
-      combined: {
-        totalInteractions: chatSummary.totalChats + voiceSummary.totalCalls,
-        totalCost: chatSummary.totalCost + voiceSummary.totalCost,
-        averageCost:
-          chatSummary.totalChats + voiceSummary.totalCalls > 0
-            ? (chatSummary.totalCost + voiceSummary.totalCost) /
-              (chatSummary.totalChats + voiceSummary.totalCalls)
-            : 0,
-      },
-    };
-
-    console.log('[Analytics Overview] Response:', response);
-    res.json(response);
-  } catch (error) {
-    console.error('Error fetching analytics overview:', error);
-    res.status(500).json({ error: 'Failed to fetch analytics overview' });
-  }
-});
+  },
+);
 
 /**
  * GET /api/platform/tenants/:tenantId/analytics/chats
  * Get list of chat sessions with filters
  * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
  */
-router.get('/:tenantId/analytics/chats', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { tenantId } = req.params;
-    const { startDate, endDate, agentId, sentiment, chatStatus, limit } = req.query;
+router.get(
+  '/:tenantId/analytics/chats',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { startDate, endDate, agentId, sentiment, chatStatus, limit } = req.query;
 
-    // Authorization: Platform admin can access any tenant, client admin only their own
-    if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-      return res.status(403).json({ error: "Access denied to this tenant's analytics" });
+      // Authorization: Platform admin can access any tenant, client admin only their own
+      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Access denied to this tenant's analytics" });
+      }
+
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        agentId: agentId as string | undefined,
+        sentiment: sentiment as string | undefined,
+        chatStatus: chatStatus as string | undefined,
+        limit: limit ? parseInt(limit as string) : 100,
+      };
+
+      const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
+
+      res.json(chats);
+    } catch (error) {
+      console.error('Error fetching chat analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch chat analytics' });
     }
-
-    const filters = {
-      startDate: startDate ? new Date(startDate as string) : undefined,
-      endDate: endDate ? new Date(endDate as string) : undefined,
-      agentId: agentId as string | undefined,
-      sentiment: sentiment as string | undefined,
-      chatStatus: chatStatus as string | undefined,
-      limit: limit ? parseInt(limit as string) : 100,
-    };
-
-    const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
-
-    res.json(chats);
-  } catch (error) {
-    console.error('Error fetching chat analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch chat analytics' });
-  }
-});
+  },
+);
 
 /**
  * GET /api/platform/tenants/:tenantId/analytics/chats/time-series
@@ -264,47 +272,51 @@ router.get(
  * Get cost tracking analytics
  * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
  */
-router.get('/:tenantId/analytics/costs', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { tenantId } = req.params;
-    const { startDate, endDate, agentId } = req.query;
+router.get(
+  '/:tenantId/analytics/costs',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { startDate, endDate, agentId } = req.query;
 
-    // Authorization: Platform admin can access any tenant, client admin only their own
-    if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-      return res.status(403).json({ error: "Access denied to this tenant's analytics" });
-    }
-
-    const filters = {
-      startDate: startDate ? new Date(startDate as string) : undefined,
-      endDate: endDate ? new Date(endDate as string) : undefined,
-      agentId: agentId as string | undefined,
-    };
-
-    const summary = await storage.getChatAnalyticsSummary(tenantId, filters);
-
-    // Get individual chats for cost breakdown by day
-    const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
-
-    // Group costs by day
-    const costsByDay: Record<string, number> = {};
-    chats.forEach((chat) => {
-      if (chat.startTimestamp) {
-        const day = chat.startTimestamp.toISOString().split('T')[0];
-        costsByDay[day] = (costsByDay[day] || 0) + (chat.combinedCost || 0);
+      // Authorization: Platform admin can access any tenant, client admin only their own
+      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Access denied to this tenant's analytics" });
       }
-    });
 
-    res.json({
-      totalCost: summary.totalCost,
-      averageCost: summary.averageCost,
-      totalChats: summary.totalChats,
-      costsByDay,
-    });
-  } catch (error) {
-    console.error('Error fetching cost analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch cost analytics' });
-  }
-});
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        agentId: agentId as string | undefined,
+      };
+
+      const summary = await storage.getChatAnalyticsSummary(tenantId, filters);
+
+      // Get individual chats for cost breakdown by day
+      const chats = await storage.getChatAnalyticsByTenant(tenantId, filters);
+
+      // Group costs by day
+      const costsByDay: Record<string, number> = {};
+      chats.forEach((chat) => {
+        if (chat.startTimestamp) {
+          const day = chat.startTimestamp.toISOString().split('T')[0];
+          costsByDay[day] = (costsByDay[day] || 0) + (chat.combinedCost || 0);
+        }
+      });
+
+      res.json({
+        totalCost: summary.totalCost,
+        averageCost: summary.averageCost,
+        totalChats: summary.totalChats,
+        costsByDay,
+      });
+    } catch (error) {
+      console.error('Error fetching cost analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch cost analytics' });
+    }
+  },
+);
 
 // ============================================
 // VOICE ANALYTICS API ENDPOINTS (Platform Admin + Client Admin)
@@ -315,53 +327,57 @@ router.get('/:tenantId/analytics/costs', requireAuth, async (req: AuthenticatedR
  * Get list of voice call sessions with filters
  * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
  */
-router.get('/:tenantId/analytics/calls', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { tenantId } = req.params;
-    const { startDate, endDate, agentId, sentiment, callStatus, limit } = req.query;
+router.get(
+  '/:tenantId/analytics/calls',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { startDate, endDate, agentId, sentiment, callStatus, limit } = req.query;
 
-    // Authorization: Platform admin can access any tenant, client admin only their own
-    if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-      return res.status(403).json({ error: "Access denied to this tenant's analytics" });
-    }
+      // Authorization: Platform admin can access any tenant, client admin only their own
+      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Access denied to this tenant's analytics" });
+      }
 
-    console.log('[Analytics Calls] Querying for tenant:', tenantId);
-    console.log('[Analytics Calls] Filters:', {
-      startDate,
-      endDate,
-      agentId,
-      sentiment,
-      callStatus,
-      limit,
-    });
-
-    const filters = {
-      startDate: startDate ? new Date(startDate as string) : undefined,
-      endDate: endDate ? new Date(endDate as string) : undefined,
-      agentId: agentId as string | undefined,
-      sentiment: sentiment as string | undefined,
-      callStatus: callStatus as string | undefined,
-      limit: limit ? parseInt(limit as string) : 100,
-    };
-
-    const calls = await storage.getVoiceAnalyticsByTenant(tenantId, filters);
-
-    console.log('[Analytics Calls] Found calls:', calls.length);
-    if (calls.length > 0) {
-      console.log('[Analytics Calls] First call sample:', {
-        id: calls[0].id,
-        tenantId: calls[0].tenantId,
-        callId: calls[0].callId,
-        agentId: calls[0].agentId,
+      console.log('[Analytics Calls] Querying for tenant:', tenantId);
+      console.log('[Analytics Calls] Filters:', {
+        startDate,
+        endDate,
+        agentId,
+        sentiment,
+        callStatus,
+        limit,
       });
-    }
 
-    res.json(calls);
-  } catch (error) {
-    console.error('Error fetching voice analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch voice analytics' });
-  }
-});
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        agentId: agentId as string | undefined,
+        sentiment: sentiment as string | undefined,
+        callStatus: callStatus as string | undefined,
+        limit: limit ? parseInt(limit as string) : 100,
+      };
+
+      const calls = await storage.getVoiceAnalyticsByTenant(tenantId, filters);
+
+      console.log('[Analytics Calls] Found calls:', calls.length);
+      if (calls.length > 0) {
+        console.log('[Analytics Calls] First call sample:', {
+          id: calls[0].id,
+          tenantId: calls[0].tenantId,
+          callId: calls[0].callId,
+          agentId: calls[0].agentId,
+        });
+      }
+
+      res.json(calls);
+    } catch (error) {
+      console.error('Error fetching voice analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch voice analytics' });
+    }
+  },
+);
 
 /**
  * GET /api/platform/tenants/:tenantId/analytics/calls/:callId

@@ -330,6 +330,7 @@ getAccessToken();
    ```
 
 3. **Auto Token Refresh:**
+
    ```typescript
    async function getExternalApiAccessToken(apiConfig) {
      // Check if token expired

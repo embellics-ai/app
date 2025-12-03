@@ -1,22 +1,20 @@
 /**
- * Miscellaneous Routes
- * Widget configuration, API keys, and health check
+ * Widget Configuration Routes
+ * Widget config management, API keys, and health check
  */
 
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage';
 import {
   type AuthenticatedRequest,
   requireAuth,
   requireClientAdmin,
+  requirePlatformAdmin,
   assertTenant,
   hashPassword,
 } from '../middleware/auth.middleware';
-import {
-  safeWidgetConfigCreateSchema,
-  safeWidgetConfigUpdateSchema,
-} from '@shared/schema';
+import { safeWidgetConfigCreateSchema, safeWidgetConfigUpdateSchema } from '@shared/schema';
 import { randomBytes } from 'crypto';
 
 const router = Router();
