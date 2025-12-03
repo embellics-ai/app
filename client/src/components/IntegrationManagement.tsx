@@ -453,6 +453,10 @@ export default function IntegrationManagement({
             <Zap className="w-4 h-4 mr-2" />
             OAuth Connections
           </TabsTrigger>
+          <TabsTrigger value="external-apis">
+            <Settings className="w-4 h-4 mr-2" />
+            External APIs
+          </TabsTrigger>
         </TabsList>
 
         {/* WhatsApp Tab */}
@@ -979,6 +983,11 @@ export default function IntegrationManagement({
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* External APIs Tab */}
+        <TabsContent value="external-apis">
+          <ExternalAPIsTab tenantId={tenantId} />
+        </TabsContent>
       </Tabs>
 
       {/* Webhook Dialog */}
@@ -1114,6 +1123,8 @@ export default function IntegrationManagement({
                           <option value="call_analyzed">Call Analyzed</option>
                           <option value="chat_started">Chat Started</option>
                           <option value="chat_ended">Chat Ended</option>
+                          <option value="call_started">Call Started</option>
+                          <option value="call_ended">Call Ended</option>
                           <option value="whatsapp_message">WhatsApp Message</option>
                           <option value="*">All Events (*)</option>
                         </select>
@@ -1267,6 +1278,504 @@ export default function IntegrationManagement({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// External APIs Tab Component
+function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingApi, setEditingApi] = useState<any>(null);
+
+  // Simple form state
+  const [formData, setFormData] = useState({
+    serviceName: '',
+    displayName: '',
+    baseUrl: '',
+    authType: 'bearer',
+    description: '',
+    credentials: {} as Record<string, string>,
+  });
+
+  // Fetch external API configurations
+  const { data: externalApis, isLoading } = useQuery({
+    queryKey: [`/api/platform/tenants/${tenantId}/external-apis`],
+  });
+
+  const apis = Array.isArray(externalApis) ? externalApis : [];
+
+  // Create/Update mutation
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      let response;
+      if (editingApi) {
+        response = await apiRequest(
+          'PUT',
+          `/api/platform/tenants/${tenantId}/external-apis/${editingApi.id}`,
+          data,
+        );
+      } else {
+        response = await apiRequest(
+          'POST',
+          `/api/platform/tenants/${tenantId}/external-apis`,
+          data,
+        );
+      }
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: `External API ${editingApi ? 'updated' : 'created'} successfully`,
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/platform/tenants/${tenantId}/external-apis`],
+      });
+      handleCloseDialog();
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || `Failed to ${editingApi ? 'update' : 'create'} external API`,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest(
+        'DELETE',
+        `/api/platform/tenants/${tenantId}/external-apis/${id}`,
+        undefined,
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'External API deleted successfully',
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/platform/tenants/${tenantId}/external-apis`],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete external API',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleEdit = (api: any) => {
+    setEditingApi(api);
+    setFormData({
+      serviceName: api.serviceName,
+      displayName: api.displayName,
+      baseUrl: api.baseUrl,
+      authType: api.authType,
+      description: api.description || '',
+      credentials: {},
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setEditingApi(null);
+    setFormData({
+      serviceName: '',
+      displayName: '',
+      baseUrl: '',
+      authType: 'bearer',
+      description: '',
+      credentials: {},
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingApi(null);
+    setFormData({
+      serviceName: '',
+      displayName: '',
+      baseUrl: '',
+      authType: 'bearer',
+      description: '',
+      credentials: {},
+    });
+  };
+
+  const updateField = (field: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateCredential = (key: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      credentials: { ...prev.credentials, [key]: value },
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const submitData: any = {
+      serviceName: formData.serviceName,
+      displayName: formData.displayName,
+      baseUrl: formData.baseUrl,
+      authType: formData.authType,
+      description: formData.description,
+      credentials: formData.credentials,
+    };
+
+    saveMutation.mutate(submitData);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>External API Configurations</CardTitle>
+            <CardDescription>
+              Configure external APIs that N8N can call through the generic HTTP proxy. No coding
+              required!
+            </CardDescription>
+          </div>
+          <Button onClick={handleAddNew}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add API
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : apis.length === 0 ? (
+          <Alert>
+            <Settings className="h-4 w-4" />
+            <AlertDescription>
+              No external APIs configured yet. Add your first API to enable N8N workflows to call
+              Google Calendar, Stripe, SendGrid, or any other external service without exposing
+              credentials.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Service</TableHead>
+                <TableHead>Base URL</TableHead>
+                <TableHead>Auth Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Usage</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {apis.map((api: any) => (
+                <TableRow key={api.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{api.displayName}</div>
+                      <div className="text-sm text-muted-foreground">{api.serviceName}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <code className="text-xs bg-muted px-2 py-1 rounded">{api.baseUrl}</code>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{api.authType}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {api.isActive ? (
+                      <Badge className="bg-green-500">Active</Badge>
+                    ) : (
+                      <Badge variant="secondary">Inactive</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div>{api.totalCalls || 0} calls</div>
+                      <div className="text-muted-foreground">
+                        {api.successfulCalls || 0} success / {api.failedCalls || 0} failed
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(api)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete {api.displayName}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this API configuration. N8N workflows
+                              using this API will stop working.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMutation.mutate(api.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              {deleteMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                'Delete'
+                              )}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+
+        {/* Add/Edit Dialog */}
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) handleCloseDialog();
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingApi ? 'Edit' : 'Add'} External API</DialogTitle>
+              <DialogDescription>
+                Configure an external API that N8N can call through the proxy endpoint.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Service Name</label>
+                <Input
+                  value={formData.serviceName}
+                  onChange={(e) => updateField('serviceName', e.target.value)}
+                  placeholder="google_calendar"
+                  disabled={!!editingApi}
+                  required
+                  pattern="[a-z0-9_]+"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Unique identifier for the proxy URL (lowercase, numbers, underscores only)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Display Name</label>
+                <Input
+                  value={formData.displayName}
+                  onChange={(e) => updateField('displayName', e.target.value)}
+                  placeholder="Google Calendar"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">User-friendly name shown in the UI</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Base URL</label>
+                <Input
+                  value={formData.baseUrl}
+                  onChange={(e) => updateField('baseUrl', e.target.value)}
+                  placeholder="https://www.googleapis.com"
+                  type="url"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">Base URL of the external API</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Authentication Type</label>
+                <Select
+                  value={formData.authType}
+                  onValueChange={(value) => {
+                    updateField('authType', value);
+                    updateField('credentials', {});
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select auth type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bearer">Bearer Token</SelectItem>
+                    <SelectItem value="api_key">API Key (Custom Header)</SelectItem>
+                    <SelectItem value="basic">Basic Auth</SelectItem>
+                    <SelectItem value="oauth2">OAuth2</SelectItem>
+                    <SelectItem value="custom_header">Custom Header</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">How to authenticate with this API</p>
+              </div>
+
+              {/* Credentials based on auth type */}
+              {formData.authType === 'bearer' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Bearer Token</label>
+                  <Input
+                    value={formData.credentials.token || ''}
+                    onChange={(e) => updateCredential('token', e.target.value)}
+                    type="password"
+                    placeholder="sk_live_..."
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The bearer token for authentication
+                  </p>
+                </div>
+              )}
+
+              {formData.authType === 'api_key' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Header Name</label>
+                    <Input
+                      value={formData.credentials.headerName || ''}
+                      onChange={(e) => updateCredential('headerName', e.target.value)}
+                      placeholder="X-API-Key"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">Header name for the API key</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">API Key</label>
+                    <Input
+                      value={formData.credentials.key || ''}
+                      onChange={(e) => updateCredential('key', e.target.value)}
+                      type="password"
+                      placeholder="abc123..."
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">Your API key</p>
+                  </div>
+                </>
+              )}
+
+              {formData.authType === 'basic' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Username</label>
+                    <Input
+                      value={formData.credentials.username || ''}
+                      onChange={(e) => updateCredential('username', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Password</label>
+                    <Input
+                      value={formData.credentials.password || ''}
+                      onChange={(e) => updateCredential('password', e.target.value)}
+                      type="password"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              {formData.authType === 'oauth2' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Access Token</label>
+                  <Input
+                    value={formData.credentials.accessToken || ''}
+                    onChange={(e) => updateCredential('accessToken', e.target.value)}
+                    type="password"
+                    placeholder="ya29.a0..."
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">OAuth2 access token</p>
+                </div>
+              )}
+
+              {formData.authType === 'custom_header' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Header Name</label>
+                    <Input
+                      value={formData.credentials.headerName || ''}
+                      onChange={(e) => updateCredential('headerName', e.target.value)}
+                      placeholder="X-Custom-Auth"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Header Value</label>
+                    <Input
+                      value={formData.credentials.headerValue || ''}
+                      onChange={(e) => updateCredential('headerValue', e.target.value)}
+                      type="password"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Description (Optional)</label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => updateField('description', e.target.value)}
+                  placeholder="What this API is used for..."
+                />
+              </div>
+
+              <Alert>
+                <Settings className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Proxy URL:</strong> Use this in N8N workflows:
+                  <br />
+                  <code className="text-xs bg-muted px-2 py-1 rounded mt-1 inline-block">
+                    https://embellics-app.onrender.com/api/proxy/{tenantId}/http/
+                    {formData.serviceName || 'SERVICE_NAME'}/ENDPOINT_PATH
+                  </code>
+                </AlertDescription>
+              </Alert>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
   );
 }
 
