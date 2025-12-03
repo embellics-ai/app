@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction, type Express } from 'exp
 import expressWs from 'express-ws';
 import { createServer } from 'http';
 import rateLimit from 'express-rate-limit';
-import { registerRoutes } from './routes';
+import { registerModularRoutes } from './routes/index';
 import { setupVite, serveStatic, log } from './vite';
 import { initializeDatabase } from './db-init';
 import { startAgentCleanupJob } from './agent-cleanup';
@@ -93,7 +93,10 @@ app.use((req, res, next) => {
     }
   });
 
-  await registerRoutes(wsApp as any as Express);
+  // Register all modular routes (Phase 1 + Phase 2 complete)
+  // Phase 1: auth, analytics, proxy, tenant, user, integration
+  // Phase 2: function, webhook, conversation, handoff, widget, misc
+  await registerModularRoutes(wsApp as any as Express);
 
   // Initialize database with platform owner if needed
   await initializeDatabase();
