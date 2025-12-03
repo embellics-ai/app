@@ -716,24 +716,27 @@ router.post('/webhook', async (req: Request, res: Response) => {
               },
               body: JSON.stringify({
                 tenantId: targetTenant.id,
+                tenantName: targetTenant.name,
                 phoneNumberId,
                 displayPhoneNumber,
-                value,
-                rawWebhook: req.body,
+                messages: value.messages,
+                contacts: value.contacts,
+                metadata: value.metadata,
+                statuses: value.statuses,
+                originalPayload: req.body,
               }),
             });
 
             if (n8nResponse.ok) {
               console.log('[WhatsApp Webhook] Successfully forwarded to N8N');
+              await storage.incrementWebhookStats(webhook.id, true);
             } else {
-              console.error(
-                '[WhatsApp Webhook] N8N webhook failed:',
-                n8nResponse.status,
-                await n8nResponse.text(),
-              );
+              console.error('[WhatsApp Webhook] N8N webhook failed:', n8nResponse.status);
+              await storage.incrementWebhookStats(webhook.id, false);
             }
           } catch (webhookError) {
             console.error('[WhatsApp Webhook] Error forwarding to N8N:', webhookError);
+            await storage.incrementWebhookStats(webhook.id, false);
           }
         }
       }
