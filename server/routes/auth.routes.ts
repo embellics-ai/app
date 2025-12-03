@@ -632,4 +632,114 @@ router.post('/reset-password', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/auth/complete-onboarding
+ * Mark user's onboarding as complete
+ */
+router.post('/complete-onboarding', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const isPlatformAdmin = req.user!.isPlatformAdmin;
+
+    // Platform admins don't have a tenantId - that's okay
+    // Client admins and support staff should have a tenantId
+    if (!isPlatformAdmin) {
+      const tenantId = assertTenant(req, res);
+      if (!tenantId) return;
+    }
+
+    await storage.markOnboardingComplete(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error completing onboarding:', error);
+    res.status(500).json({ error: 'Failed to complete onboarding' });
+  }
+});
+
+/**
+ * POST /api/auth/accept-invitation
+ * Accept user invitation and create account
+ */
+router.post('/accept-invitation', async (req: Request, res: Response) => {
+  try {
+    const acceptSchema = z.object({
+      email: z.string().email(),
+      temporaryPassword: z.string(),
+      newPassword: z.string().min(6),
+    });
+
+    const data = acceptSchema.parse(req.body);
+
+    // Get invitation
+    const invitation = await storage.getUserInvitationByEmail(data.email);
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation not found' });
+    }
+
+    if (invitation.status === 'accepted') {
+      return res.status(400).json({ error: 'Invitation already used' });
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Invitation expired' });
+    }
+
+    // Verify temporary password
+    const validPassword = await verifyPassword(
+      data.temporaryPassword,
+      invitation.temporaryPassword,
+    );
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid temporary password' });
+    }
+
+    // Hash new password
+    const hashedPassword = await hashPassword(data.newPassword);
+
+    // Create user account
+    const user = await storage.createClientUser({
+      email: invitation.email,
+      password: hashedPassword,
+      firstName: invitation.firstName,
+      lastName: invitation.lastName,
+      tenantId: invitation.tenantId,
+      role: invitation.role,
+      isPlatformAdmin: invitation.role === 'owner' || invitation.role === 'admin',
+      phoneNumber: invitation.phoneNumber || null,
+    });
+
+    // Mark invitation as used
+    await storage.markInvitationUsed(invitation.id);
+
+    // Generate JWT token
+    const token = generateToken({
+      userId: user.id,
+      tenantId: user.tenantId,
+      email: user.email,
+      role: user.role,
+      isPlatformAdmin: user.isPlatformAdmin,
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        tenantId: user.tenantId,
+        isPlatformAdmin: user.isPlatformAdmin,
+      },
+    });
+  } catch (error) {
+    console.error('Error accepting invitation:', error);
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: error.errors });
+    } else {
+      res.status(500).json({ error: 'Failed to accept invitation' });
+    }
+  }
+});
+
 export default router;
