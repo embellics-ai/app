@@ -655,4 +655,267 @@ router.get(
   },
 );
 
+// ===== External API Configuration Routes =====
+
+/**
+ * Get all external API configurations for a tenant
+ *
+ * Lists all configured external APIs with masked credentials
+ *
+ * GET /api/platform/tenants/:tenantId/external-apis
+ */
+router.get(
+  '/:tenantId/external-apis',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId) {
+          return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+        }
+        if (userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const configs = await storage.listExternalApiConfigs(tenantId);
+
+      // Return safe configuration (mask credentials)
+      const safeConfigs = configs.map((config) => ({
+        id: config.id,
+        serviceName: config.serviceName,
+        displayName: config.displayName,
+        baseUrl: config.baseUrl,
+        authType: config.authType,
+        description: config.description,
+        isActive: config.isActive,
+        lastUsedAt: config.lastUsedAt,
+        totalCalls: config.totalCalls,
+        successfulCalls: config.successfulCalls,
+        failedCalls: config.failedCalls,
+        createdAt: config.createdAt,
+        updatedAt: config.updatedAt,
+        // Don't expose encrypted credentials or custom headers
+      }));
+
+      res.json(safeConfigs);
+    } catch (error) {
+      console.error('[External API] Error listing configurations:', error);
+      res.status(500).json({ error: 'Failed to list external API configurations' });
+    }
+  },
+);
+
+/**
+ * Create external API configuration
+ *
+ * Creates a new external API configuration with encrypted credentials
+ *
+ * POST /api/platform/tenants/:tenantId/external-apis
+ */
+router.post(
+  '/:tenantId/external-apis',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const {
+        serviceName,
+        displayName,
+        baseUrl,
+        authType,
+        credentials,
+        customHeaders,
+        description,
+      } = req.body;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId) {
+          return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+        }
+        if (userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      // Validate required fields
+      if (!serviceName || !displayName || !baseUrl || !authType) {
+        return res.status(400).json({
+          error: 'Missing required fields',
+          message: 'Service name, display name, base URL, and auth type are required',
+        });
+      }
+
+      // Check if service name already exists for this tenant
+      const existing = await storage.getExternalApiConfig(tenantId, serviceName);
+      if (existing) {
+        return res.status(400).json({
+          error: 'Service name already exists',
+          message: `Service '${serviceName}' is already configured for this tenant`,
+        });
+      }
+
+      // Encrypt credentials if provided
+      let encryptedCredentials = null;
+      if (credentials && authType !== 'none') {
+        encryptedCredentials = encrypt(JSON.stringify(credentials));
+      }
+
+      // Create configuration
+      const config = await storage.createExternalApiConfig({
+        tenantId,
+        serviceName,
+        displayName,
+        baseUrl,
+        authType,
+        encryptedCredentials,
+        customHeaders: customHeaders || null,
+        description: description || null,
+        isActive: true,
+        createdBy: req.user?.userId || null,
+      });
+
+      console.log('[External API] Created configuration:', serviceName, 'for tenant:', tenantId);
+
+      res.json({
+        id: config.id,
+        serviceName: config.serviceName,
+        displayName: config.displayName,
+        baseUrl: config.baseUrl,
+        authType: config.authType,
+        description: config.description,
+        isActive: config.isActive,
+        createdAt: config.createdAt,
+      });
+    } catch (error) {
+      console.error('[External API] Error creating configuration:', error);
+      res.status(500).json({ error: 'Failed to create external API configuration' });
+    }
+  },
+);
+
+/**
+ * Update external API configuration
+ *
+ * Updates an existing external API configuration
+ *
+ * PUT /api/platform/tenants/:tenantId/external-apis/:id
+ */
+router.put(
+  '/:tenantId/external-apis/:id',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, id } = req.params;
+      const {
+        displayName,
+        baseUrl,
+        authType,
+        credentials,
+        customHeaders,
+        description,
+        isActive,
+      } = req.body;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId) {
+          return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+        }
+        if (userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      // Prepare updates
+      const updates: any = {};
+      if (displayName !== undefined) updates.displayName = displayName;
+      if (baseUrl !== undefined) updates.baseUrl = baseUrl;
+      if (authType !== undefined) updates.authType = authType;
+      if (description !== undefined) updates.description = description;
+      if (isActive !== undefined) updates.isActive = isActive;
+
+      // Update credentials if provided
+      if (credentials !== undefined) {
+        if (authType === 'none') {
+          updates.encryptedCredentials = null;
+        } else {
+          updates.encryptedCredentials = encrypt(JSON.stringify(credentials));
+        }
+      }
+
+      // Update custom headers if provided
+      if (customHeaders !== undefined) {
+        updates.customHeaders = customHeaders;
+      }
+
+      const updated = await storage.updateExternalApiConfig(id, updates);
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Configuration not found' });
+      }
+
+      console.log('[External API] Updated configuration:', id);
+
+      res.json({
+        id: updated.id,
+        serviceName: updated.serviceName,
+        displayName: updated.displayName,
+        baseUrl: updated.baseUrl,
+        authType: updated.authType,
+        description: updated.description,
+        isActive: updated.isActive,
+        updatedAt: updated.updatedAt,
+      });
+    } catch (error) {
+      console.error('[External API] Error updating configuration:', error);
+      res.status(500).json({ error: 'Failed to update external API configuration' });
+    }
+  },
+);
+
+/**
+ * Delete external API configuration
+ *
+ * Removes an external API configuration
+ *
+ * DELETE /api/platform/tenants/:tenantId/external-apis/:id
+ */
+router.delete(
+  '/:tenantId/external-apis/:id',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, id } = req.params;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId) {
+          return res.status(401).json({ error: 'Invalid token: missing tenant ID' });
+        }
+        if (userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      await storage.deleteExternalApiConfig(id);
+
+      console.log('[External API] Deleted configuration:', id);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[External API] Error deleting configuration:', error);
+      res.status(500).json({ error: 'Failed to delete external API configuration' });
+    }
+  },
+);
+
 export default router;
