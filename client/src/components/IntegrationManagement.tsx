@@ -53,6 +53,7 @@ import {
   Bell,
   Settings,
   Check,
+  Copy,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -1475,11 +1476,14 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                 <TableHead>Auth Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Usage</TableHead>
+                <TableHead>Proxy URL</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {apis.map((api: any) => (
+              {apis.map((api: any) => {
+                const proxyUrl = `https://embellics-app.onrender.com/api/proxy/${tenantId}/http/${api.serviceName}/ENDPOINT_PATH`;
+                return (
                 <TableRow key={api.id}>
                   <TableCell>
                     <div>
@@ -1507,6 +1511,22 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                         {api.successfulCalls || 0} success / {api.failedCalls || 0} failed
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(proxyUrl);
+                        toast({
+                          title: 'Copied!',
+                          description: 'Proxy URL copied to clipboard',
+                        });
+                      }}
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy URL
+                    </Button>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -1548,7 +1568,8 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -1638,7 +1659,7 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                     value={formData.credentials.token || ''}
                     onChange={(e) => updateCredential('token', e.target.value)}
                     type="password"
-                    placeholder="sk_live_..."
+                    placeholder="Enter your bearer token"
                     required
                   />
                   <p className="text-xs text-muted-foreground">
@@ -1744,12 +1765,35 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
               <Alert>
                 <Settings className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Proxy URL:</strong> Use this in N8N workflows:
-                  <br />
-                  <code className="text-xs bg-muted px-2 py-1 rounded mt-1 inline-block">
-                    https://embellics-app.onrender.com/api/proxy/{tenantId}/http/
-                    {formData.serviceName || 'SERVICE_NAME'}/ENDPOINT_PATH
-                  </code>
+                  <div className="space-y-2">
+                    <div>
+                      <strong>Proxy Endpoint URL:</strong>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs bg-muted px-2 py-1 rounded flex-1">
+                        https://embellics-app.onrender.com/api/proxy/{tenantId}/http/
+                        {formData.serviceName || 'SERVICE_NAME'}/ENDPOINT_PATH
+                      </code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = `https://embellics-app.onrender.com/api/proxy/${tenantId}/http/${formData.serviceName || 'SERVICE_NAME'}/ENDPOINT_PATH`;
+                          navigator.clipboard.writeText(url);
+                          toast({
+                            title: 'Copied!',
+                            description: 'Proxy URL copied to clipboard',
+                          });
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Use this URL in your workflows to call this API securely
+                    </p>
+                  </div>
                 </AlertDescription>
               </Alert>
 
