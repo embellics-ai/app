@@ -1611,28 +1611,43 @@ export async function registerRoutes(app: Express): Promise<void> {
               updatedBy: req.user!.userId,
             });
           }
+
+          // Deactivate OAuth credential when WhatsApp is disabled
+          const existingCredential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+          if (existingCredential) {
+            await storage.updateOAuthCredential(existingCredential.id, {
+              isActive: false,
+            });
+          }
+
           return res.json({ success: true, message: 'WhatsApp integration disabled' });
         }
 
-        // Validate required fields when enabling
-        if (
-          !data.phoneNumberId ||
-          !data.businessAccountId ||
-          !data.accessToken ||
-          !data.webhookVerifyToken
-        ) {
+        // Get existing config if updating
+        const existingConfig = integration?.whatsappConfig
+          ? decryptWhatsAppConfig(integration.whatsappConfig as any)
+          : null;
+
+        // Validate required fields when enabling (for new config or when fields are provided)
+        const phoneNumberId = data.phoneNumberId || existingConfig?.phoneNumberId;
+        const businessAccountId = data.businessAccountId || existingConfig?.businessAccountId;
+        const accessToken = data.accessToken || existingConfig?.accessToken;
+        const webhookVerifyToken = data.webhookVerifyToken || existingConfig?.webhookVerifyToken;
+        const phoneNumber = data.phoneNumber || existingConfig?.phoneNumber;
+
+        if (!phoneNumberId || !businessAccountId || !accessToken || !webhookVerifyToken) {
           return res.status(400).json({
             error: 'All WhatsApp fields are required when enabling integration',
           });
         }
 
-        // Create WhatsApp config object
+        // Create WhatsApp config object (merge with existing if present)
         const whatsappConfig: WhatsAppConfig = {
-          phoneNumberId: data.phoneNumberId,
-          businessAccountId: data.businessAccountId,
-          accessToken: data.accessToken,
-          webhookVerifyToken: data.webhookVerifyToken,
-          phoneNumber: data.phoneNumber,
+          phoneNumberId,
+          businessAccountId,
+          accessToken,
+          webhookVerifyToken,
+          phoneNumber,
         };
 
         // Encrypt sensitive fields
@@ -1654,6 +1669,33 @@ export async function registerRoutes(app: Express): Promise<void> {
             createdBy: req.user!.userId,
             updatedBy: req.user!.userId,
           });
+        }
+
+        // Create or update OAuth credential for WhatsApp
+        // This is needed for the proxy API to send messages
+        const existingCredential = await storage.getOAuthCredential(tenantId, 'whatsapp');
+
+        const credentialData = {
+          tenantId,
+          provider: 'whatsapp' as const,
+          clientId: 'whatsapp_business_api',
+          clientSecret: 'n/a',
+          accessToken: encryptedConfig.accessToken, // Already encrypted
+          refreshToken: null,
+          tokenExpiry: null,
+          scopes: null,
+          metadata: {
+            phoneNumberId: data.phoneNumberId,
+            businessAccountId: data.businessAccountId,
+            displayPhoneNumber: data.phoneNumber,
+          },
+          isActive: true,
+        };
+
+        if (existingCredential) {
+          await storage.updateOAuthCredential(existingCredential.id, credentialData);
+        } else {
+          await storage.createOAuthCredential(credentialData);
         }
 
         res.json({ success: true, message: 'WhatsApp integration configured successfully' });
