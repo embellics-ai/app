@@ -2650,7 +2650,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         const filters = {
@@ -2699,7 +2699,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         const filters = {
@@ -2736,7 +2736,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         const filters = {
@@ -2771,7 +2771,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         console.log('[Analytics Agent Breakdown] Querying for tenant:', tenantId);
@@ -2808,7 +2808,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         const chat = await storage.getChatAnalytics(chatId);
@@ -2845,7 +2845,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         const filters = {
@@ -2883,7 +2883,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         const filters = {
@@ -2937,7 +2937,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         // Authorization: Platform admin can access any tenant, client admin only their own
         if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Access denied to this tenant\'s analytics' });
+          return res.status(403).json({ error: "Access denied to this tenant's analytics" });
         }
 
         console.log('[Analytics Calls] Querying for tenant:', tenantId);
