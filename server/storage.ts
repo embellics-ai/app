@@ -41,8 +41,6 @@ import {
   type InsertChatMessage,
   type VoiceAnalytics,
   type InsertVoiceAnalytics,
-  type OAuthCredential,
-  type InsertOAuthCredential,
   type ExternalApiConfig,
   type InsertExternalApiConfig,
   users,
@@ -66,7 +64,6 @@ import {
   chatAnalytics,
   chatMessages,
   voiceAnalytics,
-  oauthCredentials,
   externalApiConfigs,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
@@ -335,21 +332,6 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]>;
   deleteChatMessages(chatAnalyticsId: string): Promise<void>;
-
-  // OAuth Credentials Methods
-  getOAuthCredential(tenantId: string, provider: string): Promise<OAuthCredential | undefined>;
-  getOAuthCredentialsByTenant(tenantId: string): Promise<OAuthCredential[]>;
-  createOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential>;
-  updateOAuthCredential(
-    id: string,
-    updates: Partial<InsertOAuthCredential>,
-  ): Promise<OAuthCredential | undefined>;
-  updateOAuthTokens(
-    id: string,
-    tokens: { accessToken: string; refreshToken?: string; tokenExpiry: Date },
-  ): Promise<void>;
-  deleteOAuthCredential(id: string): Promise<void>;
-  markOAuthCredentialUsed(id: string): Promise<void>;
 
   // External API Configurations Methods
   getExternalApiConfig(
@@ -1594,52 +1576,6 @@ export class MemStorage implements IStorage {
   }
 
   async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
-    // Stub
-  }
-
-  // OAuth Credentials stubs (not used in MemStorage, only for interface compliance)
-  async getOAuthCredential(
-    tenantId: string,
-    provider: string,
-  ): Promise<OAuthCredential | undefined> {
-    return undefined; // Stub
-  }
-
-  async getOAuthCredentialsByTenant(tenantId: string): Promise<OAuthCredential[]> {
-    return []; // Stub
-  }
-
-  async createOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential> {
-    const id = randomUUID();
-    return {
-      id,
-      ...credential,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastUsedAt: null,
-    } as OAuthCredential;
-  }
-
-  async updateOAuthCredential(
-    id: string,
-    updates: Partial<InsertOAuthCredential>,
-  ): Promise<OAuthCredential | undefined> {
-    return undefined; // Stub
-  }
-
-  async updateOAuthTokens(
-    id: string,
-    tokens: { accessToken: string; refreshToken?: string; tokenExpiry: Date },
-  ): Promise<void> {
-    // Stub
-  }
-
-  async deleteOAuthCredential(id: string): Promise<void> {
-    // Stub
-  }
-
-  async markOAuthCredentialUsed(id: string): Promise<void> {
     // Stub
   }
 
@@ -3485,97 +3421,6 @@ export class DbStorage implements IStorage {
    */
   async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
     await this.db.delete(chatMessages).where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId));
-  }
-
-  // ============================================
-  // OAUTH CREDENTIALS METHODS
-  // ============================================
-
-  /**
-   * Get OAuth credential for a tenant and provider
-   */
-  async getOAuthCredential(
-    tenantId: string,
-    provider: string,
-  ): Promise<OAuthCredential | undefined> {
-    const [credential] = await this.db
-      .select()
-      .from(oauthCredentials)
-      .where(and(eq(oauthCredentials.tenantId, tenantId), eq(oauthCredentials.provider, provider)))
-      .limit(1);
-    return credential;
-  }
-
-  /**
-   * Get all OAuth credentials for a tenant
-   */
-  async getOAuthCredentialsByTenant(tenantId: string): Promise<OAuthCredential[]> {
-    return await this.db
-      .select()
-      .from(oauthCredentials)
-      .where(eq(oauthCredentials.tenantId, tenantId));
-  }
-
-  /**
-   * Create a new OAuth credential
-   * Note: clientSecret, accessToken, and refreshToken should be encrypted before calling
-   */
-  async createOAuthCredential(credential: InsertOAuthCredential): Promise<OAuthCredential> {
-    const [created] = await this.db.insert(oauthCredentials).values(credential).returning();
-    return created!;
-  }
-
-  /**
-   * Update OAuth credential
-   */
-  async updateOAuthCredential(
-    id: string,
-    updates: Partial<InsertOAuthCredential>,
-  ): Promise<OAuthCredential | undefined> {
-    const [updated] = await this.db
-      .update(oauthCredentials)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(oauthCredentials.id, id))
-      .returning();
-    return updated;
-  }
-
-  /**
-   * Update OAuth tokens (access token, refresh token, expiry)
-   * Used when refreshing expired tokens
-   */
-  async updateOAuthTokens(
-    id: string,
-    tokens: { accessToken: string; refreshToken?: string; tokenExpiry: Date },
-  ): Promise<void> {
-    const updates: any = {
-      accessToken: tokens.accessToken,
-      tokenExpiry: tokens.tokenExpiry,
-      updatedAt: new Date(),
-    };
-
-    if (tokens.refreshToken) {
-      updates.refreshToken = tokens.refreshToken;
-    }
-
-    await this.db.update(oauthCredentials).set(updates).where(eq(oauthCredentials.id, id));
-  }
-
-  /**
-   * Delete OAuth credential
-   */
-  async deleteOAuthCredential(id: string): Promise<void> {
-    await this.db.delete(oauthCredentials).where(eq(oauthCredentials.id, id));
-  }
-
-  /**
-   * Mark OAuth credential as recently used (for analytics/monitoring)
-   */
-  async markOAuthCredentialUsed(id: string): Promise<void> {
-    await this.db
-      .update(oauthCredentials)
-      .set({ lastUsedAt: new Date() })
-      .where(eq(oauthCredentials.id, id));
   }
 
   // ============================================
