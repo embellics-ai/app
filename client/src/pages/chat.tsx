@@ -11,7 +11,14 @@ import { Send, Bot, User, Loader2, Plus, Headphones } from 'lucide-react';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
-import type { Message, Conversation } from '@shared/schema';
+// Message and Conversation types removed - tables dropped in migrations 0013/0014
+// Use WidgetChatMessage and WidgetHandoff instead
+// NOTE: This page has legacy code that needs refactoring to match new schema
+import type { WidgetChatMessage, WidgetHandoff } from '@shared/schema';
+
+// Temporary type for backward compatibility until this page is refactored
+type Message = WidgetChatMessage & { senderType?: string };
+type Conversation = WidgetHandoff;
 
 export default function Chat() {
   const [, setLocation] = useLocation();
@@ -28,16 +35,16 @@ export default function Chat() {
     }
   }, [user, setLocation]);
 
-  // Query for conversations to get the most recent one (with polling to detect handoff status)
+  // Query for handoffs (repurposed from conversations)
   // Completely disable queries for platform admins to prevent any API calls
-  const { data: conversations = [] } = useQuery<Conversation[]>({
+  const { data: conversations = [] } = useQuery<WidgetHandoff[]>({
     queryKey: ['/api/conversations'],
     refetchInterval: 3000, // Poll every 3 seconds to detect handoff status changes
     enabled: !user?.isPlatformAdmin,
   });
 
-  // Query for messages in current conversation
-  const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
+  // Query for messages in current handoff
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<WidgetChatMessage[]>({
     queryKey: ['/api/messages', currentConversationId],
     enabled: !!currentConversationId && !user?.isPlatformAdmin,
     refetchInterval: 2000, // Poll every 2 seconds for new messages
@@ -203,13 +210,13 @@ export default function Chat() {
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold">AI Chat</h1>
-            {currentConversation?.handoffStatus === 'pending_handoff' && (
+            {currentConversation?.status === 'pending' && (
               <Badge variant="secondary" data-testid="badge-handoff-pending">
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                 Waiting for agent...
               </Badge>
             )}
-            {currentConversation?.handoffStatus === 'with_human' && (
+            {currentConversation?.status === 'active' && (
               <Badge variant="default" data-testid="badge-handoff-active">
                 <Headphones className="h-3 w-3 mr-1" />
                 Human Agent
@@ -217,27 +224,28 @@ export default function Chat() {
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {currentConversation?.handoffStatus === 'with_human'
+            {currentConversation?.status === 'active'
               ? "You're now chatting with a human agent"
               : 'Powered by Retell AI Agent - Test your widget here'}
           </p>
         </div>
         <div className="flex gap-2">
-          {currentConversation && currentConversation.handoffStatus === 'ai' && (
-            <Button
-              onClick={() => requestHandoff.mutate()}
-              variant="outline"
-              disabled={requestHandoff.isPending}
-              data-testid="button-request-handoff"
-            >
-              {requestHandoff.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Headphones className="h-4 w-4 mr-2" />
-              )}
-              Talk to Human
-            </Button>
-          )}
+          {currentConversation &&
+            (currentConversation.status === 'resolved' || !currentConversation.status) && (
+              <Button
+                onClick={() => requestHandoff.mutate()}
+                variant="outline"
+                disabled={requestHandoff.isPending}
+                data-testid="button-request-handoff"
+              >
+                {requestHandoff.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Headphones className="h-4 w-4 mr-2" />
+                )}
+                Talk to Human
+              </Button>
+            )}
           <Button
             onClick={() => startNewChat.mutate()}
             variant="outline"
@@ -319,7 +327,7 @@ export default function Chat() {
 function MessageBubble({ message }: { message: Message }) {
   const isAssistant = message.role === 'assistant';
   const isHuman = message.senderType === 'human';
-  const isUser = message.senderType === 'user';
+  const isUser = message.senderType === 'user' || message.role === 'user';
 
   // Determine sender display
   let senderName = 'AI Assistant';

@@ -10,7 +10,7 @@ import {
   assertTenant,
 } from '../middleware/auth.middleware';
 import { storage } from '../storage';
-import { insertMessageSchema, insertConversationSchema } from '@shared/schema';
+import { insertWidgetHandoffMessageSchema, insertWidgetHandoffSchema } from '@shared/schema';
 import { z } from 'zod';
 import { broadcastToTenant } from '../websocket';
 import Retell from 'retell-sdk';
@@ -60,14 +60,13 @@ async function getRetellAgentResponse(
 
       retellChatId = chatSession.chat_id;
 
-      // Save Retell chat ID to conversation metadata (with tenantId for security)
-      await storage.updateConversationMetadata(
-        conversationId,
-        {
+      // Save Retell chat ID to handoff metadata
+      await storage.updateWidgetHandoffStatus(conversationId, conversation.status || 'active', {
+        metadata: {
+          ...(conversation.metadata || {}),
           retellChatId: retellChatId,
         },
-        tenantId,
-      );
+      });
 
       console.log('[Retell] Created chat session:', retellChatId);
     }
@@ -131,7 +130,7 @@ async function getRetellAgentResponse(
   }
 }
 
-// Get messages for a conversation (PROTECTED)
+// Get messages for a handoff (PROTECTED)
 router.get('/api/messages/:conversationId', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     // Validate tenant ID exists in token
@@ -139,7 +138,7 @@ router.get('/api/messages/:conversationId', requireAuth, async (req: Authenticat
     if (!tenantId) return;
 
     const { conversationId } = req.params;
-    const messages = await storage.getMessagesByConversation(conversationId, tenantId);
+    const messages = await storage.getWidgetHandoffMessages(conversationId);
     res.json(messages);
   } catch (error) {
     console.error('Error fetching messages:', error);
@@ -154,52 +153,46 @@ router.post('/api/messages', requireAuth, async (req: AuthenticatedRequest, res)
     const tenantId = assertTenant(req, res);
     if (!tenantId) return;
 
-    const validatedData = insertMessageSchema.parse(req.body);
+    const validatedData = insertWidgetHandoffMessageSchema.parse(req.body);
 
-    // Verify conversation exists and belongs to user's tenant
-    const conversation = await storage.getConversation(validatedData.conversationId, tenantId);
-    if (!conversation) {
-      return res.status(404).json({ error: 'Conversation not found' });
+    // Verify handoff exists
+    const handoff = await storage.getWidgetHandoff(validatedData.handoffId);
+    if (!handoff) {
+      return res.status(404).json({ error: 'Handoff not found' });
     }
 
-    // Save user message (server injects tenantId for security)
-    const userMessage = await storage.createMessage(
-      {
-        ...validatedData,
-        senderType: 'user', // Explicitly mark as end-user message
-      },
-      tenantId,
-    );
+    // Save user message
+    const userMessage = await storage.createWidgetHandoffMessage({
+      handoffId: validatedData.handoffId,
+      senderType: 'user',
+      content: validatedData.content,
+    });
 
     // Broadcast user message to all connected clients in this tenant
     broadcastToTenant(tenantId, 'message:created', {
       message: userMessage,
-      conversationId: validatedData.conversationId,
+      conversationId: validatedData.handoffId,
     });
 
     // Get AI response using Retell AI agent
     try {
       const aiResponseContent = await getRetellAgentResponse(
         validatedData.content,
-        validatedData.conversationId,
-        conversation,
+        validatedData.handoffId,
+        handoff,
         tenantId,
       );
 
-      const aiMessage = await storage.createMessage(
-        {
-          conversationId: validatedData.conversationId,
-          role: 'assistant',
-          content: aiResponseContent,
-          senderType: 'ai', // Explicitly mark as AI agent message
-        },
-        tenantId,
-      );
+      const aiMessage = await storage.createWidgetHandoffMessage({
+        handoffId: validatedData.handoffId,
+        senderType: 'agent',
+        content: aiResponseContent,
+      });
 
       // Broadcast AI message to all connected clients in this tenant
       broadcastToTenant(tenantId, 'message:created', {
         message: aiMessage,
-        conversationId: validatedData.conversationId,
+        conversationId: validatedData.handoffId,
       });
 
       res.json({ userMessage, aiMessage });
@@ -222,38 +215,42 @@ router.post('/api/messages', requireAuth, async (req: AuthenticatedRequest, res)
   }
 });
 
-// Get all conversations for authenticated tenant (PROTECTED)
+// Get all handoffs for authenticated tenant (PROTECTED)
 router.get('/api/conversations', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     // Validate tenant ID exists in token
     const tenantId = assertTenant(req, res);
     if (!tenantId) return;
 
-    const conversations = await storage.getConversationsByTenant(tenantId);
-    res.json(conversations);
+    const handoffs = await storage.getWidgetHandoffsByTenant(tenantId);
+    res.json(handoffs);
   } catch (error) {
-    console.error('Error fetching conversations:', error);
-    res.status(500).json({ error: 'Failed to fetch conversations' });
+    console.error('Error fetching handoffs:', error);
+    res.status(500).json({ error: 'Failed to fetch handoffs' });
   }
 });
 
-// Create a new conversation (PROTECTED)
+// Create a new handoff (PROTECTED)
 router.post('/api/conversations', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     // Validate tenant ID exists in token
     const tenantId = assertTenant(req, res);
     if (!tenantId) return;
 
-    // Parse and validate request body (server injects tenantId for security)
-    const validatedData = insertConversationSchema.parse(req.body);
-    const conversation = await storage.createConversation(validatedData, tenantId);
-    res.json(conversation);
+    // Parse and validate request body
+    const validatedData = insertWidgetHandoffSchema.parse(req.body);
+    const handoff = await storage.createWidgetHandoff({
+      ...validatedData,
+      tenantId,
+      status: 'active',
+    });
+    res.json(handoff);
   } catch (error) {
-    console.error('Error creating conversation:', error);
+    console.error('Error creating handoff:', error);
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: error.errors });
     } else {
-      res.status(500).json({ error: 'Failed to create conversation' });
+      res.status(500).json({ error: 'Failed to create handoff' });
     }
   }
 });
@@ -270,14 +267,14 @@ router.post(
 
       const { conversationId } = req.params;
 
-      // Get the conversation and verify it belongs to user's tenant
-      const conversation = await storage.getConversation(conversationId, tenantId);
-      if (!conversation) {
-        return res.status(404).json({ error: 'Conversation not found' });
+      // Get the handoff
+      const handoff = await storage.getWidgetHandoff(conversationId);
+      if (!handoff) {
+        return res.status(404).json({ error: 'Handoff not found' });
       }
 
       // End the Retell chat session if it exists
-      const metadata = conversation.metadata as {
+      const metadata = handoff.metadata as {
         retellChatId?: string;
       } | null;
       const retellChatId = metadata?.retellChatId;

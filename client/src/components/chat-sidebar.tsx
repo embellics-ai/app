@@ -11,7 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, Bot, Calendar, BarChart3 } from 'lucide-react';
 import { useLocation } from 'wouter';
-import type { Conversation } from '@shared/schema';
+// Conversation type removed - table dropped in migration 0014
+// /api/conversations now returns WidgetHandoff data
+import type { WidgetHandoff } from '@shared/schema';
 
 type ChatSidebarProps = {
   currentConversationId?: string | null;
@@ -21,8 +23,8 @@ type ChatSidebarProps = {
 export function ChatSidebar({ currentConversationId, onConversationSelect }: ChatSidebarProps) {
   const [location, setLocation] = useLocation();
 
-  // Query for all conversations
-  const { data: conversations = [] } = useQuery<Conversation[]>({
+  // Query for all handoffs (repurposed from conversations)
+  const { data: conversations = [] } = useQuery<WidgetHandoff[]>({
     queryKey: ['/api/conversations'],
   });
 
@@ -94,20 +96,22 @@ export function ChatSidebar({ currentConversationId, onConversationSelect }: Cha
               </div>
             ) : (
               <div className="space-y-1">
-                {conversations.slice(0, 10).map((conversation) => (
+                {conversations.slice(0, 10).map((handoff) => (
                   <Button
-                    key={conversation.id}
-                    variant={currentConversationId === conversation.id ? 'secondary' : 'ghost'}
+                    key={handoff.id}
+                    variant={currentConversationId === handoff.id ? 'secondary' : 'ghost'}
                     className="w-full justify-start text-left hover-elevate"
-                    onClick={() => onConversationSelect?.(conversation.id)}
-                    data-testid={`conversation-${conversation.id}`}
+                    onClick={() => onConversationSelect?.(handoff.id)}
+                    data-testid={`conversation-${handoff.id}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{conversation.title}</div>
-                      {conversation.createdAt && (
+                      <div className="text-sm font-medium truncate">
+                        {handoff.userEmail || `Chat ${handoff.chatId.slice(0, 8)}`}
+                      </div>
+                      {handoff.requestedAt && (
                         <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                           <Calendar className="h-3 w-3" />
-                          {new Date(conversation.createdAt).toLocaleDateString()}
+                          {new Date(handoff.requestedAt).toLocaleDateString()}
                         </div>
                       )}
                     </div>

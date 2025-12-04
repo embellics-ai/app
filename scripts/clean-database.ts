@@ -5,8 +5,6 @@ import { eq, ne } from 'drizzle-orm';
 import {
   clientUsers,
   tenants,
-  conversations,
-  messages,
   widgetConfigs,
   apiKeys,
   humanAgents,
@@ -50,8 +48,6 @@ async function cleanDatabase() {
     // Count records before deletion
     const userCount = await db.select().from(clientUsers);
     const tenantCount = await db.select().from(tenants);
-    const conversationCount = await db.select().from(conversations);
-    const messageCount = await db.select().from(messages);
     const widgetConfigCount = await db.select().from(widgetConfigs);
     const apiKeyCount = await db.select().from(apiKeys);
     const humanAgentCount = await db.select().from(humanAgents);
@@ -63,8 +59,6 @@ async function cleanDatabase() {
 
     console.log(`  - Users: ${userCount.length}`);
     console.log(`  - Tenants: ${tenantCount.length}`);
-    console.log(`  - Conversations: ${conversationCount.length}`);
-    console.log(`  - Messages: ${messageCount.length}`);
     console.log(`  - Widget Configs: ${widgetConfigCount.length}`);
     console.log(`  - API Keys: ${apiKeyCount.length}`);
     console.log(`  - Human Agents: ${humanAgentCount.length}`);
@@ -120,37 +114,29 @@ async function cleanDatabase() {
     console.log('  ✓ Widget chat messages deleted');
 
     // 6. Delete human agents
-    console.log('  [6/12] Deleting human agents...');
+    console.log('  [6/10] Deleting human agents...');
     await db.delete(humanAgents);
     console.log('  ✓ Human agents deleted');
 
-    // 7. Delete messages
-    console.log('  [7/12] Deleting messages...');
-    await db.delete(messages);
-    console.log('  ✓ Messages deleted');
+    // Note: messages and conversations tables removed in migration 0014 (replaced by widget_handoffs)
 
-    // 8. Delete conversations
-    console.log('  [8/12] Deleting conversations...');
-    await db.delete(conversations);
-    console.log('  ✓ Conversations deleted');
-
-    // 9. Delete API keys
-    console.log('  [9/12] Deleting API keys...');
+    // 7. Delete API keys
+    console.log('  [7/10] Deleting API keys...');
     await db.delete(apiKeys);
     console.log('  ✓ API keys deleted');
 
-    // 10. Delete widget configs
-    console.log('  [10/12] Deleting widget configs...');
+    // 8. Delete widget configs
+    console.log('  [8/10] Deleting widget configs...');
     await db.delete(widgetConfigs);
     console.log('  ✓ Widget configs deleted');
 
-    // 11. Delete tenants (this will cascade delete related records)
-    console.log('  [11/12] Deleting tenants...');
+    // 9. Delete tenants (this will cascade delete related records)
+    console.log('  [9/10] Deleting tenants...');
     await db.delete(tenants);
     console.log('  ✓ Tenants deleted');
 
-    // 12. Delete all users EXCEPT platform admin
-    console.log('  [12/12] Deleting users (except platform admin)...');
+    // 10. Delete all users EXCEPT platform admin
+    console.log('  [10/10] Deleting users (except platform admin)...');
     const deletedUsers = await db
       .delete(clientUsers)
       .where(ne(clientUsers.email, PLATFORM_ADMIN_EMAIL))

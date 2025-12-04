@@ -173,31 +173,13 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       ...chatData,
     });
 
-    // Store transcript messages in chat_messages table
-    if (chat.transcript && Array.isArray(chat.transcript)) {
-      console.log(
-        `[Retell Webhook] Storing ${chat.transcript.length} transcript messages for chat ${chat.chat_id}`,
-      );
-
-      for (const message of chat.transcript) {
-        try {
-          await storage.createChatMessage({
-            chatAnalyticsId: createdAnalytics.id,
-            messageId: message.message_id || null,
-            role: message.role || 'unknown',
-            content: message.content || '',
-            timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
-            toolCallId: message.tool_call_id || null,
-            nodeTransition: message.node_transition || null,
-          });
-        } catch (msgError) {
-          console.error('[Retell Webhook] Error storing message:', msgError);
-          // Continue with other messages even if one fails
-        }
-      }
-    } else {
-      console.log(`[Retell Webhook] No transcript found in webhook payload`);
-    }
+    // NOTE: We intentionally DO NOT store Retell's transcript
+    // Rationale: Messages are already stored in real-time in widget_chat_history during the conversation
+    // The retell_transcript_messages table was dropped in migration 0015
+    // This avoids duplicate storage and we already have the message history we need
+    console.log(
+      `[Retell Webhook] Chat analytics stored. Messages already captured in widget_chat_history during conversation.`,
+    );
 
     // Forward to tenant-specific N8N webhooks configured for this event
     const eventWebhooks = await storage.getWebhooksByEvent(tenantId, 'chat_analyzed');

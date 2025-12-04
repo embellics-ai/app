@@ -425,27 +425,25 @@ router.post('/api/handoff/trigger', requireAuth, async (req: AuthenticatedReques
     const tenantId = assertTenant(req, res);
     if (!tenantId) return;
 
-    // Get conversation
-    const conversation = await storage.getConversation(conversationId, tenantId);
-    if (!conversation) {
-      return res.status(404).json({ error: 'Conversation not found' });
+    // Get handoff
+    const handoff = await storage.getWidgetHandoff(conversationId);
+    if (!handoff) {
+      return res.status(404).json({ error: 'Handoff not found' });
     }
 
     // Generate conversation summary
-    const messages = await storage.getMessagesByConversation(conversationId, tenantId);
+    const messages = await storage.getWidgetHandoffMessages(conversationId);
     const summary = await generateConversationSummary(messages);
 
-    // Update conversation status to pending_handoff
-    await storage.updateConversation(
-      conversationId,
-      {
-        handoffStatus: 'pending_handoff',
-        conversationSummary: summary,
-        handoffTimestamp: new Date(),
+    // Update handoff status to pending_handoff
+    await storage.updateWidgetHandoffStatus(conversationId, 'pending', {
+      conversationHistory: summary,
+      lastUserMessage: messages[messages.length - 1]?.content || '',
+      metadata: {
+        ...((handoff.metadata as object) || {}),
         handoffReason: reason || 'user_request',
       },
-      tenantId,
-    );
+    });
 
     // Broadcast handoff event to tenant's admin dashboard
     broadcastToTenant(tenantId, 'handoff_requested', {
@@ -466,7 +464,7 @@ router.get('/api/handoff/pending', requireAuth, async (req: AuthenticatedRequest
   try {
     const tenantId = assertTenant(req, res);
     if (!tenantId) return;
-    const pending = await storage.getPendingHandoffs(tenantId);
+    const pending = await storage.getPendingWidgetHandoffs(tenantId);
     res.json(pending);
   } catch (error) {
     console.error('Error fetching pending handoffs:', error);
@@ -537,7 +535,7 @@ router.get('/api/handoff/active', requireAuth, async (req: AuthenticatedRequest,
   try {
     const tenantId = assertTenant(req, res);
     if (!tenantId) return;
-    const activeChats = await storage.getActiveHandoffs(tenantId);
+    const activeChats = await storage.getActiveWidgetHandoffs(tenantId);
     res.json(activeChats);
   } catch (error) {
     console.error('Error fetching active handoffs:', error);
@@ -555,9 +553,9 @@ router.get(
       if (!tenantId) return;
       const { agentId } = req.params;
 
-      const conversations = await storage.getConversationsByTenant(tenantId);
-      const activeChats = conversations.filter(
-        (c) => c.handoffStatus === 'with_human' && c.humanAgentId === agentId,
+      const handoffs = await storage.getWidgetHandoffsByTenant(tenantId);
+      const activeChats = handoffs.filter(
+        (h) => h.status === 'active' && h.assignedAgentId === agentId,
       );
 
       res.json(activeChats);
@@ -581,23 +579,19 @@ router.post('/api/handoff/send-message', requireAuth, async (req: AuthenticatedR
       })
       .parse(req.body);
 
-    // Verify conversation is assigned to this agent
-    const conversation = await storage.getConversation(conversationId, tenantId);
-    if (!conversation || conversation.humanAgentId !== humanAgentId) {
-      return res.status(403).json({ error: 'Not authorized for this conversation' });
+    // Verify handoff is assigned to this agent
+    const handoff = await storage.getWidgetHandoff(conversationId);
+    if (!handoff || handoff.assignedAgentId !== humanAgentId) {
+      return res.status(403).json({ error: 'Not authorized for this handoff' });
     }
 
     // Create message
-    const message = await storage.createMessage(
-      {
-        conversationId,
-        role: 'assistant',
-        content,
-        senderType: 'human',
-        humanAgentId,
-      },
-      tenantId,
-    );
+    const message = await storage.createWidgetHandoffMessage({
+      handoffId: conversationId,
+      senderType: 'agent',
+      senderId: humanAgentId,
+      content,
+    });
 
     // Broadcast message to chat widget
     broadcastToTenant(tenantId, 'human_agent_message', {
@@ -624,14 +618,10 @@ router.post('/api/handoff/complete', requireAuth, async (req: AuthenticatedReque
       })
       .parse(req.body);
 
-    // Update conversation status
-    await storage.updateConversation(
-      conversationId,
-      {
-        handoffStatus: 'completed',
-      },
-      tenantId,
-    );
+    // Update handoff status to completed
+    await storage.updateWidgetHandoffStatus(conversationId, 'resolved', {
+      resolvedAt: new Date(),
+    });
 
     // Decrement agent's active chats
     await storage.decrementActiveChats(humanAgentId, tenantId);

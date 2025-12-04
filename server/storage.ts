@@ -1,10 +1,4 @@
 import {
-  type User,
-  type InsertUser,
-  type Message,
-  type InsertMessage,
-  type Conversation,
-  type InsertConversation,
   type Tenant,
   type InsertTenant,
   type ClientUser,
@@ -13,10 +7,6 @@ import {
   type InsertApiKey,
   type WidgetConfig,
   type InsertWidgetConfig,
-  type AnalyticsEvent,
-  type InsertAnalyticsEvent,
-  type DailyAnalytics,
-  type InsertDailyAnalytics,
   type HumanAgent,
   type InsertHumanAgent,
   type UserInvitation,
@@ -33,25 +23,17 @@ import {
   type InsertTenantIntegration,
   type N8nWebhook,
   type InsertN8nWebhook,
-  type WebhookAnalytics,
-  type InsertWebhookAnalytics,
   type ChatAnalytics,
   type InsertChatAnalytics,
-  type ChatMessage,
-  type InsertChatMessage,
+  // ChatMessage and InsertChatMessage removed - table dropped in migration 0015
   type VoiceAnalytics,
   type InsertVoiceAnalytics,
   type ExternalApiConfig,
   type InsertExternalApiConfig,
-  users,
-  messages,
-  conversations,
   tenants,
   clientUsers,
   apiKeys,
   widgetConfigs,
-  analyticsEvents,
-  dailyAnalytics,
   humanAgents,
   userInvitations,
   passwordResetTokens,
@@ -60,9 +42,7 @@ import {
   conversationMessages,
   tenantIntegrations,
   n8nWebhooks,
-  webhookAnalytics,
   chatAnalytics,
-  retellTranscriptMessages,
   voiceAnalytics,
   externalApiConfigs,
 } from '@shared/schema';
@@ -74,10 +54,8 @@ import { eq, desc, and, or, gte, lte, gt, sql, isNull } from 'drizzle-orm';
 import { encryptApiKey, decryptApiKey } from './encryption';
 
 export interface IStorage {
-  // Legacy User methods (keeping for backward compatibility)
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  // Legacy User methods - REMOVED (see migration 0013)
+  // users table has been dropped - use client_users instead
 
   // Tenant methods
   getTenant(id: string): Promise<Tenant | undefined>;
@@ -130,34 +108,12 @@ export interface IStorage {
   incrementActiveChats(id: string, tenantId: string): Promise<void>;
   decrementActiveChats(id: string, tenantId: string): Promise<void>;
 
-  // Message methods (tenant-scoped) - tenantId is REQUIRED for security
-  getMessagesByConversation(conversationId: string, tenantId: string): Promise<Message[]>;
-  createMessage(message: InsertMessage, tenantId: string): Promise<Message>;
-  deleteMessage(id: string, tenantId: string): Promise<void>;
+  // Legacy Message and Conversation methods - REMOVED (see migration 0014)
+  // conversations and messages tables have been dropped
+  // Use widget_handoffs and widget_handoff_messages tables instead
 
-  // Conversation methods (tenant-scoped) - tenantId is REQUIRED for security
-  getConversation(id: string, tenantId: string): Promise<Conversation | undefined>;
-  getConversationsByTenant(tenantId: string): Promise<Conversation[]>;
-  getActiveHandoffs(tenantId: string): Promise<Conversation[]>;
-  getPendingHandoffs(tenantId: string): Promise<Conversation[]>;
-  createConversation(conversation: InsertConversation, tenantId: string): Promise<Conversation>;
-  updateConversation(
-    id: string,
-    updates: Partial<InsertConversation>,
-    tenantId: string,
-  ): Promise<Conversation | undefined>;
-  updateConversationMetadata(
-    id: string,
-    metadata: Record<string, any>,
-    tenantId: string,
-  ): Promise<Conversation | undefined>;
-  deleteConversation(id: string, tenantId: string): Promise<void>;
-
-  // Analytics methods
-  createAnalyticsEvent(event: InsertAnalyticsEvent): Promise<AnalyticsEvent>;
-  getAnalyticsEvents(tenantId: string, startDate: Date, endDate: Date): Promise<AnalyticsEvent[]>;
-  getDailyAnalytics(tenantId: string, startDate: Date, endDate: Date): Promise<DailyAnalytics[]>;
-  createOrUpdateDailyAnalytics(analytics: InsertDailyAnalytics): Promise<DailyAnalytics>;
+  // Analytics methods - REMOVED (see migration 0013)
+  // analytics_events, daily_analytics, and webhook_analytics tables have been dropped
 
   // User Invitation methods
   createUserInvitation(invitation: InsertUserInvitation): Promise<UserInvitation>;
@@ -242,25 +198,8 @@ export interface IStorage {
   incrementWebhookStats(id: string, success: boolean): Promise<void>;
   deleteN8nWebhook(id: string, tenantId: string): Promise<void>;
 
-  // Webhook Analytics methods
-  createWebhookAnalytics(analytics: InsertWebhookAnalytics): Promise<WebhookAnalytics>;
-  getWebhookAnalytics(webhookId: string, limit?: number): Promise<WebhookAnalytics[]>;
-  getWebhookAnalyticsByTenant(
-    tenantId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<WebhookAnalytics[]>;
-  getWebhookAnalyticsSummary(
-    tenantId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<{
-    totalCalls: number;
-    successfulCalls: number;
-    failedCalls: number;
-    averageResponseTime: number;
-  }>;
-  deleteOldWebhookAnalytics(olderThanDays: number): Promise<void>;
+  // Webhook Analytics methods - REMOVED (see migration 0013)
+  // webhook_analytics table has been dropped
 
   // Chat Analytics Methods
   createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics>;
@@ -328,10 +267,8 @@ export interface IStorage {
   }>;
   deleteOldVoiceAnalytics(olderThanDays: number): Promise<void>;
 
-  // Chat Messages Methods (optional - for detailed message storage)
-  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
-  getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]>;
-  deleteChatMessages(chatAnalyticsId: string): Promise<void>;
+  // Chat Messages Methods - REMOVED (retell_transcript_messages table dropped in migration 0015)
+  // Use getWidgetChatMessages() for real-time message data instead
 
   // External API Configurations Methods
   getExternalApiConfig(
@@ -350,49 +287,25 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private messages: Map<string, Message>;
-  private conversations: Map<string, Conversation>;
   private tenants: Map<string, Tenant>;
   private clientUsers: Map<string, ClientUser>;
   private apiKeys: Map<string, ApiKey>;
   private widgetConfigs: Map<string, WidgetConfig>;
-  private analyticsEvents: Map<string, AnalyticsEvent>;
-  private dailyAnalytics: Map<string, DailyAnalytics>;
   private humanAgents: Map<string, HumanAgent>;
   private userInvitations: Map<string, UserInvitation>;
   private passwordResetTokens: Map<string, PasswordResetToken>;
 
   constructor() {
-    this.users = new Map();
-    this.messages = new Map();
-    this.conversations = new Map();
     this.tenants = new Map();
     this.clientUsers = new Map();
     this.apiKeys = new Map();
     this.widgetConfigs = new Map();
-    this.analyticsEvents = new Map();
-    this.dailyAnalytics = new Map();
     this.humanAgents = new Map();
     this.userInvitations = new Map();
     this.passwordResetTokens = new Map();
   }
 
-  // Legacy User methods
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find((user) => user.username === username);
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
-  }
+  // Legacy User methods - REMOVED (see migration 0013)
 
   // Tenant methods
   async getTenant(id: string): Promise<Tenant | undefined> {
@@ -741,208 +654,10 @@ export class MemStorage implements IStorage {
     }
   }
 
-  // Message methods (tenant-scoped) - tenantId is REQUIRED
-  async getMessagesByConversation(conversationId: string, tenantId: string): Promise<Message[]> {
-    // ALWAYS filter by both conversationId AND tenantId for security
-    return Array.from(this.messages.values())
-      .filter((message) => {
-        return message.conversationId === conversationId && message.tenantId === tenantId;
-      })
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  }
+  // Legacy Message and Conversation methods - REMOVED (see migration 0014)
+  // Use widget handoff methods instead
 
-  async createMessage(insertMessage: InsertMessage, tenantId: string): Promise<Message> {
-    const id = randomUUID();
-    const message: Message = {
-      ...insertMessage,
-      id,
-      tenantId, // Server-injected for security
-      senderType: insertMessage.senderType ?? 'user',
-      humanAgentId: insertMessage.humanAgentId ?? null,
-      timestamp: new Date(),
-    };
-    this.messages.set(id, message);
-    return message;
-  }
-
-  async deleteMessage(id: string, tenantId: string): Promise<void> {
-    // ALWAYS verify tenantId matches for security
-    const message = this.messages.get(id);
-    if (message?.tenantId !== tenantId) return;
-    this.messages.delete(id);
-  }
-
-  // Conversation methods (tenant-scoped) - tenantId is REQUIRED
-  async getConversation(id: string, tenantId: string): Promise<Conversation | undefined> {
-    const conversation = this.conversations.get(id);
-    if (!conversation) return undefined;
-    // ALWAYS verify tenantId matches for security
-    if (conversation.tenantId !== tenantId) return undefined;
-    return conversation;
-  }
-
-  async getConversationsByTenant(tenantId: string): Promise<Conversation[]> {
-    return Array.from(this.conversations.values())
-      .filter((c) => c.tenantId === tenantId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  async getActiveHandoffs(tenantId: string): Promise<Conversation[]> {
-    return Array.from(this.conversations.values())
-      .filter((c) => c.tenantId === tenantId && c.handoffStatus === 'with_human')
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  async getPendingHandoffs(tenantId: string): Promise<Conversation[]> {
-    return Array.from(this.conversations.values())
-      .filter((c) => c.tenantId === tenantId && c.handoffStatus === 'pending_handoff')
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  async createConversation(
-    insertConversation: InsertConversation,
-    tenantId: string,
-  ): Promise<Conversation> {
-    const id = randomUUID();
-    const conversation: Conversation = {
-      id,
-      title: insertConversation.title,
-      tenantId, // Server-injected for security
-      flowId: insertConversation.flowId ?? null,
-      agentId: insertConversation.agentId ?? null,
-      endUserId: insertConversation.endUserId ?? null,
-      metadata: insertConversation.metadata ?? null,
-      handoffStatus: insertConversation.handoffStatus ?? 'ai',
-      humanAgentId: insertConversation.humanAgentId ?? null,
-      conversationSummary: insertConversation.conversationSummary ?? null,
-      handoffTimestamp: insertConversation.handoffTimestamp ?? null,
-      handoffReason: insertConversation.handoffReason ?? null,
-      createdAt: new Date(),
-    };
-    this.conversations.set(id, conversation);
-    return conversation;
-  }
-
-  async updateConversation(
-    id: string,
-    updates: Partial<InsertConversation>,
-    tenantId: string,
-  ): Promise<Conversation | undefined> {
-    const conversation = this.conversations.get(id);
-    if (!conversation) return undefined;
-    // ALWAYS verify tenantId matches for security
-    if (conversation.tenantId !== tenantId) return undefined;
-
-    // Update conversation with new fields (tenantId is already not in InsertConversation schema)
-    const updated = { ...conversation, ...updates };
-    this.conversations.set(id, updated);
-    return updated;
-  }
-
-  async updateConversationMetadata(
-    id: string,
-    metadata: Record<string, any>,
-    tenantId: string,
-  ): Promise<Conversation | undefined> {
-    const conversation = this.conversations.get(id);
-    if (!conversation) return undefined;
-    // ALWAYS verify tenantId matches for security
-    if (conversation.tenantId !== tenantId) return undefined;
-
-    // Only update metadata, don't allow other fields to be modified
-    const updated = {
-      ...conversation,
-      metadata: { ...(conversation.metadata ?? {}), ...(metadata ?? {}) },
-    };
-    this.conversations.set(id, updated);
-    return updated;
-  }
-
-  async deleteConversation(id: string, tenantId: string): Promise<void> {
-    const conversation = this.conversations.get(id);
-    if (!conversation) return;
-    // ALWAYS verify tenantId matches for security
-    if (conversation.tenantId !== tenantId) return;
-
-    this.conversations.delete(id);
-    // Also delete associated messages
-    const messages = await this.getMessagesByConversation(id, tenantId);
-    messages.forEach((message) => this.messages.delete(message.id));
-  }
-
-  // Analytics methods
-  async createAnalyticsEvent(insertEvent: InsertAnalyticsEvent): Promise<AnalyticsEvent> {
-    const id = randomUUID();
-    const event: AnalyticsEvent = {
-      id,
-      tenantId: insertEvent.tenantId,
-      conversationId: insertEvent.conversationId ?? null,
-      eventType: insertEvent.eventType,
-      eventData: insertEvent.eventData ?? null,
-      timestamp: new Date(),
-    };
-    this.analyticsEvents.set(id, event);
-    return event;
-  }
-
-  async getAnalyticsEvents(
-    tenantId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<AnalyticsEvent[]> {
-    return Array.from(this.analyticsEvents.values())
-      .filter((e) => {
-        const matchesTenant = e.tenantId === tenantId;
-        const matchesDate = e.timestamp >= startDate && e.timestamp <= endDate;
-        return matchesTenant && matchesDate;
-      })
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  }
-
-  async getDailyAnalytics(
-    tenantId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<DailyAnalytics[]> {
-    return Array.from(this.dailyAnalytics.values())
-      .filter((a) => {
-        const matchesTenant = a.tenantId === tenantId;
-        const matchesDate = a.date >= startDate && a.date <= endDate;
-        return matchesTenant && matchesDate;
-      })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }
-
-  async createOrUpdateDailyAnalytics(
-    insertAnalytics: InsertDailyAnalytics,
-  ): Promise<DailyAnalytics> {
-    // Find existing analytics for this tenant and date
-    const existing = Array.from(this.dailyAnalytics.values()).find(
-      (a) =>
-        a.tenantId === insertAnalytics.tenantId &&
-        a.date.toDateString() === insertAnalytics.date.toDateString(),
-    );
-
-    if (existing) {
-      const updated = { ...existing, ...insertAnalytics };
-      this.dailyAnalytics.set(existing.id, updated);
-      return updated;
-    } else {
-      const id = randomUUID();
-      const analytics: DailyAnalytics = {
-        id,
-        date: insertAnalytics.date,
-        tenantId: insertAnalytics.tenantId,
-        conversationCount: insertAnalytics.conversationCount ?? 0,
-        messageCount: insertAnalytics.messageCount ?? 0,
-        uniqueUsers: insertAnalytics.uniqueUsers ?? 0,
-        avgInteractions: insertAnalytics.avgInteractions ?? 0,
-        bookingActions: insertAnalytics.bookingActions ?? 0,
-      };
-      this.dailyAnalytics.set(id, analytics);
-      return analytics;
-    }
-  }
+  // Analytics methods - REMOVED (see migration 0013)
 
   // User Invitation methods
   async createUserInvitation(insertInvitation: InsertUserInvitation): Promise<UserInvitation> {
@@ -1347,49 +1062,7 @@ export class MemStorage implements IStorage {
     return []; // Stub
   }
 
-  // Webhook Analytics stubs
-  async createWebhookAnalytics(analytics: InsertWebhookAnalytics): Promise<WebhookAnalytics> {
-    const id = randomUUID();
-    return {
-      id,
-      ...analytics,
-      timestamp: new Date(),
-    } as WebhookAnalytics;
-  }
-
-  async getWebhookAnalytics(webhookId: string, limit?: number): Promise<WebhookAnalytics[]> {
-    return []; // Stub
-  }
-
-  async getWebhookAnalyticsByTenant(
-    tenantId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<WebhookAnalytics[]> {
-    return []; // Stub
-  }
-
-  async getWebhookAnalyticsSummary(
-    tenantId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<{
-    totalCalls: number;
-    successfulCalls: number;
-    failedCalls: number;
-    averageResponseTime: number;
-  }> {
-    return {
-      totalCalls: 0,
-      successfulCalls: 0,
-      failedCalls: 0,
-      averageResponseTime: 0,
-    }; // Stub
-  }
-
-  async deleteOldWebhookAnalytics(olderThanDays: number): Promise<void> {
-    // Stub
-  }
+  // Webhook Analytics methods - REMOVED (see migration 0013)
 
   // Chat Analytics stubs
   async createChatAnalytics(analytics: InsertChatAnalytics): Promise<ChatAnalytics> {
@@ -1561,23 +1234,8 @@ export class MemStorage implements IStorage {
     // Stub
   }
 
-  // Chat Messages stubs
-  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const id = randomUUID();
-    return {
-      id,
-      ...message,
-      createdAt: new Date(),
-    } as ChatMessage;
-  }
-
-  async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
-    return []; // Stub
-  }
-
-  async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
-    // Stub
-  }
+  // Chat Messages methods - REMOVED (table dropped in migration 0015)
+  // Use getWidgetChatMessages() instead
 
   // ============================================
   // EXTERNAL API CONFIGURATIONS METHODS (STUBS)
@@ -1653,21 +1311,7 @@ export class DbStorage implements IStorage {
     }
   }
 
-  // Legacy User methods
-  async getUser(id: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.id, id));
-    return result[0];
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.username, username));
-    return result[0];
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await this.db.insert(users).values(insertUser).returning();
-    return result[0];
-  }
+  // Legacy User methods - REMOVED (see migration 0013)
 
   // Tenant methods
   async getTenant(id: string): Promise<Tenant | undefined> {
@@ -1985,218 +1629,10 @@ export class DbStorage implements IStorage {
       .where(and(eq(humanAgents.id, id), eq(humanAgents.tenantId, tenantId)));
   }
 
-  // Message methods (tenant-scoped) - tenantId is REQUIRED
-  async getMessagesByConversation(conversationId: string, tenantId: string): Promise<Message[]> {
-    // ALWAYS filter by both conversationId AND tenantId for security
-    return await this.db
-      .select()
-      .from(messages)
-      .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
-      .orderBy(messages.timestamp);
-  }
+  // Legacy Message and Conversation methods - REMOVED (see migration 0014)
+  // Use widget handoff methods instead
 
-  async createMessage(insertMessage: InsertMessage, tenantId: string): Promise<Message> {
-    // Defensively require tenantId for multi-tenant isolation
-    if (!tenantId || tenantId.trim() === '') {
-      throw new Error('tenantId is required and must not be empty for creating messages');
-    }
-
-    const result = await this.db
-      .insert(messages)
-      .values({
-        ...insertMessage,
-        tenantId, // Server-injected for security
-      })
-      .returning();
-    return result[0];
-  }
-
-  async deleteMessage(id: string, tenantId: string): Promise<void> {
-    // ALWAYS filter by both id AND tenantId for security
-    await this.db.delete(messages).where(and(eq(messages.id, id), eq(messages.tenantId, tenantId)));
-  }
-
-  // Conversation methods (tenant-scoped) - tenantId is REQUIRED
-  async getConversation(id: string, tenantId: string): Promise<Conversation | undefined> {
-    // ALWAYS filter by both id AND tenantId for security
-    const result = await this.db
-      .select()
-      .from(conversations)
-      .where(and(eq(conversations.id, id), eq(conversations.tenantId, tenantId)));
-    return result[0];
-  }
-
-  async getConversationsByTenant(tenantId: string): Promise<Conversation[]> {
-    return await this.db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.tenantId, tenantId))
-      .orderBy(desc(conversations.createdAt));
-  }
-
-  async getActiveHandoffs(tenantId: string): Promise<Conversation[]> {
-    return await this.db
-      .select()
-      .from(conversations)
-      .where(
-        and(eq(conversations.tenantId, tenantId), eq(conversations.handoffStatus, 'with_human')),
-      )
-      .orderBy(desc(conversations.createdAt));
-  }
-
-  async getPendingHandoffs(tenantId: string): Promise<Conversation[]> {
-    return await this.db
-      .select()
-      .from(conversations)
-      .where(
-        and(
-          eq(conversations.tenantId, tenantId),
-          eq(conversations.handoffStatus, 'pending_handoff'),
-        ),
-      )
-      .orderBy(desc(conversations.createdAt));
-  }
-
-  async createConversation(
-    insertConversation: InsertConversation,
-    tenantId: string,
-  ): Promise<Conversation> {
-    // Defensively require tenantId for multi-tenant isolation
-    if (!tenantId || tenantId.trim() === '') {
-      throw new Error('tenantId is required and must not be empty for creating conversations');
-    }
-
-    const result = await this.db
-      .insert(conversations)
-      .values({
-        ...insertConversation,
-        tenantId, // Server-injected for security
-      })
-      .returning();
-    return result[0];
-  }
-
-  async updateConversation(
-    id: string,
-    updates: Partial<InsertConversation>,
-    tenantId: string,
-  ): Promise<Conversation | undefined> {
-    // ALWAYS filter by both id AND tenantId for security
-    // (tenantId is already not in InsertConversation schema, so no need to filter it out)
-    const result = await this.db
-      .update(conversations)
-      .set(updates)
-      .where(and(eq(conversations.id, id), eq(conversations.tenantId, tenantId)))
-      .returning();
-    return result[0];
-  }
-
-  async updateConversationMetadata(
-    id: string,
-    metadata: Record<string, any>,
-    tenantId: string,
-  ): Promise<Conversation | undefined> {
-    // Get current conversation - MUST filter by tenantId for security
-    const current = await this.getConversation(id, tenantId);
-    if (!current) return undefined;
-
-    // Merge new metadata with existing
-    const updatedMetadata = { ...(current.metadata ?? {}), ...(metadata ?? {}) };
-
-    const conditions = tenantId
-      ? and(eq(conversations.id, id), eq(conversations.tenantId, tenantId))
-      : eq(conversations.id, id);
-
-    const result = await this.db
-      .update(conversations)
-      .set({ metadata: updatedMetadata })
-      .where(conditions)
-      .returning();
-    return result[0];
-  }
-
-  async deleteConversation(id: string, tenantId: string): Promise<void> {
-    // ALWAYS filter by both id AND tenantId for security
-    // Delete associated messages first
-    await this.db
-      .delete(messages)
-      .where(and(eq(messages.conversationId, id), eq(messages.tenantId, tenantId)));
-    // Then delete the conversation
-    await this.db
-      .delete(conversations)
-      .where(and(eq(conversations.id, id), eq(conversations.tenantId, tenantId)));
-  }
-
-  // Analytics methods
-  async createAnalyticsEvent(insertEvent: InsertAnalyticsEvent): Promise<AnalyticsEvent> {
-    const result = await this.db.insert(analyticsEvents).values(insertEvent).returning();
-    return result[0];
-  }
-
-  async getAnalyticsEvents(
-    tenantId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<AnalyticsEvent[]> {
-    return await this.db
-      .select()
-      .from(analyticsEvents)
-      .where(
-        and(
-          eq(analyticsEvents.tenantId, tenantId),
-          gte(analyticsEvents.timestamp, startDate),
-          lte(analyticsEvents.timestamp, endDate),
-        ),
-      )
-      .orderBy(analyticsEvents.timestamp);
-  }
-
-  async getDailyAnalytics(
-    tenantId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<DailyAnalytics[]> {
-    return await this.db
-      .select()
-      .from(dailyAnalytics)
-      .where(
-        and(
-          eq(dailyAnalytics.tenantId, tenantId),
-          gte(dailyAnalytics.date, startDate),
-          lte(dailyAnalytics.date, endDate),
-        ),
-      )
-      .orderBy(dailyAnalytics.date);
-  }
-
-  async createOrUpdateDailyAnalytics(
-    insertAnalytics: InsertDailyAnalytics,
-  ): Promise<DailyAnalytics> {
-    // Try to find existing record
-    const existing = await this.db
-      .select()
-      .from(dailyAnalytics)
-      .where(
-        and(
-          eq(dailyAnalytics.tenantId, insertAnalytics.tenantId),
-          eq(dailyAnalytics.date, insertAnalytics.date),
-        ),
-      );
-
-    if (existing.length > 0) {
-      // Update existing
-      const result = await this.db
-        .update(dailyAnalytics)
-        .set(insertAnalytics)
-        .where(eq(dailyAnalytics.id, existing[0].id))
-        .returning();
-      return result[0];
-    } else {
-      // Create new
-      const result = await this.db.insert(dailyAnalytics).values(insertAnalytics).returning();
-      return result[0];
-    }
-  }
+  // Analytics methods - REMOVED (see migration 0013)
 
   // User Invitation methods
   async createUserInvitation(insertInvitation: InsertUserInvitation): Promise<UserInvitation> {
@@ -2722,99 +2158,7 @@ export class DbStorage implements IStorage {
   // WEBHOOK ANALYTICS METHODS
   // ============================================
 
-  /**
-   * Create a webhook analytics record
-   */
-  async createWebhookAnalytics(analytics: InsertWebhookAnalytics): Promise<WebhookAnalytics> {
-    const result = await this.db.insert(webhookAnalytics).values(analytics).returning();
-    return result[0];
-  }
-
-  /**
-   * Get webhook analytics for a specific webhook
-   */
-  async getWebhookAnalytics(webhookId: string, limit = 100): Promise<WebhookAnalytics[]> {
-    return await this.db
-      .select()
-      .from(webhookAnalytics)
-      .where(eq(webhookAnalytics.webhookId, webhookId))
-      .orderBy(desc(webhookAnalytics.timestamp))
-      .limit(limit);
-  }
-
-  /**
-   * Get webhook analytics for a tenant within a date range
-   */
-  async getWebhookAnalyticsByTenant(
-    tenantId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<WebhookAnalytics[]> {
-    const conditions = [eq(webhookAnalytics.tenantId, tenantId)];
-
-    if (startDate) {
-      conditions.push(gte(webhookAnalytics.timestamp, startDate));
-    }
-    if (endDate) {
-      conditions.push(lte(webhookAnalytics.timestamp, endDate));
-    }
-
-    return await this.db
-      .select()
-      .from(webhookAnalytics)
-      .where(and(...conditions))
-      .orderBy(desc(webhookAnalytics.timestamp));
-  }
-
-  /**
-   * Get webhook analytics summary for a tenant
-   */
-  async getWebhookAnalyticsSummary(
-    tenantId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<{
-    totalCalls: number;
-    successfulCalls: number;
-    failedCalls: number;
-    averageResponseTime: number;
-  }> {
-    const conditions = [eq(webhookAnalytics.tenantId, tenantId)];
-
-    if (startDate) {
-      conditions.push(gte(webhookAnalytics.timestamp, startDate));
-    }
-    if (endDate) {
-      conditions.push(lte(webhookAnalytics.timestamp, endDate));
-    }
-
-    const result = await this.db
-      .select({
-        totalCalls: sql<number>`COUNT(*)`,
-        successfulCalls: sql<number>`SUM(CASE WHEN ${webhookAnalytics.success} THEN 1 ELSE 0 END)`,
-        failedCalls: sql<number>`SUM(CASE WHEN NOT ${webhookAnalytics.success} THEN 1 ELSE 0 END)`,
-        averageResponseTime: sql<number>`AVG(${webhookAnalytics.responseTime})`,
-      })
-      .from(webhookAnalytics)
-      .where(and(...conditions));
-
-    return {
-      totalCalls: Number(result[0]?.totalCalls || 0),
-      successfulCalls: Number(result[0]?.successfulCalls || 0),
-      failedCalls: Number(result[0]?.failedCalls || 0),
-      averageResponseTime: Number(result[0]?.averageResponseTime || 0),
-    };
-  }
-
-  /**
-   * Delete old webhook analytics (for cleanup/archiving)
-   */
-  async deleteOldWebhookAnalytics(olderThanDays: number): Promise<void> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
-
-    await this.db.delete(webhookAnalytics).where(lte(webhookAnalytics.timestamp, cutoffDate));
-  }
+  // Webhook Analytics methods - REMOVED (see migration 0013)
 
   // ============================================
   // CHAT ANALYTICS METHODS
@@ -3448,36 +2792,13 @@ export class DbStorage implements IStorage {
   }
 
   // ============================================
-  // RETELL TRANSCRIPT MESSAGES METHODS
+  // RETELL TRANSCRIPT MESSAGES METHODS - REMOVED
   // ============================================
-
-  /**
-   * Create a new retell transcript message
-   */
-  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const [created] = await this.db.insert(retellTranscriptMessages).values(message).returning();
-    return created!;
-  }
-
-  /**
-   * Get all transcript messages for a chat
-   */
-  async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
-    return await this.db
-      .select()
-      .from(retellTranscriptMessages)
-      .where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId))
-      .orderBy(retellTranscriptMessages.timestamp);
-  }
-
-  /**
-   * Delete all transcript messages for a chat
-   */
-  async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
-    await this.db
-      .delete(retellTranscriptMessages)
-      .where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId));
-  }
+  // These methods were removed because retell_transcript_messages table was dropped in migration 0015
+  // Messages are stored in widget_chat_history instead
+  //
+  // If you need message data, use:
+  // - getWidgetChatMessages(chatId) for real-time conversation messages
 
   // ============================================
   // EXTERNAL API CONFIGURATIONS METHODS

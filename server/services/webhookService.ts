@@ -283,23 +283,9 @@ async function logWebhookAnalytics(
   result: WebhookCallResult,
 ): Promise<void> {
   try {
-    // Get webhook to get tenantId
-    const webhook = await storage.getN8nWebhook(webhookId);
-    if (!webhook) {
-      console.error('[Webhook Service] Webhook not found for analytics:', webhookId);
-      return;
-    }
-
-    await storage.createWebhookAnalytics({
-      webhookId,
-      tenantId: webhook.tenantId,
-      requestPayload,
-      responseBody: result.responseBody || null,
-      statusCode: result.statusCode || null,
-      responseTime: result.responseTime,
-      success: result.success,
-      errorMessage: result.errorMessage || null,
-    });
+    // Note: Webhook analytics table was removed in migration 0013
+    // Webhook success/failure is tracked via incrementWebhookStats on the webhook itself
+    console.log('[Webhook Service] Analytics logging skipped (webhook_analytics table removed)');
   } catch (error) {
     console.error('[Webhook Service] Failed to log analytics:', error);
     // Don't throw - analytics logging should not break the main flow
