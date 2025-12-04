@@ -553,6 +553,7 @@ export default function EnhancedChatAnalytics({
                 <Area
                   type="monotone"
                   dataKey="positive"
+                  name="Positive"
                   stackId="1"
                   stroke="#10b981"
                   fillOpacity={1}
@@ -561,6 +562,7 @@ export default function EnhancedChatAnalytics({
                 <Area
                   type="monotone"
                   dataKey="neutral"
+                  name="Neutral"
                   stackId="1"
                   stroke="#f97316"
                   fillOpacity={1}
@@ -569,6 +571,7 @@ export default function EnhancedChatAnalytics({
                 <Area
                   type="monotone"
                   dataKey="negative"
+                  name="Negative"
                   stackId="1"
                   stroke="#ef4444"
                   fillOpacity={1}

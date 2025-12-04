@@ -2237,6 +2237,23 @@ export class DbStorage implements IStorage {
   ): Promise<ChatAnalytics[]> {
     const conditions = [eq(chatAnalytics.tenantId, tenantId)];
 
+    // Get widget config to filter only current/active agents
+    const widgetConfig = await this.db
+      .select()
+      .from(widgetConfigs)
+      .where(eq(widgetConfigs.tenantId, tenantId))
+      .limit(1);
+
+    const config = widgetConfig[0];
+    const currentAgentIds: string[] = [];
+    if (config?.retellAgentId) currentAgentIds.push(config.retellAgentId);
+    if (config?.whatsappAgentId) currentAgentIds.push(config.whatsappAgentId);
+
+    // Only show chats from active agents
+    if (currentAgentIds.length > 0) {
+      conditions.push(or(...currentAgentIds.map((agentId) => eq(chatAnalytics.agentId, agentId)))!);
+    }
+
     if (filters?.startDate) {
       conditions.push(gte(chatAnalytics.startTimestamp, filters.startDate));
     }
@@ -2540,6 +2557,7 @@ export class DbStorage implements IStorage {
     {
       agentId: string;
       agentName: string;
+      count: number;
       totalChats: number;
       successfulChats: number;
       successRate: number;
@@ -2566,6 +2584,23 @@ export class DbStorage implements IStorage {
       .from(chatAnalytics)
       .where(and(...conditions));
 
+    // Get tenant info and widget config to determine current agents
+    const [tenantInfo, widgetConfig] = await Promise.all([
+      this.db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1),
+      this.db.select().from(widgetConfigs).where(eq(widgetConfigs.tenantId, tenantId)).limit(1),
+    ]);
+
+    const tenant = tenantInfo[0];
+    const config = widgetConfig[0];
+
+    // Build set of current agent IDs (agents that are currently configured)
+    const currentAgentIds = new Set<string>();
+    if (config?.retellAgentId) currentAgentIds.add(config.retellAgentId);
+    if (config?.whatsappAgentId) currentAgentIds.add(config.whatsappAgentId);
+
+    console.log('[Agent Breakdown] Current agents:', Array.from(currentAgentIds));
+    console.log('[Agent Breakdown] Total chats in period:', chats.length);
+
     // Group by agent and calculate metrics
     const agentMap = new Map<
       string,
@@ -2576,12 +2611,34 @@ export class DbStorage implements IStorage {
         totalDuration: number;
         totalCost: number;
         sentimentCounts: Record<string, number>;
+        isCurrentAgent: boolean;
       }
     >();
 
     chats.forEach((chat) => {
       const agentId = chat.agentId;
-      const agentName = chat.agentName || agentId;
+      const isCurrentAgent = currentAgentIds.has(agentId);
+
+      // Skip deleted agents - only process current agents
+      if (!isCurrentAgent) {
+        return;
+      }
+
+      // Create a friendly agent name
+      let agentName: string;
+      if (chat.agentName && !chat.agentName.startsWith('agent_')) {
+        // Use existing name if it's not a raw agent ID
+        agentName = chat.agentName;
+      } else if (config?.retellAgentId === agentId) {
+        // Chat agent - use tenant name
+        agentName = `${tenant?.name || 'Chat'} Agent`;
+      } else if (config?.whatsappAgentId === agentId) {
+        // WhatsApp agent - use tenant name
+        agentName = `${tenant?.name || 'WhatsApp'} Agent (WhatsApp)`;
+      } else {
+        // Fallback (shouldn't reach here due to isCurrentAgent check)
+        agentName = agentId;
+      }
 
       if (!agentMap.has(agentId)) {
         agentMap.set(agentId, {
@@ -2591,6 +2648,7 @@ export class DbStorage implements IStorage {
           totalDuration: 0,
           totalCost: 0,
           sentimentCounts: {},
+          isCurrentAgent,
         });
       }
 
@@ -2613,11 +2671,12 @@ export class DbStorage implements IStorage {
       agentData.sentimentCounts[sentiment] = (agentData.sentimentCounts[sentiment] || 0) + 1;
     });
 
-    // Convert to array with calculated averages and sort by count descending
-    return Array.from(agentMap.entries())
+    // Convert to array with calculated averages and sort by chat count descending
+    const result = Array.from(agentMap.entries())
       .map(([agentId, data]) => ({
         agentId,
         agentName: data.agentName,
+        count: data.totalChats, // Map totalChats to count for frontend compatibility
         totalChats: data.totalChats,
         successfulChats: data.successfulChats,
         successRate: data.totalChats > 0 ? (data.successfulChats / data.totalChats) * 100 : 0,
@@ -2628,6 +2687,13 @@ export class DbStorage implements IStorage {
         sentimentBreakdown: data.sentimentCounts,
       }))
       .sort((a, b) => b.totalChats - a.totalChats);
+
+    console.log(
+      '[Agent Breakdown] Returning agents:',
+      result.map((r) => ({ name: r.agentName, count: r.count })),
+    );
+
+    return result;
   }
 
   /**

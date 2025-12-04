@@ -443,11 +443,11 @@ export default function IntegrationManagement({
             WhatsApp
           </TabsTrigger>
           <TabsTrigger value="sms">
-            <Mail className="w-4 h-4 mr-2" />
+            <Bell className="w-4 h-4 mr-2" />
             SMS
           </TabsTrigger>
           <TabsTrigger value="n8n">
-            <Webhook className="w-4 h-4 mr-2" />
+            <Zap className="w-4 h-4 mr-2" />
             N8N Webhooks
           </TabsTrigger>
           <TabsTrigger value="external-apis">

@@ -515,6 +515,7 @@ export default function UnifiedAnalytics() {
                     <TableRow>
                       <TableHead>Chat ID</TableHead>
                       <TableHead>Agent</TableHead>
+                      <TableHead>Date/Time</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead>Messages</TableHead>
                       <TableHead>Sentiment</TableHead>
@@ -529,6 +530,16 @@ export default function UnifiedAnalytics() {
                           {chat.chatId.substring(0, 12)}...
                         </TableCell>
                         <TableCell>{chat.agentName || 'Unknown'}</TableCell>
+                        <TableCell className="text-xs">
+                          {chat.startTimestamp
+                            ? new Date(chat.startTimestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 'N/A'}
+                        </TableCell>
                         <TableCell>{formatDuration(chat.duration)}</TableCell>
                         <TableCell>{chat.messageCount}</TableCell>
                         <TableCell>
