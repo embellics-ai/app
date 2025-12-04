@@ -827,7 +827,9 @@ export const retellTranscriptMessages = pgTable(
   }),
 );
 
-export const insertRetellTranscriptMessageSchema = createInsertSchema(retellTranscriptMessages).omit({
+export const insertRetellTranscriptMessageSchema = createInsertSchema(
+  retellTranscriptMessages,
+).omit({
   id: true,
   createdAt: true,
 });

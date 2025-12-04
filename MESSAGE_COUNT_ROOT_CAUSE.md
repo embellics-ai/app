@@ -24,6 +24,7 @@ STOP ❌ - Never stores messages!
 ### What's Missing
 
 Retell sends a `transcript` array with all messages:
+
 ```javascript
 {
   "chat": {
@@ -38,6 +39,7 @@ Retell sends a `transcript` array with all messages:
 ```
 
 We should be:
+
 1. Creating `chat_analytics` record ✅
 2. **Loop through `transcript` array**
 3. **Store each message in `chat_messages` table** ❌ NOT DOING THIS
@@ -62,7 +64,7 @@ chat_messages (child) - ❌ EMPTY!
 └── ...
 
 widget_chat_messages (separate) - ✅ POPULATED
-├── id  
+├── id
 ├── tenant_id
 ├── chat_id
 ├── role
@@ -89,7 +91,7 @@ We have TWO message tables:
 Looking at the architecture, **we don't actually need** the `chat_messages` table because:
 
 1. **Real-time messages** → stored in `widget_chat_messages` ✅
-2. **Message count** → can be queried from `widget_chat_messages` ✅  
+2. **Message count** → can be queried from `widget_chat_messages` ✅
 3. **Analytics** → stored in `chat_analytics` with summary ✅
 4. **Transcript** → Retell stores it, we can fetch via API if needed
 
@@ -123,11 +125,13 @@ if (chat.transcript && Array.isArray(chat.transcript)) {
 ```
 
 **Pros:**
+
 - Complete Retell transcript stored
 - Includes tool calls, node transitions
 - Can analyze conversation flow later
 
 **Cons:**
+
 - Duplicates data (already in `widget_chat_messages`)
 - Extra database writes
 - `widget_chat_messages` is real-time, this is post-analysis
@@ -135,17 +139,20 @@ if (chat.transcript && Array.isArray(chat.transcript)) {
 ### Option 2: Count from `widget_chat_messages` (Current Fix)
 
 Already implemented in my previous commit:
+
 ```javascript
 const actualMessageCount = await storage.getWidgetChatMessagesCount(chatData.chatId);
-messageCount: actualMessageCount || retellMessageCount
+messageCount: actualMessageCount || retellMessageCount;
 ```
 
 **Pros:**
+
 - Uses real-time data
 - No duplicate storage
 - Already implemented ✅
 
 **Cons:**
+
 - Doesn't store Retell's full transcript
 - Missing tool call details
 - Won't work if chat bypasses widget (e.g., phone calls)
@@ -176,7 +183,7 @@ if (chatData.chatType === 'web_chat') {
   actualMessageCount = chat.transcript.length;
 }
 
-messageCount: actualMessageCount || 0
+messageCount: actualMessageCount || 0;
 ```
 
 ## Table Naming Issues (Your Observation)
@@ -184,11 +191,13 @@ messageCount: actualMessageCount || 0
 You're right - the names are confusing:
 
 ### Current (Confusing)
+
 - `chat_analytics` ✅ Good name
 - `chat_messages` ❌ Confusing - sounds like actual messages
 - `widget_chat_messages` ❌ Implies only widget, but could be WhatsApp too
 
 ### Better Names
+
 - `chat_analytics` ✅ Keep
 - `chat_transcript_messages` - Makes it clear it's from Retell transcript
 - `conversation_messages` - Generic, covers widget, WhatsApp, voice
@@ -196,6 +205,7 @@ You're right - the names are confusing:
 ## The Cost Issue (Still Separate)
 
 Cost = 0 is a **different issue**:
+
 - Retell might not send cost data in webhook
 - Need to check: `chat.chat_cost` vs `chat.cost_analysis.combined`
 - May need to calculate from token usage
@@ -204,15 +214,18 @@ Cost = 0 is a **different issue**:
 ## Recommended Action Plan
 
 ### Immediate (Now)
+
 1. ✅ **Already done:** Count messages from `widget_chat_messages` for web chats
 2. ⏳ **Deploy and test:** See if message count shows up
 
 ### Short-term (This Week)
+
 1. Have a WhatsApp chat, check if message count works
 2. Check webhook logs for `chat.transcript` structure
 3. Decide: Store transcript or not?
 
 ### Long-term (Future Refactor)
+
 1. Rename tables for clarity
 2. Implement hybrid approach for all chat types
 3. Add cost tracking (separate investigation)

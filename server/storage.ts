@@ -3474,7 +3474,9 @@ export class DbStorage implements IStorage {
    * Delete all transcript messages for a chat
    */
   async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
-    await this.db.delete(retellTranscriptMessages).where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId));
+    await this.db
+      .delete(retellTranscriptMessages)
+      .where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId));
   }
 
   // ============================================

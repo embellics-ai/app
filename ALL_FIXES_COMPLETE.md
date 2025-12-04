@@ -10,6 +10,7 @@
 **Problem:** Webhook received transcript but never stored individual messages
 
 **Solution:**
+
 - Loop through `chat.transcript` array after creating analytics record
 - Store each message in `chat_messages` table
 - Link to parent `chat_analytics` record via foreign key
@@ -17,11 +18,12 @@
 - Added logging to show message count
 
 **Code Added:**
+
 ```javascript
 // Store transcript messages in chat_messages table
 if (chat.transcript && Array.isArray(chat.transcript)) {
   console.log(`[Retell Webhook] Storing ${chat.transcript.length} transcript messages`);
-  
+
   for (const message of chat.transcript) {
     await storage.createChatMessage({
       chatAnalyticsId: createdAnalytics.id,
@@ -37,6 +39,7 @@ if (chat.transcript && Array.isArray(chat.transcript)) {
 ```
 
 **Result:**
+
 - `chat_messages` table will now be populated with full transcript
 - Detailed chat analytics endpoint (`GET /api/platform/tenants/:tenantId/analytics/chats/:chatId`) will return messages
 - Tool calls and node transitions captured for analysis
@@ -48,11 +51,13 @@ if (chat.transcript && Array.isArray(chat.transcript)) {
 **Problem:** Message count showing 0 in analytics
 
 **Solution:**
+
 - Smart logic: Use `widget_chat_messages` for web chats (real-time storage)
 - Fall back to `transcript.length` for WhatsApp/voice calls
 - Clear variable names and detailed logging
 
 **Code Updated:**
+
 ```javascript
 // Get message count - strategy depends on chat type
 const widgetMessages = await storage.getWidgetChatMessages(chat.chat_id);
@@ -64,10 +69,18 @@ const transcriptCount = chat.transcript?.length || 0;
 // Use widget count if available (web chats), otherwise use transcript count
 const messageCount = widgetMessageCount > 0 ? widgetMessageCount : transcriptCount;
 
-console.log('Message count - Widget:', widgetMessageCount, 'Transcript:', transcriptCount, 'Using:', messageCount);
+console.log(
+  'Message count - Widget:',
+  widgetMessageCount,
+  'Transcript:',
+  transcriptCount,
+  'Using:',
+  messageCount,
+);
 ```
 
 **Result:**
+
 - Web chats: Count from `widget_chat_messages` (real-time, accurate)
 - WhatsApp/Voice: Count from transcript (now also stored in `chat_messages`)
 - Analytics shows actual message count instead of 0
@@ -79,11 +92,13 @@ console.log('Message count - Widget:', widgetMessageCount, 'Transcript:', transc
 **Problem:** Cost showing €0.00 in analytics
 
 **Solution:**
+
 - Try multiple cost field locations in webhook payload
 - Clear logging showing which field was found
 - Warning if no cost data available
 
 **Code Updated:**
+
 ```javascript
 let combinedCost = 0;
 let productCosts = null;
@@ -105,6 +120,7 @@ if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
 ```
 
 **Result:**
+
 - If Retell sends cost data, we'll find it
 - Logs show exactly which field was used
 - If cost is still 0, logs will show what fields Retell actually sent
@@ -126,9 +142,11 @@ if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
 3. Check analytics dashboard
 4. **Expected:** "Avg Messages" shows actual count (not 0)
 5. Check database:
+
    ```sql
    SELECT chat_id, message_count FROM chat_analytics ORDER BY created_at DESC LIMIT 1;
    ```
+
    Should show actual message count
 
 6. Check transcript storage:
@@ -170,17 +188,18 @@ if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
 
 ## What We Fixed
 
-| Issue | Before | After |
-|-------|--------|-------|
-| Message count | 0 (always) | Actual count ✅ |
-| Chat messages table | Empty | Full transcript ✅ |
-| Cost display | €0.00 | Actual cost (if Retell sends) ✅ |
-| Detailed chat view | No messages | Full transcript ✅ |
-| WhatsApp analytics | Broken | Working ✅ |
+| Issue               | Before      | After                            |
+| ------------------- | ----------- | -------------------------------- |
+| Message count       | 0 (always)  | Actual count ✅                  |
+| Chat messages table | Empty       | Full transcript ✅               |
+| Cost display        | €0.00       | Actual cost (if Retell sends) ✅ |
+| Detailed chat view  | No messages | Full transcript ✅               |
+| WhatsApp analytics  | Broken      | Working ✅                       |
 
 ## What Might Still Be 0
 
 **If cost is still €0.00 after deployment:**
+
 - Means Retell AI is NOT sending cost data in webhook
 - Logs will show: `⚠️ No cost data found in webhook payload`
 - Solutions:
@@ -201,6 +220,7 @@ if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
 ## Database Changes
 
 **No schema changes needed!** All tables already exist:
+
 - `chat_analytics` - Already existed
 - `chat_messages` - Already existed (just empty)
 - `widget_chat_messages` - Already existed and working
@@ -232,6 +252,7 @@ We're just **populating** the empty `chat_messages` table now.
 ---
 
 **All fixes are non-breaking:**
+
 - If Retell doesn't send transcript: No messages stored (same as before)
 - If Retell doesn't send cost: Cost = 0 (same as before)
 - If widget_chat_messages empty: Falls back to transcript count
