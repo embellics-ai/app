@@ -4,7 +4,7 @@
 
 ✅ **The code is NOT broken** - The webhook endpoint is working correctly  
 ✅ **Test confirmed**: `curl` to production endpoint returns proper error response  
-✅ **Route is registered**: `/api/retell/chat-analyzed` is accessible  
+✅ **Route is registered**: `/api/retell/chat-analyzed` is accessible
 
 ❌ **Root Cause**: Retell AI dashboard is NOT sending webhook events to your server
 
@@ -41,6 +41,7 @@
 ### Step 2: Verify Configuration
 
 After saving, you should see:
+
 ```
 Event: chat.analyzed
 URL: https://embellics-app.onrender.com/api/retell/chat-analyzed
@@ -61,8 +62,9 @@ Status: ✅ Active
 ### Step 4: Verify in Database
 
 After a new chat, run this query in DBeaver:
+
 ```sql
-SELECT 
+SELECT
   "chatId",
   "agentName",
   "startTimestamp",
@@ -79,20 +81,24 @@ You should see the new chat with a very recent `createdAt` timestamp.
 ## Common Webhook Configuration Mistakes
 
 ### ❌ Wrong URL
+
 - Bad: `http://embellics-app.onrender.com` (http instead of https)
 - Bad: `https://embellics-app.onrender.com/api/retell` (missing `/chat-analyzed`)
 - Bad: `https://localhost:3000/api/retell/chat-analyzed` (localhost instead of production)
 - ✅ Correct: `https://embellics-app.onrender.com/api/retell/chat-analyzed`
 
 ### ❌ Wrong Event Type
+
 - Bad: `call.ended` (that's for voice calls, not chats)
 - Bad: `chat.started` (we need analyzed, not started)
 - ✅ Correct: `chat.analyzed` or `chat_analyzed`
 
 ### ❌ Webhook Disabled
+
 - Make sure the webhook is **enabled/active** in the dashboard
 
 ### ❌ Wrong Environment
+
 - Make sure you're configuring the **production** Retell workspace, not test/dev
 
 ## Alternative: Check Retell AI Documentation
@@ -106,6 +112,7 @@ If you can't find webhook settings:
 ## Proof That Code Is Working
 
 ### Test 1: Manual Webhook Test
+
 ```bash
 curl -X POST https://embellics-app.onrender.com/api/retell/chat-analyzed \\
   -H "Content-Type: application/json" \\
@@ -115,6 +122,7 @@ curl -X POST https://embellics-app.onrender.com/api/retell/chat-analyzed \\
 **Result**: ✅ Returns `{"error":"Could not determine tenant_id..."}` (endpoint is working!)
 
 ### Test 2: Valid Payload Test
+
 ```bash
 curl -X POST https://embellics-app.onrender.com/api/retell/chat-analyzed \\
   -H "Content-Type: application/json" \\
