@@ -591,6 +591,8 @@ router.delete(
 
 /**
  * Get webhook analytics summary for a tenant
+ * NOTE: This endpoint is deprecated - webhook_analytics table was removed in migration 0013
+ * Use the webhook's totalCalls/successfulCalls stats instead
  *
  * GET /api/platform/tenants/:tenantId/webhooks/analytics/summary
  */
@@ -601,20 +603,15 @@ router.get(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tenantId } = req.params;
-      const { startDate, endDate } = req.query;
 
-      // Verify tenant exists
-      const tenant = await storage.getTenant(tenantId);
-      if (!tenant) {
-        return res.status(404).json({ error: 'Tenant not found' });
-      }
-
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
-
-      const summary = await storage.getWebhookAnalyticsSummary(tenantId, start, end);
-
-      res.json(summary);
+      // Return empty analytics since webhook_analytics table was removed
+      res.json({
+        totalCalls: 0,
+        successfulCalls: 0,
+        failedCalls: 0,
+        averageResponseTime: 0,
+        message: 'Webhook analytics table removed. Use webhook stats instead.',
+      });
     } catch (error) {
       console.error('Error fetching webhook analytics summary:', error);
       res.status(500).json({ error: 'Failed to fetch analytics summary' });
@@ -624,6 +621,8 @@ router.get(
 
 /**
  * Get detailed analytics for a specific webhook
+ * NOTE: This endpoint is deprecated - webhook_analytics table was removed in migration 0013
+ * Use the webhook's stats (totalCalls, successfulCalls, lastTriggered) instead
  *
  * GET /api/platform/tenants/:tenantId/webhooks/:webhookId/analytics
  */
@@ -634,7 +633,6 @@ router.get(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tenantId, webhookId } = req.params;
-      const { limit } = req.query;
 
       // Verify webhook exists and belongs to tenant
       const webhook = await storage.getN8nWebhook(webhookId);
@@ -642,12 +640,8 @@ router.get(
         return res.status(404).json({ error: 'Webhook not found' });
       }
 
-      const analytics = await storage.getWebhookAnalytics(
-        webhookId,
-        limit ? parseInt(limit as string) : undefined,
-      );
-
-      res.json(analytics);
+      // Return empty analytics since webhook_analytics table was removed
+      res.json([]);
     } catch (error) {
       console.error('Error fetching webhook analytics:', error);
       res.status(500).json({ error: 'Failed to fetch webhook analytics' });

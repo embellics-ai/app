@@ -217,12 +217,14 @@ router.get(
         return res.status(404).json({ error: 'Chat not found' });
       }
 
-      // Optionally get individual messages
-      const messages = await storage.getChatMessages(chatId);
+      // NOTE: retell_transcript_messages table was dropped in migration 0015
+      // Messages are stored in widget_chat_history during the conversation
+      // To get chat history, fetch from widget_chat_history using chat.chatId
 
       res.json({
         ...chat,
-        messages,
+        messages: [], // Transcript messages not stored by design
+        note: 'Real-time messages available in widget_chat_history table',
       });
     } catch (error) {
       console.error('Error fetching chat details:', error);
@@ -411,63 +413,8 @@ router.get(
 // ============================================
 // LEGACY ANALYTICS ENDPOINTS (Client Admin Only)
 // ============================================
-
-/**
- * GET /api/analytics/summary
- * Get daily analytics summary for tenant
- * Legacy endpoint - supports both date range and "days" parameter
- */
-router.get('/summary', requireAuth, requireClientAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    // Validate tenant ID exists in token
-    const tenantId = assertTenant(req, res);
-    if (!tenantId) return;
-
-    // Support both date range and legacy "days" parameter
-    let startDate: Date;
-    let endDate: Date;
-
-    if (req.query.startDate && req.query.endDate) {
-      startDate = new Date(req.query.startDate as string);
-      endDate = new Date(req.query.endDate as string);
-    } else {
-      const days = parseInt(req.query.days as string) || 7;
-      endDate = new Date();
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-    }
-
-    // Get daily analytics
-    const dailyData = await storage.getDailyAnalytics(tenantId, startDate, endDate);
-
-    // Calculate totals
-    const totalConversations = dailyData.reduce((sum, day) => sum + day.conversationCount, 0);
-    const totalMessages = dailyData.reduce((sum, day) => sum + day.messageCount, 0);
-    const totalUsers = dailyData.reduce((sum, day) => sum + day.uniqueUsers, 0);
-    const avgInteractions =
-      dailyData.length > 0
-        ? Math.round(
-            dailyData.reduce((sum, day) => sum + day.avgInteractions, 0) / dailyData.length,
-          )
-        : 0;
-
-    res.json({
-      totalConversations,
-      totalMessages,
-      uniqueUsers: totalUsers,
-      avgInteractions,
-      dailyData: dailyData.map((d) => ({
-        date: d.date,
-        conversations: d.conversationCount,
-        messages: d.messageCount,
-        users: d.uniqueUsers,
-      })),
-    });
-  } catch (error) {
-    console.error('Error fetching analytics summary:', error);
-    res.status(500).json({ error: 'Failed to fetch analytics' });
-  }
-});
+// Note: /summary endpoint removed (used deleted daily_analytics table)
+// Use /api/analytics/chat and /api/analytics/voice endpoints instead
 
 // Get analytics from Retell AI (PROTECTED)
 router.get('/retell', requireAuth, requireClientAdmin, async (req: AuthenticatedRequest, res) => {

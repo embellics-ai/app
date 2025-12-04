@@ -86,21 +86,8 @@ async function cleanDatabase() {
     const deletedResetTokens = await db.delete(schema.passwordResetTokens);
     console.log(`   Deleted all records\n`);
 
-    console.log('🗑️  Deleting daily analytics...');
-    const deletedDailyAnalytics = await db.delete(schema.dailyAnalytics);
-    console.log(`   Deleted all records\n`);
-
-    console.log('🗑️  Deleting analytics events...');
-    const deletedAnalyticsEvents = await db.delete(schema.analyticsEvents);
-    console.log(`   Deleted all records\n`);
-
-    console.log('🗑️  Deleting messages...');
-    const deletedMessages = await db.delete(schema.messages);
-    console.log(`   Deleted all records\n`);
-
-    console.log('🗑️  Deleting conversations...');
-    const deletedConversations = await db.delete(schema.conversations);
-    console.log(`   Deleted all records\n`);
+    // Note: daily_analytics, analytics_events, and webhook_analytics tables removed in migration 0013
+    // Note: messages and conversations tables removed in migration 0014 (replaced by widget_handoffs)
 
     console.log('🗑️  Deleting widget chat messages...');
     const deletedWidgetMessages = await db.delete(schema.widgetChatMessages);

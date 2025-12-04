@@ -181,9 +181,9 @@ export const widgetConfigs = pgTable('widget_configs', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Widget Chat Messages (Store all chat messages for history persistence)
-// Conversation Messages - Real-time messages from all channels (widget, WhatsApp, etc.)
-export const conversationMessages = pgTable('conversation_messages', {
+// Widget Chat History (Store all chat messages for persistence across sessions)
+// Renamed from conversation_messages in migration 0014 for clarity
+export const widgetChatHistory = pgTable('widget_chat_history', {
   id: varchar('id')
     .primaryKey()
     .default(sql`gen_random_uuid()`),
@@ -196,19 +196,23 @@ export const conversationMessages = pgTable('conversation_messages', {
   timestamp: timestamp('timestamp').defaultNow().notNull(),
 });
 
-export const insertConversationMessageSchema = createInsertSchema(conversationMessages).omit({
+export const insertWidgetChatHistorySchema = createInsertSchema(widgetChatHistory).omit({
   id: true,
   timestamp: true,
 });
 
-export type InsertConversationMessage = z.infer<typeof insertConversationMessageSchema>;
-export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type InsertWidgetChatHistory = z.infer<typeof insertWidgetChatHistorySchema>;
+export type WidgetChatHistory = typeof widgetChatHistory.$inferSelect;
 
-// Legacy aliases for backward compatibility
-export const widgetChatMessages = conversationMessages;
-export const insertWidgetChatMessageSchema = insertConversationMessageSchema;
-export type InsertWidgetChatMessage = InsertConversationMessage;
-export type WidgetChatMessage = ConversationMessage;
+// Legacy aliases for backward compatibility (deprecated - use widgetChatHistory)
+export const conversationMessages = widgetChatHistory;
+export const widgetChatMessages = widgetChatHistory;
+export const insertConversationMessageSchema = insertWidgetChatHistorySchema;
+export const insertWidgetChatMessageSchema = insertWidgetChatHistorySchema;
+export type InsertConversationMessage = InsertWidgetChatHistory;
+export type InsertWidgetChatMessage = InsertWidgetChatHistory;
+export type ConversationMessage = WidgetChatHistory;
+export type WidgetChatMessage = WidgetChatHistory;
 
 export const insertWidgetConfigSchema = createInsertSchema(widgetConfigs).omit({
   id: true,
@@ -235,145 +239,24 @@ export type InsertSafeWidgetConfig = z.infer<typeof safeWidgetConfigCreateSchema
 export type UpdateSafeWidgetConfig = z.infer<typeof safeWidgetConfigUpdateSchema>;
 
 // ============================================
-// UPDATED EXISTING TABLES WITH TENANT SCOPING
+// REMOVED TABLES (Migrations 0013 & 0014)
 // ============================================
+// Migration 0013 dropped: users, analytics_events, daily_analytics, webhook_analytics
+// Migration 0014 dropped: conversations, messages (replaced by widget_handoffs + widget_handoff_messages)
+// Migration 0014 renamed: conversation_messages → widget_chat_history
+//
+// These tables have been completely removed and should no longer be used:
+// - users (replaced by client_users)
+// - analytics_events (never used)
+// - daily_analytics (never used)
+// - webhook_analytics (never used)
+// - conversations (replaced by widget_handoffs)
+// - messages (replaced by widget_handoff_messages)
 
-// ...existing code...
-export const users = pgTable('users', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  username: text('username').notNull().unique(),
-  password: text('password').notNull(),
-});
-
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-// Conversations (now tenant-scoped with human handoff support)
-export const conversations = pgTable('conversations', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .notNull()
-    .references(() => tenants.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  flowId: text('flow_id'),
-  agentId: text('agent_id'),
-  endUserId: text('end_user_id'), // Optional: track which end user this conversation belongs to
-  metadata: jsonb('metadata'),
-  // Human Agent Handoff Fields
-  handoffStatus: text('handoff_status').notNull().default('ai'), // ai, pending_handoff, with_human, completed
-  humanAgentId: varchar('human_agent_id').references(() => humanAgents.id, {
-    onDelete: 'set null',
-  }),
-  conversationSummary: text('conversation_summary'), // AI-generated summary for human agent context
-  handoffTimestamp: timestamp('handoff_timestamp'), // When handoff was triggered
-  handoffReason: text('handoff_reason'), // user_request, ai_escalation, timeout, etc.
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const insertConversationSchema = createInsertSchema(conversations).omit({
-  id: true,
-  createdAt: true,
-  tenantId: true, // Server will inject this from authenticated user
-});
-
-export type InsertConversation = z.infer<typeof insertConversationSchema>;
-export type Conversation = typeof conversations.$inferSelect;
-
-// Messages (now tenant-scoped with sender tracking)
-export const messages = pgTable('messages', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .notNull()
-    .references(() => tenants.id, { onDelete: 'cascade' }),
-  conversationId: varchar('conversation_id')
-    .notNull()
-    .references(() => conversations.id, { onDelete: 'cascade' }),
-  role: text('role').notNull(), // user, assistant, system
-  content: text('content').notNull(),
-  senderType: text('sender_type').notNull().default('user'), // user (end-customer), ai (Retell agent), human (human agent), system
-  humanAgentId: varchar('human_agent_id').references(() => humanAgents.id, {
-    onDelete: 'set null',
-  }),
-  timestamp: timestamp('timestamp').defaultNow().notNull(),
-});
-
-export const insertMessageSchema = createInsertSchema(messages).omit({
-  id: true,
-  timestamp: true,
-  tenantId: true, // Server will inject this from authenticated user
-});
-
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type Message = typeof messages.$inferSelect;
-
-// ============================================
-// ANALYTICS TABLES
-// ============================================
-
-// Analytics Events (Track all events for analytics)
-export const analyticsEvents = pgTable('analytics_events', {
-  id: varchar('id')
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  tenantId: varchar('tenant_id')
-    .notNull()
-    .references(() => tenants.id, { onDelete: 'cascade' }),
-  conversationId: varchar('conversation_id').references(() => conversations.id, {
-    onDelete: 'cascade',
-  }),
-  eventType: text('event_type').notNull(), // conversation_started, message_sent, booking_action, etc.
-  eventData: jsonb('event_data'), // Flexible JSON data for event details
-  timestamp: timestamp('timestamp').defaultNow().notNull(),
-});
-
-export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({
-  id: true,
-  timestamp: true,
-});
-
-export type InsertAnalyticsEvent = z.infer<typeof insertAnalyticsEventSchema>;
-export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
-
-// Daily Analytics Summary (Pre-aggregated metrics for fast dashboard loading)
-export const dailyAnalytics = pgTable(
-  'daily_analytics',
-  {
-    id: varchar('id')
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    tenantId: varchar('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    date: timestamp('date').notNull(),
-    conversationCount: integer('conversation_count').notNull().default(0),
-    messageCount: integer('message_count').notNull().default(0),
-    uniqueUsers: integer('unique_users').notNull().default(0),
-    avgInteractions: integer('avg_interactions').notNull().default(0),
-    bookingActions: integer('booking_actions').notNull().default(0),
-  },
-  (table) => ({
-    // Unique constraint to prevent duplicate analytics for same tenant/date
-    uniqueTenantDate: uniqueIndex('unique_tenant_date_idx').on(table.tenantId, table.date),
-  }),
-);
-
-export const insertDailyAnalyticsSchema = createInsertSchema(dailyAnalytics).omit({
-  id: true,
-});
-
-export type InsertDailyAnalytics = z.infer<typeof insertDailyAnalyticsSchema>;
-export type DailyAnalytics = typeof dailyAnalytics.$inferSelect;
+// Legacy stubs for backward compatibility only - DO NOT USE
+export const users = { id: '', username: '', password: '' } as any;
+export type User = { id: string; username: string; password: string };
+export type InsertUser = Omit<User, 'id'>;
 
 // ============================================
 // PASSWORD RESET TOKENS
@@ -603,57 +486,6 @@ export const insertN8nWebhookSchema = createInsertSchema(n8nWebhooks).omit({
 export type InsertN8nWebhook = z.infer<typeof insertN8nWebhookSchema>;
 export type N8nWebhook = typeof n8nWebhooks.$inferSelect;
 
-// Webhook Analytics (Track all webhook calls for monitoring and debugging)
-export const webhookAnalytics = pgTable(
-  'webhook_analytics',
-  {
-    id: varchar('id')
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    tenantId: varchar('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    webhookId: varchar('webhook_id')
-      .notNull()
-      .references(() => n8nWebhooks.id, { onDelete: 'cascade' }),
-
-    // Request Details
-    requestPayload: jsonb('request_payload'), // What was sent to webhook
-    requestHeaders: jsonb('request_headers'), // Headers sent (sanitized - no auth tokens)
-
-    // Response Details
-    statusCode: integer('status_code'), // HTTP status code (200, 500, etc.)
-    responseBody: jsonb('response_body'), // Response from n8n
-    responseTime: integer('response_time'), // Milliseconds
-
-    // Status
-    success: boolean('success').notNull(), // True if status 2xx
-    errorMessage: text('error_message'), // Error details if failed
-
-    // Context
-    triggeredBy: text('triggered_by'), // What triggered this webhook (e.g., "widget_chat", "api_call")
-    metadata: jsonb('metadata'), // Additional context
-
-    timestamp: timestamp('timestamp').defaultNow().notNull(),
-  },
-  (table) => ({
-    // Index for fast lookups by tenant and webhook
-    tenantWebhookIdx: uniqueIndex('webhook_analytics_tenant_webhook_idx').on(
-      table.tenantId,
-      table.webhookId,
-      table.timestamp,
-    ),
-  }),
-);
-
-export const insertWebhookAnalyticsSchema = createInsertSchema(webhookAnalytics).omit({
-  id: true,
-  timestamp: true,
-});
-
-export type InsertWebhookAnalytics = z.infer<typeof insertWebhookAnalyticsSchema>;
-export type WebhookAnalytics = typeof webhookAnalytics.$inferSelect;
-
 // ============================================
 // RETELL AI CHAT ANALYTICS
 // ============================================
@@ -795,53 +627,15 @@ export const insertVoiceAnalyticsSchema = createInsertSchema(voiceAnalytics).omi
 export type InsertVoiceAnalytics = z.infer<typeof insertVoiceAnalyticsSchema>;
 export type VoiceAnalytics = typeof voiceAnalytics.$inferSelect;
 
-// Retell Transcript Messages - Detailed transcript from Retell's chat_analyzed webhook
-export const retellTranscriptMessages = pgTable(
-  'retell_transcript_messages',
-  {
-    id: varchar('id')
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    chatAnalyticsId: varchar('chat_analytics_id')
-      .notNull()
-      .references(() => chatAnalytics.id, { onDelete: 'cascade' }),
-
-    // Message Details
-    messageId: text('message_id'), // Retell's message ID
-    role: text('role').notNull(), // 'agent' or 'user'
-    content: text('content').notNull(), // Message content
-    timestamp: timestamp('timestamp').notNull(), // When message was sent
-
-    // Function/Tool Calls
-    toolCallId: text('tool_call_id'), // If this message triggered a tool
-    nodeTransition: text('node_transition'), // Which node this led to
-
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-  },
-  (table) => ({
-    // Index for fast lookups by chat
-    retellTranscriptMessagesIdx: uniqueIndex('retell_transcript_messages_chat_idx').on(
-      table.chatAnalyticsId,
-      table.timestamp,
-    ),
-  }),
-);
-
-export const insertRetellTranscriptMessageSchema = createInsertSchema(
-  retellTranscriptMessages,
-).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertRetellTranscriptMessage = z.infer<typeof insertRetellTranscriptMessageSchema>;
-export type RetellTranscriptMessage = typeof retellTranscriptMessages.$inferSelect;
-
-// Legacy aliases for backward compatibility
-export const chatMessages = retellTranscriptMessages;
-export const insertChatMessageSchema = insertRetellTranscriptMessageSchema;
-export type InsertChatMessage = InsertRetellTranscriptMessage;
-export type ChatMessage = RetellTranscriptMessage;
+// ============================================
+// REMOVED: retell_transcript_messages (Migration 0015)
+// ============================================
+// This table was removed because:
+// - Messages are already stored in real-time in widget_chat_history
+// - Storing Retell's post-chat transcript was redundant
+// - Real-time messages are sufficient for our use case
+//
+// If needed in the future, use widget_chat_history for message data
 
 // ============================================
 // EXTERNAL API CONFIGURATIONS
