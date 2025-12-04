@@ -430,24 +430,37 @@ router.get('/api/widget/session/:chatId/history', async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Validate API key - get all keys and verify with bcrypt
-    const allApiKeys = await storage.getAllApiKeys();
-    let apiKeyRecord = null;
-
-    for (const key of allApiKeys) {
-      const isMatch = await verifyPassword(apiKey, key.keyHash);
-      if (isMatch) {
-        apiKeyRecord = key;
-        break;
+    // Check if this is a platform admin test token
+    let tenantId: string;
+    if (apiKey.startsWith('test_')) {
+      const testTokenData = widgetTestTokens.get(apiKey);
+      if (!testTokenData) {
+        return res.status(401).json({ error: 'Invalid or expired test token' });
       }
-    }
+      tenantId = testTokenData.tenantId;
+      console.log('[Widget Test] Platform admin loading history for tenant:', tenantId);
+    } else {
+      // Validate regular API key - get all keys and verify with bcrypt
+      const allApiKeys = await storage.getAllApiKeys();
+      let apiKeyRecord = null;
 
-    if (!apiKeyRecord) {
-      return res.status(401).json({ error: 'Invalid API key' });
+      for (const key of allApiKeys) {
+        const isMatch = await verifyPassword(apiKey, key.keyHash);
+        if (isMatch) {
+          apiKeyRecord = key;
+          break;
+        }
+      }
+
+      if (!apiKeyRecord) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+
+      tenantId = apiKeyRecord.tenantId;
     }
 
     // Get widget configuration for domain validation
-    const widgetConfig = await storage.getWidgetConfig(apiKeyRecord.tenantId);
+    const widgetConfig = await storage.getWidgetConfig(tenantId);
     if (!widgetConfig) {
       return res.status(500).json({ error: 'Widget configuration not found' });
     }
