@@ -182,7 +182,8 @@ export const widgetConfigs = pgTable('widget_configs', {
 });
 
 // Widget Chat Messages (Store all chat messages for history persistence)
-export const widgetChatMessages = pgTable('widget_chat_messages', {
+// Conversation Messages - Real-time messages from all channels (widget, WhatsApp, etc.)
+export const conversationMessages = pgTable('conversation_messages', {
   id: varchar('id')
     .primaryKey()
     .default(sql`gen_random_uuid()`),
@@ -195,13 +196,19 @@ export const widgetChatMessages = pgTable('widget_chat_messages', {
   timestamp: timestamp('timestamp').defaultNow().notNull(),
 });
 
-export const insertWidgetChatMessageSchema = createInsertSchema(widgetChatMessages).omit({
+export const insertConversationMessageSchema = createInsertSchema(conversationMessages).omit({
   id: true,
   timestamp: true,
 });
 
-export type InsertWidgetChatMessage = z.infer<typeof insertWidgetChatMessageSchema>;
-export type WidgetChatMessage = typeof widgetChatMessages.$inferSelect;
+export type InsertConversationMessage = z.infer<typeof insertConversationMessageSchema>;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+
+// Legacy aliases for backward compatibility
+export const widgetChatMessages = conversationMessages;
+export const insertWidgetChatMessageSchema = insertConversationMessageSchema;
+export type InsertWidgetChatMessage = InsertConversationMessage;
+export type WidgetChatMessage = ConversationMessage;
 
 export const insertWidgetConfigSchema = createInsertSchema(widgetConfigs).omit({
   id: true,
@@ -788,9 +795,9 @@ export const insertVoiceAnalyticsSchema = createInsertSchema(voiceAnalytics).omi
 export type InsertVoiceAnalytics = z.infer<typeof insertVoiceAnalyticsSchema>;
 export type VoiceAnalytics = typeof voiceAnalytics.$inferSelect;
 
-// Chat Messages (Individual messages from chat sessions - optional detailed storage)
-export const chatMessages = pgTable(
-  'chat_messages',
+// Retell Transcript Messages - Detailed transcript from Retell's chat_analyzed webhook
+export const retellTranscriptMessages = pgTable(
+  'retell_transcript_messages',
   {
     id: varchar('id')
       .primaryKey()
@@ -813,20 +820,26 @@ export const chatMessages = pgTable(
   },
   (table) => ({
     // Index for fast lookups by chat
-    chatMessagesIdx: uniqueIndex('chat_messages_chat_idx').on(
+    retellTranscriptMessagesIdx: uniqueIndex('retell_transcript_messages_chat_idx').on(
       table.chatAnalyticsId,
       table.timestamp,
     ),
   }),
 );
 
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+export const insertRetellTranscriptMessageSchema = createInsertSchema(retellTranscriptMessages).omit({
   id: true,
   createdAt: true,
 });
 
-export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
-export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertRetellTranscriptMessage = z.infer<typeof insertRetellTranscriptMessageSchema>;
+export type RetellTranscriptMessage = typeof retellTranscriptMessages.$inferSelect;
+
+// Legacy aliases for backward compatibility
+export const chatMessages = retellTranscriptMessages;
+export const insertChatMessageSchema = insertRetellTranscriptMessageSchema;
+export type InsertChatMessage = InsertRetellTranscriptMessage;
+export type ChatMessage = RetellTranscriptMessage;
 
 // ============================================
 // EXTERNAL API CONFIGURATIONS

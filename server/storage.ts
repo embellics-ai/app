@@ -57,12 +57,12 @@ import {
   passwordResetTokens,
   widgetHandoffs,
   widgetHandoffMessages,
-  widgetChatMessages,
+  conversationMessages,
   tenantIntegrations,
   n8nWebhooks,
   webhookAnalytics,
   chatAnalytics,
-  chatMessages,
+  retellTranscriptMessages,
   voiceAnalytics,
   externalApiConfigs,
 } from '@shared/schema';
@@ -2521,18 +2521,18 @@ export class DbStorage implements IStorage {
       .orderBy(widgetHandoffMessages.timestamp);
   }
 
-  // Widget Chat Messages (for history persistence)
+  // Conversation Messages (real-time messages from all channels: widget, WhatsApp, voice)
   async createWidgetChatMessage(message: InsertWidgetChatMessage): Promise<WidgetChatMessage> {
-    const result = await this.db.insert(widgetChatMessages).values(message).returning();
+    const result = await this.db.insert(conversationMessages).values(message).returning();
     return result[0];
   }
 
   async getWidgetChatMessages(chatId: string): Promise<WidgetChatMessage[]> {
     return await this.db
       .select()
-      .from(widgetChatMessages)
-      .where(eq(widgetChatMessages.chatId, chatId))
-      .orderBy(widgetChatMessages.timestamp);
+      .from(conversationMessages)
+      .where(eq(conversationMessages.chatId, chatId))
+      .orderBy(conversationMessages.timestamp);
   }
 
   // ============================================
@@ -3448,33 +3448,33 @@ export class DbStorage implements IStorage {
   }
 
   // ============================================
-  // CHAT MESSAGES METHODS
+  // RETELL TRANSCRIPT MESSAGES METHODS
   // ============================================
 
   /**
-   * Create a new chat message
+   * Create a new retell transcript message
    */
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const [created] = await this.db.insert(chatMessages).values(message).returning();
+    const [created] = await this.db.insert(retellTranscriptMessages).values(message).returning();
     return created!;
   }
 
   /**
-   * Get all messages for a chat
+   * Get all transcript messages for a chat
    */
   async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
     return await this.db
       .select()
-      .from(chatMessages)
-      .where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId))
-      .orderBy(chatMessages.timestamp);
+      .from(retellTranscriptMessages)
+      .where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId))
+      .orderBy(retellTranscriptMessages.timestamp);
   }
 
   /**
-   * Delete all messages for a chat
+   * Delete all transcript messages for a chat
    */
   async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
-    await this.db.delete(chatMessages).where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId));
+    await this.db.delete(retellTranscriptMessages).where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId));
   }
 
   // ============================================
