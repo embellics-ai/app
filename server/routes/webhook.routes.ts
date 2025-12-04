@@ -34,10 +34,20 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
     const endTimestamp = chat.end_timestamp ? new Date(chat.end_timestamp) : null;
 
+    // Log timestamps for debugging
+    console.log('[Retell Webhook] Timestamps:', {
+      start_timestamp: chat.start_timestamp,
+      end_timestamp: chat.end_timestamp,
+      startTimestamp: startTimestamp?.toISOString(),
+      endTimestamp: endTimestamp?.toISOString(),
+      duration_from_retell: chat.duration,
+    });
+
     // Calculate duration in seconds if not provided by Retell
     let duration = chat.duration || null;
     if (!duration && startTimestamp && endTimestamp) {
       duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
+      console.log('[Retell Webhook] Calculated duration:', duration, 'seconds');
     }
 
     const chatData = {
