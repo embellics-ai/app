@@ -32,19 +32,28 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
 
     console.log('[Retell Webhook] Processing chat:', chat.chat_id, '- Status:', chat.chat_status);
 
-    // Debug: Log fields related to messages and costs
-    console.log(
-      '[Retell Webhook] Messages field:',
-      typeof chat.messages,
-      chat.messages?.length || 'N/A',
-    );
-    console.log(
-      '[Retell Webhook] Transcript field:',
-      typeof chat.transcript,
-      chat.transcript?.length || 'N/A',
-    );
-    console.log('[Retell Webhook] Chat cost:', chat.chat_cost);
-    console.log('[Retell Webhook] Cost analysis:', chat.cost_analysis);
+    // Extract cost from multiple possible fields
+    let combinedCost = 0;
+    let productCosts = null;
+
+    // Try different cost field structures
+    if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
+      combinedCost = chat.chat_cost;
+      console.log('[Retell Webhook] Found cost in chat.chat_cost:', combinedCost);
+    } else if (chat.cost_analysis?.combined) {
+      combinedCost = chat.cost_analysis.combined;
+      productCosts = chat.cost_analysis.product_costs || null;
+      console.log('[Retell Webhook] Found cost in chat.cost_analysis.combined:', combinedCost);
+    } else if (chat.cost_analysis?.total) {
+      combinedCost = chat.cost_analysis.total;
+      console.log('[Retell Webhook] Found cost in chat.cost_analysis.total:', combinedCost);
+    } else {
+      console.warn('[Retell Webhook] ⚠️ No cost data found in webhook payload');
+      console.warn('[Retell Webhook] Available cost fields:', {
+        chat_cost: chat.chat_cost,
+        cost_analysis: chat.cost_analysis,
+      });
+    }
 
     // Extract data from Retell's chat_analyzed event
     const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
@@ -111,8 +120,8 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
       userSentiment: chat.chat_analysis?.user_sentiment || null,
       chatSuccessful: chat.chat_analysis?.chat_successful || null,
-      combinedCost: chat.chat_cost || chat.cost_analysis?.combined || 0,
-      productCosts: chat.cost_analysis?.product_costs || null,
+      combinedCost,
+      productCosts,
       metadata: {
         whatsapp_user: chat.metadata?.whatsapp_user || null,
         // Add any other metadata fields
