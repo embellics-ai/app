@@ -19,7 +19,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
-import { MessageSquare, Clock, DollarSign, TrendingUp, CalendarIcon } from 'lucide-react';
+import { Phone, Clock, Activity, CheckCircle, CalendarIcon } from 'lucide-react';
 import { useState } from 'react';
 import { format, subDays } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
