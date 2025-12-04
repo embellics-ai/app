@@ -32,6 +32,12 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
 
     console.log('[Retell Webhook] Processing chat:', chat.chat_id, '- Status:', chat.chat_status);
 
+    // Debug: Log fields related to messages and costs
+    console.log('[Retell Webhook] Messages field:', typeof chat.messages, chat.messages?.length || 'N/A');
+    console.log('[Retell Webhook] Transcript field:', typeof chat.transcript, chat.transcript?.length || 'N/A');
+    console.log('[Retell Webhook] Chat cost:', chat.chat_cost);
+    console.log('[Retell Webhook] Cost analysis:', chat.cost_analysis);
+
     // Extract data from Retell's chat_analyzed event
     const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
     const endTimestamp = chat.end_timestamp ? new Date(chat.end_timestamp) : null;

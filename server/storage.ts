@@ -3192,7 +3192,18 @@ export class DbStorage implements IStorage {
       startDate?: Date;
       endDate?: Date;
     },
-  ): Promise<{ agentId: string; agentName: string; count: number }[]> {
+  ): Promise<{
+    agentId: string;
+    agentName: string;
+    totalChats: number;
+    successfulChats: number;
+    successRate: number;
+    totalDuration: number;
+    averageDuration: number;
+    totalCost: number;
+    averageCost: number;
+    sentimentBreakdown: Record<string, number>;
+  }[]> {
     const conditions = [eq(chatAnalytics.tenantId, tenantId)];
 
     if (filters?.startDate) {
@@ -3209,27 +3220,68 @@ export class DbStorage implements IStorage {
       .from(chatAnalytics)
       .where(and(...conditions));
 
-    // Group by agent
-    const agentMap = new Map<string, { agentName: string; count: number }>();
+    // Group by agent and calculate metrics
+    const agentMap = new Map<
+      string,
+      {
+        agentName: string;
+        totalChats: number;
+        successfulChats: number;
+        totalDuration: number;
+        totalCost: number;
+        sentimentCounts: Record<string, number>;
+      }
+    >();
 
     chats.forEach((chat) => {
       const agentId = chat.agentId;
       const agentName = chat.agentName || agentId;
 
       if (!agentMap.has(agentId)) {
-        agentMap.set(agentId, { agentName, count: 0 });
+        agentMap.set(agentId, {
+          agentName,
+          totalChats: 0,
+          successfulChats: 0,
+          totalDuration: 0,
+          totalCost: 0,
+          sentimentCounts: {},
+        });
       }
-      agentMap.get(agentId)!.count++;
+
+      const agentData = agentMap.get(agentId)!;
+      agentData.totalChats++;
+
+      if (chat.chatSuccessful) {
+        agentData.successfulChats++;
+      }
+
+      if (chat.duration) {
+        agentData.totalDuration += chat.duration;
+      }
+
+      if (chat.combinedCost) {
+        agentData.totalCost += chat.combinedCost;
+      }
+
+      const sentiment = chat.userSentiment || 'unknown';
+      agentData.sentimentCounts[sentiment] = (agentData.sentimentCounts[sentiment] || 0) + 1;
     });
 
-    // Convert to array and sort by count descending
+    // Convert to array with calculated averages and sort by count descending
     return Array.from(agentMap.entries())
       .map(([agentId, data]) => ({
         agentId,
         agentName: data.agentName,
-        count: data.count,
+        totalChats: data.totalChats,
+        successfulChats: data.successfulChats,
+        successRate: data.totalChats > 0 ? (data.successfulChats / data.totalChats) * 100 : 0,
+        totalDuration: data.totalDuration,
+        averageDuration: data.totalChats > 0 ? data.totalDuration / data.totalChats : 0,
+        totalCost: data.totalCost,
+        averageCost: data.totalChats > 0 ? data.totalCost / data.totalChats : 0,
+        sentimentBreakdown: data.sentimentCounts,
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.totalChats - a.totalChats);
   }
 
   /**
