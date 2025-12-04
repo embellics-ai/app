@@ -158,6 +158,32 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       ...chatData,
     });
 
+    // Store transcript messages in chat_messages table
+    if (chat.transcript && Array.isArray(chat.transcript)) {
+      console.log(
+        `[Retell Webhook] Storing ${chat.transcript.length} transcript messages for chat ${chat.chat_id}`,
+      );
+
+      for (const message of chat.transcript) {
+        try {
+          await storage.createChatMessage({
+            chatAnalyticsId: createdAnalytics.id,
+            messageId: message.message_id || null,
+            role: message.role || 'unknown',
+            content: message.content || '',
+            timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
+            toolCallId: message.tool_call_id || null,
+            nodeTransition: message.node_transition || null,
+          });
+        } catch (msgError) {
+          console.error('[Retell Webhook] Error storing message:', msgError);
+          // Continue with other messages even if one fails
+        }
+      }
+    } else {
+      console.log(`[Retell Webhook] No transcript found in webhook payload`);
+    }
+
     // Forward to tenant-specific N8N webhooks configured for this event
     const eventWebhooks = await storage.getWebhooksByEvent(tenantId, 'chat_analyzed');
 
