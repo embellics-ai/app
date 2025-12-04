@@ -48,17 +48,11 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       duration_from_retell: chat.duration,
     });
 
-    // If end_timestamp is missing, log a warning
-    if (!chat.end_timestamp) {
-      console.warn('[Retell Webhook] ⚠️ end_timestamp is missing - chat may not have ended yet');
-      console.warn('[Retell Webhook] This will result in duration = null until chat ends');
-    }
-
     // Calculate duration in seconds if not provided by Retell
     let duration = chat.duration || null;
     let calculatedEndTimestamp = endTimestamp;
 
-    // If end_timestamp is missing but chat has ended, use current time
+    // If end_timestamp is missing but chat has ended, use current time as fallback
     if (
       !endTimestamp &&
       startTimestamp &&
@@ -66,14 +60,16 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     ) {
       calculatedEndTimestamp = new Date();
       console.log(
-        '[Retell Webhook] Chat ended but no end_timestamp, using current time:',
+        '[Retell Webhook] ⚠️ Retell did not send end_timestamp, using current time as fallback:',
         calculatedEndTimestamp.toISOString(),
       );
     }
 
     if (!duration && startTimestamp && calculatedEndTimestamp) {
       duration = Math.round((calculatedEndTimestamp.getTime() - startTimestamp.getTime()) / 1000);
-      console.log('[Retell Webhook] Calculated duration:', duration, 'seconds');
+      console.log('[Retell Webhook] ✅ Calculated duration:', duration, 'seconds');
+    } else if (!endTimestamp && !calculatedEndTimestamp) {
+      console.warn('[Retell Webhook] ⚠️ Cannot calculate duration - chat still active, will update on next webhook');
     }
 
     const chatData = {
