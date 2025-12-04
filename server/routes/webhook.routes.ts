@@ -75,19 +75,25 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       );
     }
 
-    // Get actual message count from database (more reliable than Retell's data)
-    const storedMessages = await storage.getWidgetChatMessages(chat.chat_id);
-    const actualMessageCount = storedMessages.length;
+    // Get message count - strategy depends on chat type
+    // For web chats: Count from widget_chat_messages (real-time storage)
+    // For WhatsApp/voice: Use transcript length (will be stored in chat_messages)
+    const widgetMessages = await storage.getWidgetChatMessages(chat.chat_id);
+    const widgetMessageCount = widgetMessages.length;
 
-    // Try to get message count from Retell's data as fallback
-    const retellMessageCount =
-      chat.transcript?.length || chat.messages?.length || chat.message_with_tool_calls?.length || 0;
+    // Get count from Retell's transcript
+    const transcriptCount = chat.transcript?.length || 0;
+
+    // Use widget count if available (web chats), otherwise use transcript count
+    const messageCount = widgetMessageCount > 0 ? widgetMessageCount : transcriptCount;
 
     console.log(
-      '[Retell Webhook] Message count - Stored:',
-      actualMessageCount,
-      'Retell:',
-      retellMessageCount,
+      '[Retell Webhook] Message count - Widget:',
+      widgetMessageCount,
+      'Transcript:',
+      transcriptCount,
+      'Using:',
+      messageCount,
     );
 
     const chatData = {
@@ -100,7 +106,7 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       startTimestamp,
       endTimestamp: calculatedEndTimestamp,
       duration,
-      messageCount: actualMessageCount || retellMessageCount, // Use stored count first
+      messageCount,
       toolCallsCount: chat.tool_calls?.length || 0,
       dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
       userSentiment: chat.chat_analysis?.user_sentiment || null,
