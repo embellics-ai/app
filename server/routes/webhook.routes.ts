@@ -30,35 +30,40 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     // Retell sends data nested under "chat" object
     const chat = payload.chat || payload;
 
-    // Log full payload structure for debugging
-    console.log('[Retell Webhook] Received webhook for chat:', chat.chat_id);
-    console.log('[Retell Webhook] Chat status:', chat.chat_status);
-    console.log('[Retell Webhook] Full chat object keys:', Object.keys(chat));
+    console.log('[Retell Webhook] Processing chat:', chat.chat_id, '- Status:', chat.chat_status);
+
+    // Extract cost from multiple possible fields
+    let combinedCost = 0;
+    let productCosts = null;
+
+    // Try different cost field structures
+    if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
+      combinedCost = chat.chat_cost;
+      console.log('[Retell Webhook] Found cost in chat.chat_cost:', combinedCost);
+    } else if (chat.cost_analysis?.combined) {
+      combinedCost = chat.cost_analysis.combined;
+      productCosts = chat.cost_analysis.product_costs || null;
+      console.log('[Retell Webhook] Found cost in chat.cost_analysis.combined:', combinedCost);
+    } else if (chat.cost_analysis?.total) {
+      combinedCost = chat.cost_analysis.total;
+      console.log('[Retell Webhook] Found cost in chat.cost_analysis.total:', combinedCost);
+    } else {
+      console.warn('[Retell Webhook] ⚠️ No cost data found in webhook payload');
+      console.warn('[Retell Webhook] Available cost fields:', {
+        chat_cost: chat.chat_cost,
+        cost_analysis: chat.cost_analysis,
+      });
+    }
 
     // Extract data from Retell's chat_analyzed event
     const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
     const endTimestamp = chat.end_timestamp ? new Date(chat.end_timestamp) : null;
 
-    // Log timestamps for debugging
-    console.log('[Retell Webhook] Timestamps:', {
-      start_timestamp: chat.start_timestamp,
-      end_timestamp: chat.end_timestamp,
-      startTimestamp: startTimestamp?.toISOString(),
-      endTimestamp: endTimestamp?.toISOString(),
-      duration_from_retell: chat.duration,
-    });
-
-    // If end_timestamp is missing, log a warning
-    if (!chat.end_timestamp) {
-      console.warn('[Retell Webhook] ⚠️ end_timestamp is missing - chat may not have ended yet');
-      console.warn('[Retell Webhook] This will result in duration = null until chat ends');
-    }
-
     // Calculate duration in seconds if not provided by Retell
     let duration = chat.duration || null;
     let calculatedEndTimestamp = endTimestamp;
 
-    // If end_timestamp is missing but chat has ended, use current time
+    // If end_timestamp is missing but chat has ended, use current time as fallback
     if (
       !endTimestamp &&
       startTimestamp &&
@@ -66,15 +71,39 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     ) {
       calculatedEndTimestamp = new Date();
       console.log(
-        '[Retell Webhook] Chat ended but no end_timestamp, using current time:',
-        calculatedEndTimestamp.toISOString(),
+        '[Retell Webhook] Using current time as end_timestamp (Retell did not provide it)',
       );
     }
 
     if (!duration && startTimestamp && calculatedEndTimestamp) {
       duration = Math.round((calculatedEndTimestamp.getTime() - startTimestamp.getTime()) / 1000);
-      console.log('[Retell Webhook] Calculated duration:', duration, 'seconds');
+      console.log('[Retell Webhook] Duration:', duration, 'seconds');
+    } else if (!endTimestamp && !calculatedEndTimestamp) {
+      console.warn(
+        '[Retell Webhook] ⚠️ Chat still active - will calculate duration on next webhook',
+      );
     }
+
+    // Get message count - strategy depends on chat type
+    // For web chats: Count from widget_chat_messages (real-time storage)
+    // For WhatsApp/voice: Use transcript length (will be stored in chat_messages)
+    const widgetMessages = await storage.getWidgetChatMessages(chat.chat_id);
+    const widgetMessageCount = widgetMessages.length;
+
+    // Get count from Retell's transcript
+    const transcriptCount = chat.transcript?.length || 0;
+
+    // Use widget count if available (web chats), otherwise use transcript count
+    const messageCount = widgetMessageCount > 0 ? widgetMessageCount : transcriptCount;
+
+    console.log(
+      '[Retell Webhook] Message count - Widget:',
+      widgetMessageCount,
+      'Transcript:',
+      transcriptCount,
+      'Using:',
+      messageCount,
+    );
 
     const chatData = {
       chatId: chat.chat_id,
@@ -86,13 +115,13 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       startTimestamp,
       endTimestamp: calculatedEndTimestamp,
       duration,
-      messageCount: chat.messages?.length || 0,
+      messageCount,
       toolCallsCount: chat.tool_calls?.length || 0,
       dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
       userSentiment: chat.chat_analysis?.user_sentiment || null,
       chatSuccessful: chat.chat_analysis?.chat_successful || null,
-      combinedCost: chat.cost_analysis?.combined || 0,
-      productCosts: chat.cost_analysis?.product_costs || null,
+      combinedCost,
+      productCosts,
       metadata: {
         whatsapp_user: chat.metadata?.whatsapp_user || null,
         // Add any other metadata fields
@@ -143,6 +172,32 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       tenantId,
       ...chatData,
     });
+
+    // Store transcript messages in chat_messages table
+    if (chat.transcript && Array.isArray(chat.transcript)) {
+      console.log(
+        `[Retell Webhook] Storing ${chat.transcript.length} transcript messages for chat ${chat.chat_id}`,
+      );
+
+      for (const message of chat.transcript) {
+        try {
+          await storage.createChatMessage({
+            chatAnalyticsId: createdAnalytics.id,
+            messageId: message.message_id || null,
+            role: message.role || 'unknown',
+            content: message.content || '',
+            timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
+            toolCallId: message.tool_call_id || null,
+            nodeTransition: message.node_transition || null,
+          });
+        } catch (msgError) {
+          console.error('[Retell Webhook] Error storing message:', msgError);
+          // Continue with other messages even if one fails
+        }
+      }
+    } else {
+      console.log(`[Retell Webhook] No transcript found in webhook payload`);
+    }
 
     // Forward to tenant-specific N8N webhooks configured for this event
     const eventWebhooks = await storage.getWebhooksByEvent(tenantId, 'chat_analyzed');

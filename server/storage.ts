@@ -57,12 +57,12 @@ import {
   passwordResetTokens,
   widgetHandoffs,
   widgetHandoffMessages,
-  widgetChatMessages,
+  conversationMessages,
   tenantIntegrations,
   n8nWebhooks,
   webhookAnalytics,
   chatAnalytics,
-  chatMessages,
+  retellTranscriptMessages,
   voiceAnalytics,
   externalApiConfigs,
 } from '@shared/schema';
@@ -2521,18 +2521,18 @@ export class DbStorage implements IStorage {
       .orderBy(widgetHandoffMessages.timestamp);
   }
 
-  // Widget Chat Messages (for history persistence)
+  // Conversation Messages (real-time messages from all channels: widget, WhatsApp, voice)
   async createWidgetChatMessage(message: InsertWidgetChatMessage): Promise<WidgetChatMessage> {
-    const result = await this.db.insert(widgetChatMessages).values(message).returning();
+    const result = await this.db.insert(conversationMessages).values(message).returning();
     return result[0];
   }
 
   async getWidgetChatMessages(chatId: string): Promise<WidgetChatMessage[]> {
     return await this.db
       .select()
-      .from(widgetChatMessages)
-      .where(eq(widgetChatMessages.chatId, chatId))
-      .orderBy(widgetChatMessages.timestamp);
+      .from(conversationMessages)
+      .where(eq(conversationMessages.chatId, chatId))
+      .orderBy(conversationMessages.timestamp);
   }
 
   // ============================================
@@ -3192,7 +3192,20 @@ export class DbStorage implements IStorage {
       startDate?: Date;
       endDate?: Date;
     },
-  ): Promise<{ agentId: string; agentName: string; count: number }[]> {
+  ): Promise<
+    {
+      agentId: string;
+      agentName: string;
+      totalChats: number;
+      successfulChats: number;
+      successRate: number;
+      totalDuration: number;
+      averageDuration: number;
+      totalCost: number;
+      averageCost: number;
+      sentimentBreakdown: Record<string, number>;
+    }[]
+  > {
     const conditions = [eq(chatAnalytics.tenantId, tenantId)];
 
     if (filters?.startDate) {
@@ -3209,27 +3222,68 @@ export class DbStorage implements IStorage {
       .from(chatAnalytics)
       .where(and(...conditions));
 
-    // Group by agent
-    const agentMap = new Map<string, { agentName: string; count: number }>();
+    // Group by agent and calculate metrics
+    const agentMap = new Map<
+      string,
+      {
+        agentName: string;
+        totalChats: number;
+        successfulChats: number;
+        totalDuration: number;
+        totalCost: number;
+        sentimentCounts: Record<string, number>;
+      }
+    >();
 
     chats.forEach((chat) => {
       const agentId = chat.agentId;
       const agentName = chat.agentName || agentId;
 
       if (!agentMap.has(agentId)) {
-        agentMap.set(agentId, { agentName, count: 0 });
+        agentMap.set(agentId, {
+          agentName,
+          totalChats: 0,
+          successfulChats: 0,
+          totalDuration: 0,
+          totalCost: 0,
+          sentimentCounts: {},
+        });
       }
-      agentMap.get(agentId)!.count++;
+
+      const agentData = agentMap.get(agentId)!;
+      agentData.totalChats++;
+
+      if (chat.chatSuccessful) {
+        agentData.successfulChats++;
+      }
+
+      if (chat.duration) {
+        agentData.totalDuration += chat.duration;
+      }
+
+      if (chat.combinedCost) {
+        agentData.totalCost += chat.combinedCost;
+      }
+
+      const sentiment = chat.userSentiment || 'unknown';
+      agentData.sentimentCounts[sentiment] = (agentData.sentimentCounts[sentiment] || 0) + 1;
     });
 
-    // Convert to array and sort by count descending
+    // Convert to array with calculated averages and sort by count descending
     return Array.from(agentMap.entries())
       .map(([agentId, data]) => ({
         agentId,
         agentName: data.agentName,
-        count: data.count,
+        totalChats: data.totalChats,
+        successfulChats: data.successfulChats,
+        successRate: data.totalChats > 0 ? (data.successfulChats / data.totalChats) * 100 : 0,
+        totalDuration: data.totalDuration,
+        averageDuration: data.totalChats > 0 ? data.totalDuration / data.totalChats : 0,
+        totalCost: data.totalCost,
+        averageCost: data.totalChats > 0 ? data.totalCost / data.totalChats : 0,
+        sentimentBreakdown: data.sentimentCounts,
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.totalChats - a.totalChats);
   }
 
   /**
@@ -3394,33 +3448,35 @@ export class DbStorage implements IStorage {
   }
 
   // ============================================
-  // CHAT MESSAGES METHODS
+  // RETELL TRANSCRIPT MESSAGES METHODS
   // ============================================
 
   /**
-   * Create a new chat message
+   * Create a new retell transcript message
    */
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
-    const [created] = await this.db.insert(chatMessages).values(message).returning();
+    const [created] = await this.db.insert(retellTranscriptMessages).values(message).returning();
     return created!;
   }
 
   /**
-   * Get all messages for a chat
+   * Get all transcript messages for a chat
    */
   async getChatMessages(chatAnalyticsId: string): Promise<ChatMessage[]> {
     return await this.db
       .select()
-      .from(chatMessages)
-      .where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId))
-      .orderBy(chatMessages.timestamp);
+      .from(retellTranscriptMessages)
+      .where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId))
+      .orderBy(retellTranscriptMessages.timestamp);
   }
 
   /**
-   * Delete all messages for a chat
+   * Delete all transcript messages for a chat
    */
   async deleteChatMessages(chatAnalyticsId: string): Promise<void> {
-    await this.db.delete(chatMessages).where(eq(chatMessages.chatAnalyticsId, chatAnalyticsId));
+    await this.db
+      .delete(retellTranscriptMessages)
+      .where(eq(retellTranscriptMessages.chatAnalyticsId, chatAnalyticsId));
   }
 
   // ============================================
