@@ -30,6 +30,11 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     // Retell sends data nested under "chat" object
     const chat = payload.chat || payload;
 
+    // Log full payload structure for debugging
+    console.log('[Retell Webhook] Received webhook for chat:', chat.chat_id);
+    console.log('[Retell Webhook] Chat status:', chat.chat_status);
+    console.log('[Retell Webhook] Full chat object keys:', Object.keys(chat));
+
     // Extract data from Retell's chat_analyzed event
     const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
     const endTimestamp = chat.end_timestamp ? new Date(chat.end_timestamp) : null;
@@ -43,10 +48,31 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       duration_from_retell: chat.duration,
     });
 
+    // If end_timestamp is missing, log a warning
+    if (!chat.end_timestamp) {
+      console.warn('[Retell Webhook] ⚠️ end_timestamp is missing - chat may not have ended yet');
+      console.warn('[Retell Webhook] This will result in duration = null until chat ends');
+    }
+
     // Calculate duration in seconds if not provided by Retell
     let duration = chat.duration || null;
-    if (!duration && startTimestamp && endTimestamp) {
-      duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
+    let calculatedEndTimestamp = endTimestamp;
+
+    // If end_timestamp is missing but chat has ended, use current time
+    if (
+      !endTimestamp &&
+      startTimestamp &&
+      (chat.chat_status === 'ended' || chat.chat_status === 'completed')
+    ) {
+      calculatedEndTimestamp = new Date();
+      console.log(
+        '[Retell Webhook] Chat ended but no end_timestamp, using current time:',
+        calculatedEndTimestamp.toISOString(),
+      );
+    }
+
+    if (!duration && startTimestamp && calculatedEndTimestamp) {
+      duration = Math.round((calculatedEndTimestamp.getTime() - startTimestamp.getTime()) / 1000);
       console.log('[Retell Webhook] Calculated duration:', duration, 'seconds');
     }
 
@@ -58,7 +84,7 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       chatType: chat.chat_type || null, // Will be inferred below if null
       chatStatus: chat.chat_status || null,
       startTimestamp,
-      endTimestamp,
+      endTimestamp: calculatedEndTimestamp,
       duration,
       messageCount: chat.messages?.length || 0,
       toolCallsCount: chat.tool_calls?.length || 0,
