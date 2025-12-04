@@ -30,23 +30,11 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     // Retell sends data nested under "chat" object
     const chat = payload.chat || payload;
 
-    // Log full payload structure for debugging
-    console.log('[Retell Webhook] Received webhook for chat:', chat.chat_id);
-    console.log('[Retell Webhook] Chat status:', chat.chat_status);
-    console.log('[Retell Webhook] Full chat object keys:', Object.keys(chat));
+    console.log('[Retell Webhook] Processing chat:', chat.chat_id, '- Status:', chat.chat_status);
 
     // Extract data from Retell's chat_analyzed event
     const startTimestamp = chat.start_timestamp ? new Date(chat.start_timestamp) : null;
     const endTimestamp = chat.end_timestamp ? new Date(chat.end_timestamp) : null;
-
-    // Log timestamps for debugging
-    console.log('[Retell Webhook] Timestamps:', {
-      start_timestamp: chat.start_timestamp,
-      end_timestamp: chat.end_timestamp,
-      startTimestamp: startTimestamp?.toISOString(),
-      endTimestamp: endTimestamp?.toISOString(),
-      duration_from_retell: chat.duration,
-    });
 
     // Calculate duration in seconds if not provided by Retell
     let duration = chat.duration || null;
@@ -60,16 +48,15 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     ) {
       calculatedEndTimestamp = new Date();
       console.log(
-        '[Retell Webhook] ⚠️ Retell did not send end_timestamp, using current time as fallback:',
-        calculatedEndTimestamp.toISOString(),
+        '[Retell Webhook] Using current time as end_timestamp (Retell did not provide it)',
       );
     }
 
     if (!duration && startTimestamp && calculatedEndTimestamp) {
       duration = Math.round((calculatedEndTimestamp.getTime() - startTimestamp.getTime()) / 1000);
-      console.log('[Retell Webhook] ✅ Calculated duration:', duration, 'seconds');
+      console.log('[Retell Webhook] Duration:', duration, 'seconds');
     } else if (!endTimestamp && !calculatedEndTimestamp) {
-      console.warn('[Retell Webhook] ⚠️ Cannot calculate duration - chat still active, will update on next webhook');
+      console.warn('[Retell Webhook] ⚠️ Chat still active - will calculate duration on next webhook');
     }
 
     const chatData = {
