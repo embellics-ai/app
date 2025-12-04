@@ -33,8 +33,16 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     console.log('[Retell Webhook] Processing chat:', chat.chat_id, '- Status:', chat.chat_status);
 
     // Debug: Log fields related to messages and costs
-    console.log('[Retell Webhook] Messages field:', typeof chat.messages, chat.messages?.length || 'N/A');
-    console.log('[Retell Webhook] Transcript field:', typeof chat.transcript, chat.transcript?.length || 'N/A');
+    console.log(
+      '[Retell Webhook] Messages field:',
+      typeof chat.messages,
+      chat.messages?.length || 'N/A',
+    );
+    console.log(
+      '[Retell Webhook] Transcript field:',
+      typeof chat.transcript,
+      chat.transcript?.length || 'N/A',
+    );
     console.log('[Retell Webhook] Chat cost:', chat.chat_cost);
     console.log('[Retell Webhook] Cost analysis:', chat.cost_analysis);
 
@@ -62,8 +70,20 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       duration = Math.round((calculatedEndTimestamp.getTime() - startTimestamp.getTime()) / 1000);
       console.log('[Retell Webhook] Duration:', duration, 'seconds');
     } else if (!endTimestamp && !calculatedEndTimestamp) {
-      console.warn('[Retell Webhook] ⚠️ Chat still active - will calculate duration on next webhook');
+      console.warn(
+        '[Retell Webhook] ⚠️ Chat still active - will calculate duration on next webhook',
+      );
     }
+
+    // Get actual message count from database (more reliable than Retell's data)
+    const storedMessages = await storage.getWidgetChatMessages(chat.chat_id);
+    const actualMessageCount = storedMessages.length;
+
+    // Try to get message count from Retell's data as fallback
+    const retellMessageCount =
+      chat.transcript?.length || chat.messages?.length || chat.message_with_tool_calls?.length || 0;
+
+    console.log('[Retell Webhook] Message count - Stored:', actualMessageCount, 'Retell:', retellMessageCount);
 
     const chatData = {
       chatId: chat.chat_id,
@@ -75,12 +95,12 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       startTimestamp,
       endTimestamp: calculatedEndTimestamp,
       duration,
-      messageCount: chat.messages?.length || 0,
+      messageCount: actualMessageCount || retellMessageCount, // Use stored count first
       toolCallsCount: chat.tool_calls?.length || 0,
       dynamicVariables: chat.collected_dynamic_variables || chat.dynamic_variables || null,
       userSentiment: chat.chat_analysis?.user_sentiment || null,
       chatSuccessful: chat.chat_analysis?.chat_successful || null,
-      combinedCost: chat.cost_analysis?.combined || 0,
+      combinedCost: chat.chat_cost || chat.cost_analysis?.combined || 0,
       productCosts: chat.cost_analysis?.product_costs || null,
       metadata: {
         whatsapp_user: chat.metadata?.whatsapp_user || null,

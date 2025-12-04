@@ -6,6 +6,7 @@
 ## Problem
 
 Analytics dashboard shows:
+
 - **Total Cost:** €0.00
 - **Avg Messages:** 0.0
 
@@ -16,29 +17,33 @@ But there are 9 chats in the database, so data IS being stored.
 ### Issue #1: Backend Not Calculating Metrics ✅ FIXED
 
 The `getChatAnalyticsAgentBreakdown()` function was only returning basic counts:
+
 ```javascript
 {
   agentId: string;
   agentName: string;
-  count: number;  // ❌ Only this!
+  count: number; // ❌ Only this!
 }
 ```
 
 But the frontend expects:
+
 ```javascript
 {
   agentId: string;
   agentName: string;
   totalChats: number;
-  totalCost: number;        // ❌ Missing!
-  averageCost: number;      // ❌ Missing!
-  totalDuration: number;    // ❌ Missing!
-  averageDuration: number;  // ❌ Missing!
-  sentimentBreakdown: {};   // ❌ Missing!
+  totalCost: number; // ❌ Missing!
+  averageCost: number; // ❌ Missing!
+  totalDuration: number; // ❌ Missing!
+  averageDuration: number; // ❌ Missing!
+  sentimentBreakdown: {
+  } // ❌ Missing!
 }
 ```
 
 **Fix Applied:** Enhanced `storage.getChatAnalyticsAgentBreakdown()` to:
+
 - Calculate `totalCost` by summing `combinedCost` from all chats
 - Calculate `averageCost` = totalCost / totalChats
 - Calculate `totalDuration` and `averageDuration`
@@ -48,6 +53,7 @@ But the frontend expects:
 ### Issue #2: Retell Not Sending Cost/Message Data ⚠️ NEEDS VERIFICATION
 
 The webhook code extracts:
+
 ```javascript
 messageCount: chat.messages?.length || 0,
 combinedCost: chat.cost_analysis?.combined || 0,
@@ -56,12 +62,14 @@ combinedCost: chat.cost_analysis?.combined || 0,
 But Retell might be sending these fields with different names or structure.
 
 **From previous logs**, we saw Retell sends:
+
 - `transcript` (array) - NOT `messages`
 - `chat_cost` (object) - NOT `cost_analysis`
 
 ## Debug Logging Added
 
 Added logging to webhook to see what Retell actually sends:
+
 ```javascript
 console.log('[Retell Webhook] Messages field:', typeof chat.messages, chat.messages?.length);
 console.log('[Retell Webhook] Transcript field:', typeof chat.transcript, chat.transcript?.length);
@@ -74,6 +82,7 @@ console.log('[Retell Webhook] Cost analysis:', chat.cost_analysis);
 ### Step 1: Check Production Webhook Logs
 
 After next chat, check Render logs for:
+
 ```
 [Retell Webhook] Messages field: ...
 [Retell Webhook] Transcript field: ...
@@ -81,6 +90,7 @@ After next chat, check Render logs for:
 ```
 
 This will tell us:
+
 - Does Retell send `messages` or `transcript`?
 - Does Retell send `cost_analysis` or `chat_cost`?
 - What is the structure of these fields?
@@ -90,12 +100,14 @@ This will tell us:
 Based on logs, likely need to change:
 
 **Before:**
+
 ```javascript
 messageCount: chat.messages?.length || 0,
 combinedCost: chat.cost_analysis?.combined || 0,
 ```
 
 **After (probably):**
+
 ```javascript
 messageCount: chat.transcript?.length || chat.messages?.length || 0,
 combinedCost: chat.chat_cost || chat.cost_analysis?.combined || 0,
@@ -104,14 +116,15 @@ combinedCost: chat.chat_cost || chat.cost_analysis?.combined || 0,
 ### Step 3: Verify Database Has Data
 
 After fix, check database:
+
 ```sql
-SELECT 
+SELECT
   chat_id,
   message_count,
   combined_cost,
   duration
-FROM chat_analytics 
-ORDER BY created_at DESC 
+FROM chat_analytics
+ORDER BY created_at DESC
 LIMIT 5;
 ```
 
@@ -120,6 +133,7 @@ Should see actual values, not 0/null.
 ### Step 4: Test Analytics Dashboard
 
 After fix and new chat:
+
 - ✅ Total Cost should show actual amount
 - ✅ Avg Messages should show actual count
 - ✅ Duration already working (shows "3m 16s")
@@ -127,14 +141,16 @@ After fix and new chat:
 ## Temporary Workaround
 
 If Retell doesn't send message count, we can calculate it from `transcript`:
+
 ```javascript
 // Count user + assistant messages from transcript
-const messageCount = chat.transcript ? 
-  chat.transcript.filter(t => t.role === 'user' || t.role === 'assistant').length : 
-  0;
+const messageCount = chat.transcript
+  ? chat.transcript.filter((t) => t.role === 'user' || t.role === 'assistant').length
+  : 0;
 ```
 
 If Retell doesn't send cost, we might need to:
+
 1. Calculate from token usage (if Retell sends that)
 2. Or accept that cost tracking requires Retell API key to fetch separately
 
@@ -153,6 +169,7 @@ If Retell doesn't send cost, we might need to:
 ## Expected Outcome
 
 After next chat (with new webhook logging):
+
 1. Logs will show what fields Retell actually sends
 2. We update field mapping in webhook
 3. Cost and message count populate correctly

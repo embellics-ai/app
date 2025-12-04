@@ -3192,18 +3192,20 @@ export class DbStorage implements IStorage {
       startDate?: Date;
       endDate?: Date;
     },
-  ): Promise<{
-    agentId: string;
-    agentName: string;
-    totalChats: number;
-    successfulChats: number;
-    successRate: number;
-    totalDuration: number;
-    averageDuration: number;
-    totalCost: number;
-    averageCost: number;
-    sentimentBreakdown: Record<string, number>;
-  }[]> {
+  ): Promise<
+    {
+      agentId: string;
+      agentName: string;
+      totalChats: number;
+      successfulChats: number;
+      successRate: number;
+      totalDuration: number;
+      averageDuration: number;
+      totalCost: number;
+      averageCost: number;
+      sentimentBreakdown: Record<string, number>;
+    }[]
+  > {
     const conditions = [eq(chatAnalytics.tenantId, tenantId)];
 
     if (filters?.startDate) {

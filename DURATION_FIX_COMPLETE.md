@@ -22,11 +22,13 @@ After analyzing production webhook logs from Render.com, we identified that **Re
 ### Why This Happens
 
 Retell AI appears to send the `chat_analyzed` webhook **BEFORE the chat officially ends**, resulting in:
+
 - ✅ `start_timestamp` is present
 - ❌ `end_timestamp` is `undefined`
 - ❌ `duration` is `undefined`
 
 This is likely because:
+
 1. The webhook is triggered when the analysis completes (not when chat ends)
 2. Retell processes the chat in real-time but doesn't finalize the end time immediately
 3. The webhook may be called multiple times (we saw 2 calls in logs, both without end_timestamp)
@@ -34,6 +36,7 @@ This is likely because:
 ### Impact
 
 Without `end_timestamp`, we cannot calculate duration:
+
 ```javascript
 // This fails when endTimestamp is null
 duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
@@ -46,6 +49,7 @@ Result: **duration = null** is stored in database, displayed as "0s" in analytic
 ### Fix 1: Enhanced Logging (Diagnostic)
 
 Added detailed logging to understand what Retell sends:
+
 ```javascript
 console.log('[Retell Webhook] Received webhook for chat:', chat.chat_id);
 console.log('[Retell Webhook] Chat status:', chat.chat_status);
@@ -53,6 +57,7 @@ console.log('[Retell Webhook] Full chat object keys:', Object.keys(chat));
 ```
 
 This helps us see:
+
 - What fields Retell actually sends
 - The `chat_status` field value
 - Timing of webhook calls
@@ -65,8 +70,11 @@ If `end_timestamp` is missing BUT chat status indicates it ended, use current ti
 let calculatedEndTimestamp = endTimestamp;
 
 // If end_timestamp is missing but chat has ended, use current time
-if (!endTimestamp && startTimestamp && 
-    (chat.chat_status === 'ended' || chat.chat_status === 'completed')) {
+if (
+  !endTimestamp &&
+  startTimestamp &&
+  (chat.chat_status === 'ended' || chat.chat_status === 'completed')
+) {
   calculatedEndTimestamp = new Date();
   console.log('[Retell Webhook] Chat ended but no end_timestamp, using current time');
 }
@@ -78,6 +86,7 @@ if (!duration && startTimestamp && calculatedEndTimestamp) {
 ```
 
 **Logic:**
+
 1. Check if `end_timestamp` is missing
 2. Check if `chat_status` indicates chat ended (e.g., 'ended', 'completed')
 3. If both true: use `new Date()` as the end time
@@ -86,6 +95,7 @@ if (!duration && startTimestamp && calculatedEndTimestamp) {
 ### Fix 3: Warning Logs
 
 Added warnings when `end_timestamp` is missing:
+
 ```javascript
 if (!chat.end_timestamp) {
   console.warn('[Retell Webhook] ⚠️ end_timestamp is missing - chat may not have ended yet');
@@ -98,14 +108,16 @@ This alerts us in logs if the issue persists.
 ## How This Fixes Duration = 0
 
 ### Before Fix:
+
 ```
 Webhook arrives → end_timestamp = undefined → duration = null → Stored as null → Display "0s"
 ```
 
 ### After Fix:
+
 ```
 Webhook arrives → end_timestamp = undefined
-  → Check chat_status = 'ended' 
+  → Check chat_status = 'ended'
   → Use current time as end_timestamp
   → Calculate duration = (now - start) / 1000
   → Store actual duration
@@ -115,6 +127,7 @@ Webhook arrives → end_timestamp = undefined
 ## Existing Safety Features
 
 The code already handles duplicate webhooks via UPSERT:
+
 ```javascript
 // In storage.ts - createChatAnalytics()
 .onConflictDoUpdate({
@@ -128,6 +141,7 @@ The code already handles duplicate webhooks via UPSERT:
 ```
 
 This means:
+
 - First webhook (no end_timestamp): Creates record with duration=null
 - Second webhook (with end_timestamp): Updates record with actual duration
 - Our fallback fix: Immediately calculates duration using current time
@@ -160,6 +174,7 @@ After deploying this fix to production:
 
 1. **Have a test chat** on the widget (at least 30+ seconds)
 2. **Check production logs** for:
+
    ```
    [Retell Webhook] Received webhook for chat: chat_xxxxx
    [Retell Webhook] Chat status: ended (or completed)
@@ -168,26 +183,27 @@ After deploying this fix to production:
    ```
 
 3. **Check database:**
+
    ```sql
-   SELECT chat_id, duration, start_timestamp, end_timestamp 
-   FROM chat_analytics 
-   ORDER BY created_at DESC 
+   SELECT chat_id, duration, start_timestamp, end_timestamp
+   FROM chat_analytics
+   ORDER BY created_at DESC
    LIMIT 5;
    ```
-   
+
    Should see: `duration > 0` ✅
 
 4. **Check analytics page:** Recent chats should show actual durations
 
 ## Edge Cases Handled
 
-| Scenario | Behavior |
-|----------|----------|
-| `end_timestamp` present | Use Retell's timestamp (most accurate) |
-| `end_timestamp` missing, status='ended' | Use current time as fallback ✅ |
-| `end_timestamp` missing, status='active' | Store null, wait for next webhook |
-| Multiple webhooks | UPSERT updates with latest data ✅ |
-| Chat < 1 second | Duration = 0 is accurate ✅ |
+| Scenario                                 | Behavior                               |
+| ---------------------------------------- | -------------------------------------- |
+| `end_timestamp` present                  | Use Retell's timestamp (most accurate) |
+| `end_timestamp` missing, status='ended'  | Use current time as fallback ✅        |
+| `end_timestamp` missing, status='active' | Store null, wait for next webhook      |
+| Multiple webhooks                        | UPSERT updates with latest data ✅     |
+| Chat < 1 second                          | Duration = 0 is accurate ✅            |
 
 ## Commits
 
@@ -212,23 +228,28 @@ After deploying this fix to production:
 ## Alternative Solutions Considered
 
 ### Option 1: Store Last Message Timestamp
+
 **Idea:** Use timestamp of last message as end time  
 **Rejected:** Messages may continue after chat "ends" internally
 
 ### Option 2: Wait for Second Webhook
+
 **Idea:** Don't store anything until we have end_timestamp  
 **Rejected:** May never arrive, would lose chat data
 
 ### Option 3: Track End Time Client-Side
+
 **Idea:** Widget sends end time when user closes chat  
 **Rejected:** Not reliable (user may close browser), adds complexity
 
 ### ✅ Option 4: Use Current Time as Fallback (CHOSEN)
+
 **Why:** Simple, works immediately, gets overwritten if Retell sends real timestamp later
 
 ## Conclusion
 
 The duration = 0 issue was caused by Retell AI not sending `end_timestamp` in webhooks. We fixed it by:
+
 1. Using current time as fallback when chat status indicates it ended
 2. Relying on existing UPSERT logic to update if better data arrives later
 3. Adding comprehensive logging for future debugging
