@@ -83,7 +83,12 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
     const retellMessageCount =
       chat.transcript?.length || chat.messages?.length || chat.message_with_tool_calls?.length || 0;
 
-    console.log('[Retell Webhook] Message count - Stored:', actualMessageCount, 'Retell:', retellMessageCount);
+    console.log(
+      '[Retell Webhook] Message count - Stored:',
+      actualMessageCount,
+      'Retell:',
+      retellMessageCount,
+    );
 
     const chatData = {
       chatId: chat.chat_id,
