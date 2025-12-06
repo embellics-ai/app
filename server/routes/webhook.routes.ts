@@ -134,8 +134,10 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
 
     // Always look up widget config to infer chat type, even if we have tenantId from metadata
     if (chatData.agentId) {
+      console.log('[Retell Webhook] Looking up agent config for agent ID:', chatData.agentId);
       const widgetConfig = await storage.getWidgetConfigByAgentId(chatData.agentId);
       if (widgetConfig) {
+        console.log('[Retell Webhook] Found widget config for tenant:', widgetConfig.tenantId);
         // Use widget config tenantId if we don't have one from metadata
         if (!tenantId) {
           tenantId = widgetConfig.tenantId;
@@ -152,6 +154,9 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
             console.log('[Retell Webhook] Inferred chat type: web_chat');
           }
         }
+      } else {
+        console.warn('[Retell Webhook] No widget config found for agent ID:', chatData.agentId);
+        console.warn('[Retell Webhook] Agent ID may not be configured in Widget Settings');
       }
     }
 
@@ -164,6 +169,7 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
       return res.status(400).json({
         error:
           'Could not determine tenant_id. Include tenant_id in metadata or configure agent in system.',
+        agentId: chatData.agentId, // Include agent ID in response for debugging
       });
     }
 
@@ -446,6 +452,315 @@ router.post('/call-ended', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[Retell Voice Webhook] Error processing call.ended event:', error);
     res.status(500).json({ error: 'Failed to process voice analytics', details: error.message });
+  }
+});
+
+/**
+ * POST /chat-ended
+ * Retell AI Chat Ended Webhook
+ * Alternative endpoint for chat completion events
+ * Some Retell configurations use "chat-ended" instead of "chat-analyzed"
+ */
+router.post('/chat-ended', async (req: Request, res: Response) => {
+  try {
+    console.log('[Retell Webhook] Received chat-ended event, forwarding to chat-analyzed handler');
+
+    // Forward to the chat-analyzed handler by calling the same logic
+    // We'll modify the request to match the expected format
+    const payload = req.body;
+
+    // Get tenant_id from metadata or lookup agent
+    const chat = payload.chat || payload;
+    let tenantId = chat.metadata?.tenant_id || payload.tenant_id;
+
+    if (!tenantId && chat.agent_id) {
+      const widgetConfig = await storage.getWidgetConfigByAgentId(chat.agent_id);
+      if (widgetConfig) {
+        tenantId = widgetConfig.tenantId;
+      }
+    }
+
+    if (!tenantId) {
+      console.error('[Retell Webhook] chat-ended: Could not determine tenant_id');
+      return res.status(400).json({
+        error: 'Could not determine tenant_id',
+        agentId: chat.agent_id,
+      });
+    }
+
+    // Forward to N8N webhooks registered for chat_ended event
+    const n8nWebhooks = await storage.getWebhooksByEvent(tenantId, 'chat_ended');
+
+    if (n8nWebhooks.length > 0) {
+      console.log(`[Retell Webhook] Forwarding chat-ended to ${n8nWebhooks.length} N8N webhook(s)`);
+
+      const forwardPromises = n8nWebhooks.map(async (webhook) => {
+        try {
+          const response = await fetch(webhook.webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Tenant-ID': tenantId,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log(`[Retell Webhook] ✓ Forwarded to ${webhook.workflowName}`);
+            await storage.incrementWebhookStats(webhook.id, true);
+          } else {
+            console.error(
+              `[Retell Webhook] ✗ Failed to forward to ${webhook.workflowName}:`,
+              response.statusText,
+            );
+            await storage.incrementWebhookStats(webhook.id, false);
+          }
+        } catch (error: any) {
+          console.error(
+            `[Retell Webhook] ✗ Error forwarding to ${webhook.workflowName}:`,
+            error.message,
+          );
+          await storage.incrementWebhookStats(webhook.id, false);
+        }
+      });
+
+      await Promise.allSettled(forwardPromises);
+    }
+
+    res.status(200).json({ success: true, message: 'Chat ended event processed' });
+  } catch (error: any) {
+    console.error('[Retell Webhook] Error processing chat-ended event:', error);
+    res.status(500).json({ error: 'Failed to process chat ended event', details: error.message });
+  }
+});
+
+/**
+ * POST /chat-started
+ * Retell AI Chat Started Webhook
+ * Receives chat start notifications
+ */
+router.post('/chat-started', async (req: Request, res: Response) => {
+  try {
+    console.log('[Retell Webhook] Received chat-started event');
+
+    const payload = req.body;
+    const chat = payload.chat || payload;
+    let tenantId = chat.metadata?.tenant_id || payload.tenant_id;
+
+    if (!tenantId && chat.agent_id) {
+      const widgetConfig = await storage.getWidgetConfigByAgentId(chat.agent_id);
+      if (widgetConfig) {
+        tenantId = widgetConfig.tenantId;
+      }
+    }
+
+    if (!tenantId) {
+      console.error('[Retell Webhook] chat-started: Could not determine tenant_id');
+      return res.status(400).json({
+        error: 'Could not determine tenant_id',
+        agentId: chat.agent_id,
+      });
+    }
+
+    // Forward to N8N webhooks
+    const n8nWebhooks = await storage.getWebhooksByEvent(tenantId, 'chat_started');
+
+    if (n8nWebhooks.length > 0) {
+      console.log(
+        `[Retell Webhook] Forwarding chat-started to ${n8nWebhooks.length} N8N webhook(s)`,
+      );
+
+      const forwardPromises = n8nWebhooks.map(async (webhook) => {
+        try {
+          const response = await fetch(webhook.webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Tenant-ID': tenantId,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log(`[Retell Webhook] ✓ Forwarded to ${webhook.workflowName}`);
+            await storage.incrementWebhookStats(webhook.id, true);
+          } else {
+            console.error(
+              `[Retell Webhook] ✗ Failed to forward to ${webhook.workflowName}:`,
+              response.statusText,
+            );
+            await storage.incrementWebhookStats(webhook.id, false);
+          }
+        } catch (error: any) {
+          console.error(
+            `[Retell Webhook] ✗ Error forwarding to ${webhook.workflowName}:`,
+            error.message,
+          );
+          await storage.incrementWebhookStats(webhook.id, false);
+        }
+      });
+
+      await Promise.allSettled(forwardPromises);
+    }
+
+    res.status(200).json({ success: true, message: 'Chat started event processed' });
+  } catch (error: any) {
+    console.error('[Retell Webhook] Error processing chat-started event:', error);
+    res.status(500).json({ error: 'Failed to process chat started event', details: error.message });
+  }
+});
+
+/**
+ * POST /call-started
+ * Retell AI Call Started Webhook
+ * Receives call start notifications for voice calls
+ */
+router.post('/call-started', async (req: Request, res: Response) => {
+  try {
+    console.log('[Retell Webhook] Received call-started event');
+
+    const payload = req.body;
+    const call = payload.call || payload;
+    let tenantId = call.metadata?.tenant_id || payload.tenant_id;
+
+    if (!tenantId && call.agent_id) {
+      const widgetConfig = await storage.getWidgetConfigByAgentId(call.agent_id);
+      if (widgetConfig) {
+        tenantId = widgetConfig.tenantId;
+      }
+    }
+
+    if (!tenantId) {
+      console.error('[Retell Webhook] call-started: Could not determine tenant_id');
+      return res.status(400).json({
+        error: 'Could not determine tenant_id',
+        agentId: call.agent_id,
+      });
+    }
+
+    // Forward to N8N webhooks
+    const n8nWebhooks = await storage.getWebhooksByEvent(tenantId, 'call_started');
+
+    if (n8nWebhooks.length > 0) {
+      console.log(
+        `[Retell Webhook] Forwarding call-started to ${n8nWebhooks.length} N8N webhook(s)`,
+      );
+
+      const forwardPromises = n8nWebhooks.map(async (webhook) => {
+        try {
+          const response = await fetch(webhook.webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Tenant-ID': tenantId,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log(`[Retell Webhook] ✓ Forwarded to ${webhook.workflowName}`);
+            await storage.incrementWebhookStats(webhook.id, true);
+          } else {
+            console.error(
+              `[Retell Webhook] ✗ Failed to forward to ${webhook.workflowName}:`,
+              response.statusText,
+            );
+            await storage.incrementWebhookStats(webhook.id, false);
+          }
+        } catch (error: any) {
+          console.error(
+            `[Retell Webhook] ✗ Error forwarding to ${webhook.workflowName}:`,
+            error.message,
+          );
+          await storage.incrementWebhookStats(webhook.id, false);
+        }
+      });
+
+      await Promise.allSettled(forwardPromises);
+    }
+
+    res.status(200).json({ success: true, message: 'Call started event processed' });
+  } catch (error: any) {
+    console.error('[Retell Webhook] Error processing call-started event:', error);
+    res.status(500).json({ error: 'Failed to process call started event', details: error.message });
+  }
+});
+
+/**
+ * POST /call-analyzed
+ * Retell AI Call Analyzed Webhook
+ * Alternative endpoint for voice call analytics (similar to call-ended)
+ */
+router.post('/call-analyzed', async (req: Request, res: Response) => {
+  try {
+    console.log('[Retell Webhook] Received call-analyzed event');
+
+    const payload = req.body;
+    const call = payload.call || payload;
+    let tenantId = call.metadata?.tenant_id || payload.tenant_id;
+
+    if (!tenantId && call.agent_id) {
+      const widgetConfig = await storage.getWidgetConfigByAgentId(call.agent_id);
+      if (widgetConfig) {
+        tenantId = widgetConfig.tenantId;
+      }
+    }
+
+    if (!tenantId) {
+      console.error('[Retell Webhook] call-analyzed: Could not determine tenant_id');
+      return res.status(400).json({
+        error: 'Could not determine tenant_id',
+        agentId: call.agent_id,
+      });
+    }
+
+    // Forward to N8N webhooks
+    const n8nWebhooks = await storage.getWebhooksByEvent(tenantId, 'call_analyzed');
+
+    if (n8nWebhooks.length > 0) {
+      console.log(
+        `[Retell Webhook] Forwarding call-analyzed to ${n8nWebhooks.length} N8N webhook(s)`,
+      );
+
+      const forwardPromises = n8nWebhooks.map(async (webhook) => {
+        try {
+          const response = await fetch(webhook.webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Tenant-ID': tenantId,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log(`[Retell Webhook] ✓ Forwarded to ${webhook.workflowName}`);
+            await storage.incrementWebhookStats(webhook.id, true);
+          } else {
+            console.error(
+              `[Retell Webhook] ✗ Failed to forward to ${webhook.workflowName}:`,
+              response.statusText,
+            );
+            await storage.incrementWebhookStats(webhook.id, false);
+          }
+        } catch (error: any) {
+          console.error(
+            `[Retell Webhook] ✗ Error forwarding to ${webhook.workflowName}:`,
+            error.message,
+          );
+          await storage.incrementWebhookStats(webhook.id, false);
+        }
+      });
+
+      await Promise.allSettled(forwardPromises);
+    }
+
+    res.status(200).json({ success: true, message: 'Call analyzed event processed' });
+  } catch (error: any) {
+    console.error('[Retell Webhook] Error processing call-analyzed event:', error);
+    res
+      .status(500)
+      .json({ error: 'Failed to process call analyzed event', details: error.message });
   }
 });
 
