@@ -32,19 +32,31 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
 
     console.log('[Retell Webhook] Processing chat:', chat.chat_id, '- Status:', chat.chat_status);
 
+    // DEBUG: Log the raw cost structure from Retell
+    console.log('[Retell Webhook] Raw chat.chat_cost:', JSON.stringify(chat.chat_cost));
+
     // Extract cost from multiple possible fields
     let combinedCost = 0;
     let productCosts = null;
 
-    // Try different cost field structures
-    if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
+    // Try different cost field structures based on Retell's actual webhook payload
+    // Retell sends: chat.chat_cost.combined_cost and chat.chat_cost.product_costs
+    if (chat.chat_cost && typeof chat.chat_cost === 'object') {
+      // NEW: Handle chat_cost as object (current Retell format)
+      combinedCost = chat.chat_cost.combined_cost || 0;
+      productCosts = chat.chat_cost.product_costs || null;
+      console.log('[Retell Webhook] ✅ Extracted cost from chat.chat_cost.combined_cost:', combinedCost);
+    } else if (typeof chat.chat_cost === 'number' && chat.chat_cost > 0) {
+      // Fallback: Handle chat_cost as number (legacy format)
       combinedCost = chat.chat_cost;
-      console.log('[Retell Webhook] Found cost in chat.chat_cost:', combinedCost);
+      console.log('[Retell Webhook] Found cost in chat.chat_cost (number):', combinedCost);
     } else if (chat.cost_analysis?.combined) {
+      // Alternative format: cost_analysis.combined
       combinedCost = chat.cost_analysis.combined;
       productCosts = chat.cost_analysis.product_costs || null;
       console.log('[Retell Webhook] Found cost in chat.cost_analysis.combined:', combinedCost);
     } else if (chat.cost_analysis?.total) {
+      // Alternative format: cost_analysis.total
       combinedCost = chat.cost_analysis.total;
       console.log('[Retell Webhook] Found cost in chat.cost_analysis.total:', combinedCost);
     } else {
@@ -86,21 +98,41 @@ router.post('/chat-analyzed', async (req: Request, res: Response) => {
 
     // Get message count - strategy depends on chat type
     // For web chats: Count from widget_chat_messages (real-time storage)
-    // For WhatsApp/voice: Use transcript length (will be stored in chat_messages)
+    // For WhatsApp/voice: Count from transcript_object array (if available)
     const widgetMessages = await storage.getWidgetChatMessages(chat.chat_id);
     const widgetMessageCount = widgetMessages.length;
 
-    // Get count from Retell's transcript
-    const transcriptCount = chat.transcript?.length || 0;
+    // DEBUG: Log transcript structure
+    console.log('[Retell Webhook] Transcript type:', typeof chat.transcript, 'length:', chat.transcript?.length);
+    console.log('[Retell Webhook] Transcript_object:', Array.isArray(chat.transcript_object) ? `array with ${chat.transcript_object.length} messages` : typeof chat.transcript_object);
 
-    // Use widget count if available (web chats), otherwise use transcript count
-    const messageCount = widgetMessageCount > 0 ? widgetMessageCount : transcriptCount;
+    // CRITICAL FIX: Retell sends transcript_object (array of messages), NOT transcript (string)
+    // transcript_object = [{role: 'agent', content: '...'}, {role: 'user', content: '...'}]
+    // transcript = full conversation as string (used for character count - NOT message count!)
+    let transcriptMessageCount = 0;
+    
+    if (Array.isArray(chat.transcript_object)) {
+      // Use transcript_object array length for actual message count
+      transcriptMessageCount = chat.transcript_object.length;
+      console.log('[Retell Webhook] ✅ Using transcript_object array:', transcriptMessageCount, 'messages');
+    } else if (Array.isArray(chat.transcript)) {
+      // Fallback: If transcript is an array (older format?)
+      transcriptMessageCount = chat.transcript.length;
+      console.log('[Retell Webhook] Using transcript array:', transcriptMessageCount, 'messages');
+    } else {
+      // transcript is a string - DON'T use string length as message count!
+      console.warn('[Retell Webhook] ⚠️ transcript is a string (length:', chat.transcript?.length, '), NOT using for message count');
+      transcriptMessageCount = 0;
+    }
+
+    // Use widget count if available (web chats), otherwise use transcript message count
+    const messageCount = widgetMessageCount > 0 ? widgetMessageCount : transcriptMessageCount;
 
     console.log(
       '[Retell Webhook] Message count - Widget:',
       widgetMessageCount,
-      'Transcript:',
-      transcriptCount,
+      'Transcript Messages:',
+      transcriptMessageCount,
       'Using:',
       messageCount,
     );
