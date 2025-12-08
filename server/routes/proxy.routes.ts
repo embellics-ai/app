@@ -446,9 +446,10 @@ router.post(
 // ============================================
 
 /**
- * POST /:tenantId/http/:serviceName/:endpoint(*)
+ * ALL /:tenantId/http/:serviceName/:endpoint(*)
  * Generic HTTP Proxy
  * Proxies ANY external API request from N8N using UI-configured credentials
+ * Supports: GET, POST, PUT, PATCH, DELETE
  * Examples: Google Calendar, Stripe, SendGrid, Custom CRM APIs, etc.
  *
  * Supported auth types:
@@ -459,16 +460,17 @@ router.post(
  * - custom_header: Any custom header (e.g., X-Custom-Auth)
  * - none: No authentication
  */
-router.post(
+router.all(
   '/:tenantId/http/:serviceName/:endpoint(*)',
   validateN8NSecret,
   async (req: Request, res: Response) => {
     try {
       const { tenantId, serviceName, endpoint } = req.params;
       const requestData = req.body;
+      const httpMethod = req.method; // GET, POST, PUT, PATCH, DELETE, etc.
 
       console.log(
-        `[Proxy] Generic HTTP request for tenant: ${tenantId}, service: ${serviceName}, endpoint: ${endpoint}`,
+        `[Proxy] ${httpMethod} request for tenant: ${tenantId}, service: ${serviceName}, endpoint: ${endpoint}`,
       );
 
       // Get external API configuration from database
@@ -553,12 +555,20 @@ router.post(
         );
       }
 
-      // Forward request to external API
-      const response = await fetch(fullUrl, {
-        method: 'POST',
+      // Forward request to external API with the same HTTP method
+      const fetchOptions: RequestInit = {
+        method: httpMethod,
         headers,
-        body: JSON.stringify(requestData),
-      });
+      };
+
+      // Only include body for methods that support it (not GET or HEAD)
+      if (httpMethod !== 'GET' && httpMethod !== 'HEAD' && requestData) {
+        fetchOptions.body = JSON.stringify(requestData);
+      }
+
+      console.log(`[Proxy] Calling ${httpMethod} ${fullUrl}`);
+
+      const response = await fetch(fullUrl, fetchOptions);
 
       const responseData = await response.json();
 
