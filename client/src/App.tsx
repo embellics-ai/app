@@ -173,7 +173,13 @@ function ProtectedAppContent() {
   };
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/forgot-password', '/reset-password'];
+  const publicRoutes = [
+    '/login',
+    '/forgot-password',
+    '/reset-password',
+    '/payment/success',
+    '/payment/cancelled',
+  ];
   const isPublicRoute = (path: string) => {
     // Check exact matches
     if (publicRoutes.includes(path)) return true;
