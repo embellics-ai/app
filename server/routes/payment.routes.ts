@@ -11,10 +11,18 @@ const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool);
 
-// Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-11-17.clover',
-});
+// Initialize Stripe (lazy initialization to ensure env vars are loaded)
+function getStripeClient(): Stripe {
+  const apiKey = process.env.STRIPE_SECRET_KEY;
+  
+  if (!apiKey) {
+    throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+  }
+  
+  return new Stripe(apiKey, {
+    apiVersion: '2025-11-17.clover',
+  });
+}
 
 /**
  * POST /api/payments/create-link
@@ -68,7 +76,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
     // Stripe expects amount in cents (smallest currency unit)
     const amountInCents = Math.round(amount * 100);
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripeClient().checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
@@ -164,7 +172,7 @@ router.get('/:id/status', async (req: Request, res: Response) => {
     // If payment is still pending, check Stripe for latest status
     if (paymentLink.status === 'pending') {
       try {
-        const session = await stripe.checkout.sessions.retrieve(paymentLink.stripeSessionId);
+        const session = await getStripeClient().checkout.sessions.retrieve(paymentLink.stripeSessionId);
 
         // Update status if payment was completed
         if (session.payment_status === 'paid') {
