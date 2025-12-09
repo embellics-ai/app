@@ -39,6 +39,8 @@ import handoffRoutes from './handoff.routes';
 import widgetRoutes from './widget.routes';
 import widgetTestRoutes from './widget-test.routes';
 import widgetConfigRoutes from './widget-config.routes';
+import paymentRoutes from './payment.routes';
+import stripeWebhookRoutes from './stripe-webhook.routes';
 
 export async function registerModularRoutes(app: Express): Promise<void> {
   // ===== Phase 1: Extracted Modular Routes =====
@@ -86,11 +88,17 @@ export async function registerModularRoutes(app: Express): Promise<void> {
   // Widget configuration routes (client admin)
   app.use('/', widgetConfigRoutes); // Uses /api/widget-config, /api/api-keys, /api/health
 
+  // Payment routes (Stripe integration)
+  app.use('/api/payments', paymentRoutes);
+
+  // Stripe webhook routes (MUST come before JSON body parser in main app)
+  app.use('/api/webhooks', stripeWebhookRoutes);
+
   console.log(
     '[Router] ✅ Registered Phase 1 routes: auth, analytics, proxy, tenant, user, integration',
   );
   console.log(
-    '[Router] ✅ Registered Phase 2 routes: function, webhook, conversation, handoff, widget, widget-test, widget-config',
+    '[Router] ✅ Registered Phase 2 routes: function, webhook, conversation, handoff, widget, widget-test, widget-config, payment, stripe-webhook',
   );
   console.log('[Router] ✅ All modular routes registered successfully');
 }
