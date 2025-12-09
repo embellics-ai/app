@@ -42,7 +42,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
-      
+
       {/* Payment callback pages - public */}
       <Route path="/payment/success" component={PaymentSuccess} />
       <Route path="/payment/cancelled" component={PaymentCancelled} />

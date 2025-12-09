@@ -11,9 +11,7 @@ export default function PaymentCancelled() {
             <XCircle className="w-10 h-10 text-red-600" />
           </div>
           <CardTitle className="text-2xl">Payment Cancelled</CardTitle>
-          <CardDescription>
-            Your payment was cancelled and no charges were made.
-          </CardDescription>
+          <CardDescription>Your payment was cancelled and no charges were made.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
@@ -42,11 +40,7 @@ export default function PaymentCancelled() {
           </div>
 
           <div className="pt-4 space-y-2">
-            <Button 
-              className="w-full" 
-              variant="outline"
-              onClick={() => window.close()}
-            >
+            <Button className="w-full" variant="outline" onClick={() => window.close()}>
               Close Window
             </Button>
             <p className="text-xs text-center text-muted-foreground">
