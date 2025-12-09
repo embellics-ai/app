@@ -181,10 +181,12 @@ function ProtectedAppContent() {
     '/payment/cancelled',
   ];
   const isPublicRoute = (path: string) => {
+    // Remove query params and check the base path
+    const basePath = path.split('?')[0];
     // Check exact matches
-    if (publicRoutes.includes(path)) return true;
-    // Check if path starts with a public route (for query params like /reset-password?token=...)
-    return publicRoutes.some((route) => path.startsWith(route));
+    if (publicRoutes.includes(basePath)) return true;
+    // Check if path starts with a public route
+    return publicRoutes.some((route) => basePath.startsWith(route));
   };
 
   // Redirect to login if not authenticated (except for public routes)

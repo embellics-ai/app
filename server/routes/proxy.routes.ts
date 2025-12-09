@@ -503,7 +503,7 @@ router.all(
 
       // Prepare headers
       const headers: Record<string, string> = {};
-      
+
       // Stripe requires form-encoded data, others use JSON
       if (serviceName === 'stripe') {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
