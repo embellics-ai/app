@@ -30,6 +30,8 @@ import WidgetTestPage from '@/pages/widget-test';
 import Login from '@/pages/login';
 import ForgotPassword from '@/pages/forgot-password';
 import ResetPassword from '@/pages/reset-password';
+import PaymentSuccess from '@/pages/PaymentSuccess';
+import PaymentCancelled from '@/pages/PaymentCancelled';
 import NotFound from '@/pages/not-found';
 import { useEffect } from 'react';
 
@@ -40,6 +42,10 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      
+      {/* Payment callback pages - public */}
+      <Route path="/payment/success" component={PaymentSuccess} />
+      <Route path="/payment/cancelled" component={PaymentCancelled} />
 
       {/* Protected routes - wrapped with ProtectedRoute */}
       <Route path="/">
