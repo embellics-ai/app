@@ -489,12 +489,13 @@ router.all(
         ? apiConfig.baseUrl.slice(0, -1)
         : apiConfig.baseUrl;
       const endpointPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-      
+
       // Preserve query parameters from the original request
-      const queryString = Object.keys(req.query).length > 0 
-        ? '?' + new URLSearchParams(req.query as any).toString()
-        : '';
-      
+      const queryString =
+        Object.keys(req.query).length > 0
+          ? '?' + new URLSearchParams(req.query as any).toString()
+          : '';
+
       const fullUrl = `${baseUrl}${endpointPath}${queryString}`;
 
       console.log(`[Proxy] Calling external API: ${fullUrl}`);
