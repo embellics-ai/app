@@ -25,8 +25,8 @@ async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
       and(
         eq(externalApiConfigs.tenantId, tenantId),
         eq(externalApiConfigs.serviceName, 'stripe'),
-        eq(externalApiConfigs.isActive, true)
-      )
+        eq(externalApiConfigs.isActive, true),
+      ),
     )
     .limit(1);
 
@@ -40,7 +40,7 @@ async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
 
   // Decrypt and parse credentials
   const credentials = JSON.parse(decrypt(stripeConfig.encryptedCredentials));
-  
+
   if (!credentials.token) {
     throw new Error(`Invalid Stripe credentials for tenant ${tenantId}`);
   }

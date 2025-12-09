@@ -1,11 +1,13 @@
 # Phorest API Investigation - "Only one type field" Error
 
 ## Problem
+
 Getting persistent error: `"Purchase item invalid: Only one type field can be set per purchase item"`
 
 ## Attempted Solutions
 
 ### Attempt 1: Service ID + Price
+
 ```json
 {
   "serviceId": "5S0lN-rm7P0ziFDoN_z6ew",
@@ -13,17 +15,21 @@ Getting persistent error: `"Purchase item invalid: Only one type field can be se
   "quantity": 1
 }
 ```
+
 **Result:** ❌ Same error
 
 ### Attempt 2: Service ID only
+
 ```json
 {
   "serviceId": "5S0lN-rm7P0ziFDoN_z6ew"
 }
 ```
+
 **Result:** ❌ Same error
 
 ### Attempt 3: Custom item (description + price)
+
 ```json
 {
   "description": "Payment - Service",
@@ -31,9 +37,11 @@ Getting persistent error: `"Purchase item invalid: Only one type field can be se
   "quantity": 1
 }
 ```
+
 **Result:** ❌ Same error
 
 ### Attempt 4: Nested service object
+
 ```json
 {
   "service": {
@@ -43,9 +51,11 @@ Getting persistent error: `"Purchase item invalid: Only one type field can be se
   "quantity": 1
 }
 ```
+
 **Result:** ❌ Same error
 
 ## API Details
+
 - **Endpoint:** `POST /business/{businessId}/branch/{branchId}/purchase`
 - **Authentication:** Basic Auth (working - no 401 errors)
 - **Business ID:** Valid (otherwise would get 404)
@@ -72,9 +82,11 @@ Getting persistent error: `"Purchase item invalid: Only one type field can be se
 ## Recommendations
 
 ### 1. Contact Phorest Support
+
 **Email:** support@phorest.com or api-support@phorest.com
 
 **What to ask:**
+
 ```
 Subject: "Only one type field can be set per purchase item" Error
 
@@ -100,18 +112,22 @@ Thank you!
 ```
 
 ### 2. Check Phorest Dashboard
+
 - Go to Phorest Dashboard → Services
 - Check if the service ID `5S0lN-rm7P0ziFDoN_z6ew` exists
 - Verify service configuration (is it active? any special flags?)
 - Check if there are any "type" fields set on the service
 
 ### 3. Try Phorest Developer Portal
+
 - Check if there's a sandbox/test environment
 - Look for code examples in their developer docs
 - Check for any API version requirements
 
 ### 4. Alternative: Use Phorest Booking API
+
 Instead of Create Purchase, we might need to:
+
 1. Create/update the booking with payment status
 2. Let Phorest automatically create the purchase
 3. OR use a different endpoint for recording payments

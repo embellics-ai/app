@@ -16,8 +16,8 @@ const db = drizzle(pool);
  * Get tenant's Stripe client and webhook secret
  * For webhook verification, we need both the API key and webhook secret
  */
-async function getTenantStripeConfig(tenantId: string): Promise<{ 
-  stripe: Stripe; 
+async function getTenantStripeConfig(tenantId: string): Promise<{
+  stripe: Stripe;
   webhookSecret: string;
 }> {
   const [stripeConfig] = await db
@@ -27,8 +27,8 @@ async function getTenantStripeConfig(tenantId: string): Promise<{
       and(
         eq(externalApiConfigs.tenantId, tenantId),
         eq(externalApiConfigs.serviceName, 'stripe'),
-        eq(externalApiConfigs.isActive, true)
-      )
+        eq(externalApiConfigs.isActive, true),
+      ),
     )
     .limit(1);
 
@@ -37,7 +37,7 @@ async function getTenantStripeConfig(tenantId: string): Promise<{
   }
 
   const credentials = JSON.parse(decrypt(stripeConfig.encryptedCredentials));
-  
+
   if (!credentials.token) {
     throw new Error(`Invalid Stripe credentials for tenant ${tenantId}`);
   }
@@ -48,7 +48,7 @@ async function getTenantStripeConfig(tenantId: string): Promise<{
 
   return {
     stripe: new Stripe(credentials.token, { apiVersion: '2025-11-17.clover' }),
-    webhookSecret
+    webhookSecret,
   };
 }
 
@@ -81,7 +81,7 @@ router.post(
      * MULTI-TENANCY NOTE:
      * For true multi-tenant webhook verification, each tenant should configure their own
      * webhook endpoint in Stripe pointing to: /api/webhooks/stripe/:tenantId
-     * 
+     *
      * For now, we skip signature verification and rely on the database lookup.
      * In production, consider using Stripe Connect for proper multi-tenant webhooks.
      */
