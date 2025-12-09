@@ -161,11 +161,7 @@ function AppHeader() {
 }
 
 function ProtectedAppContent() {
-  const { user, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
-
-  // Initialize heartbeat for agents (support_staff and client_admin)
-  useHeartbeat();
 
   const style = {
     '--sidebar-width': '16rem',
@@ -189,12 +185,31 @@ function ProtectedAppContent() {
     return publicRoutes.some((route) => basePath.startsWith(route));
   };
 
-  // Redirect to login if not authenticated (except for public routes)
+  // Show public pages without authentication
+  if (isPublicRoute(location)) {
+    return (
+      <main className="h-screen">
+        <Router />
+      </main>
+    );
+  }
+
+  // For protected routes, use auth
+  return <AuthenticatedContent location={location} setLocation={setLocation} style={style} />;
+}
+
+function AuthenticatedContent({ location, setLocation, style }: { location: string; setLocation: (path: string) => void; style: any }) {
+  const { user, isLoading } = useAuth();
+
+  // Initialize heartbeat for agents (support_staff and client_admin)
+  useHeartbeat();
+
+  // Redirect to login if not authenticated
   useEffect(() => {
-    if (!isLoading && !user && !isPublicRoute(location)) {
+    if (!isLoading && !user) {
       setLocation('/login');
     }
-  }, [user, isLoading, location, setLocation]);
+  }, [user, isLoading, setLocation]);
 
   // Remove forced onboarding redirect - users can access onboarding page optionally
 
@@ -213,15 +228,6 @@ function ProtectedAppContent() {
       }
     }
   }, [user, isLoading, location, setLocation]);
-
-  // Show public pages without sidebar
-  if (isPublicRoute(location)) {
-    return (
-      <main className="h-screen">
-        <Router />
-      </main>
-    );
-  }
 
   // Show loading state
   if (isLoading) {
