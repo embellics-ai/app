@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 export default function PaymentSuccess() {
-  const [searchParams] = useSearchParams();
+  const [location] = useLocation();
+  const searchParams = new URLSearchParams(window.location.search);
   const sessionId = searchParams.get('session_id');
   const [loading, setLoading] = useState(true);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
@@ -48,9 +49,7 @@ export default function PaymentSuccess() {
           )}
 
           <div className="space-y-2 text-center">
-            <p className="text-sm text-muted-foreground">
-              ✅ Your booking has been confirmed
-            </p>
+            <p className="text-sm text-muted-foreground">✅ Your booking has been confirmed</p>
             <p className="text-sm text-muted-foreground">
               📧 You will receive a confirmation email shortly
             </p>
@@ -60,10 +59,7 @@ export default function PaymentSuccess() {
           </div>
 
           <div className="pt-4 space-y-2">
-            <Button 
-              className="w-full" 
-              onClick={() => window.close()}
-            >
+            <Button className="w-full" onClick={() => window.close()}>
               Close Window
             </Button>
             <p className="text-xs text-center text-muted-foreground">
