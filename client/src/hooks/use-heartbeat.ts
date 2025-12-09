@@ -33,7 +33,7 @@ export function useHeartbeat() {
         // Get fresh token from localStorage each time
         const token = localStorage.getItem('auth_token');
         if (!token) {
-          console.error('[Heartbeat] No auth token found - stopping');
+          console.error('[Heartbeat] No auth token found');
           if (intervalId) {
             clearInterval(intervalId);
             intervalId = null;
