@@ -2,8 +2,9 @@ import express, { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { paymentLinks } from '../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { paymentLinks, externalApiConfigs } from '../../shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { decrypt } from '../encryption';
 
 const router = express.Router();
 
@@ -11,15 +12,41 @@ const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool);
 
-// Initialize Stripe (lazy initialization to ensure env vars are loaded)
-function getStripeClient(): Stripe {
-  const apiKey = process.env.STRIPE_SECRET_KEY;
-  
-  if (!apiKey) {
-    throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+/**
+ * Get tenant's Stripe API key from External API configs
+ * Returns a Stripe client initialized with the tenant's credentials
+ */
+async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
+  // Fetch tenant's Stripe configuration
+  const [stripeConfig] = await db
+    .select()
+    .from(externalApiConfigs)
+    .where(
+      and(
+        eq(externalApiConfigs.tenantId, tenantId),
+        eq(externalApiConfigs.serviceName, 'stripe'),
+        eq(externalApiConfigs.isActive, true)
+      )
+    )
+    .limit(1);
+
+  if (!stripeConfig) {
+    throw new Error(`No Stripe configuration found for tenant ${tenantId}`);
   }
+
+  if (!stripeConfig.encryptedCredentials) {
+    throw new Error(`Stripe credentials not configured for tenant ${tenantId}`);
+  }
+
+  // Decrypt and parse credentials
+  const credentials = JSON.parse(decrypt(stripeConfig.encryptedCredentials));
   
-  return new Stripe(apiKey, {
+  if (!credentials.token) {
+    throw new Error(`Invalid Stripe credentials for tenant ${tenantId}`);
+  }
+
+  // Return Stripe client with tenant's API key
+  return new Stripe(credentials.token, {
     apiVersion: '2025-11-17.clover',
   });
 }
@@ -72,11 +99,14 @@ router.post('/create-link', async (req: Request, res: Response) => {
       });
     }
 
+    // Get tenant's Stripe client
+    const stripe = await getTenantStripeClient(tenantId);
+
     // Create Stripe Checkout Session
     // Stripe expects amount in cents (smallest currency unit)
     const amountInCents = Math.round(amount * 100);
 
-    const session = await getStripeClient().checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
@@ -92,8 +122,8 @@ router.post('/create-link', async (req: Request, res: Response) => {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.APP_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.APP_URL}/payment/cancelled`,
+      success_url: `${process.env.APP_URL?.replace(/\/$/, '')}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_URL?.replace(/\/$/, '')}/payment/cancelled`,
       customer_email: customerEmail,
       metadata: {
         tenantId,
@@ -172,7 +202,9 @@ router.get('/:id/status', async (req: Request, res: Response) => {
     // If payment is still pending, check Stripe for latest status
     if (paymentLink.status === 'pending') {
       try {
-        const session = await getStripeClient().checkout.sessions.retrieve(paymentLink.stripeSessionId);
+        // Get tenant's Stripe client
+        const stripe = await getTenantStripeClient(paymentLink.tenantId);
+        const session = await stripe.checkout.sessions.retrieve(paymentLink.stripeSessionId);
 
         // Update status if payment was completed
         if (session.payment_status === 'paid') {
