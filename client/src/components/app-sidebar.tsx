@@ -132,9 +132,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b p-4">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
-              <MessageSquare className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src="/favicon.png" alt="Embellics Logo" className="h-8 w-8 rounded-md" />
             <div className="flex flex-col flex-1">
               <span className="font-semibold text-sm">Embellics</span>
               <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
