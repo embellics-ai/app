@@ -108,6 +108,31 @@ export default function AnalyticsChat() {
     return params.toString();
   };
 
+  // Fetch live USD to EUR exchange rate
+  const { data: exchangeRate } = useQuery({
+    queryKey: ['exchange-rate'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        const data = await response.json();
+        return data.rates.EUR as number;
+      } catch (error) {
+        console.error('Failed to fetch exchange rate, using fallback:', error);
+        return 0.92; // Fallback rate
+      }
+    },
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour
+    refetchInterval: 1000 * 60 * 60, // Refetch every hour
+  });
+
+  const formatCurrency = (amountUSD: number) => {
+    const amountEUR = amountUSD * (exchangeRate || 0.92);
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(amountEUR);
+  };
+
   // Fetch agent breakdown
   const { data: agentData, isLoading: agentLoading } = useQuery<AgentBreakdown[]>({
     queryKey: [
@@ -232,7 +257,7 @@ export default function AnalyticsChat() {
     },
     {
       title: 'Total Cost',
-      value: `$${totalCost.toFixed(2)}`,
+      value: formatCurrency(totalCost),
       icon: DollarSign,
       iconColor: 'text-purple-500',
     },
@@ -434,7 +459,9 @@ export default function AnalyticsChat() {
                           </span>
                         </td>
                         <td className="p-4 align-middle">{chat.chatSuccessful ? '✓' : '✗'}</td>
-                        <td className="p-4 align-middle">${(chat.combinedCost || 0).toFixed(4)}</td>
+                        <td className="p-4 align-middle">
+                          {formatCurrency(chat.combinedCost || 0)}
+                        </td>
                       </tr>
                     ))
                   ) : (

@@ -17,6 +17,7 @@ import {
   Phone,
   MessageSquare,
   Activity,
+  DollarSign,
   Euro,
   Clock,
   CheckCircle2,
@@ -274,11 +275,31 @@ export default function UnifiedAnalytics() {
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  const formatCurrency = (amount: number) => {
+  // Fetch live USD to EUR exchange rate
+  const { data: exchangeRate } = useQuery({
+    queryKey: ['exchange-rate'],
+    queryFn: async () => {
+      try {
+        // Using exchangerate-api.com (free, no API key required)
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        const data = await response.json();
+        return data.rates.EUR as number;
+      } catch (error) {
+        console.error('Failed to fetch exchange rate, using fallback:', error);
+        return 0.92; // Fallback rate if API fails
+      }
+    },
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour
+    refetchInterval: 1000 * 60 * 60, // Refetch every hour
+  });
+
+  const formatCurrency = (amountUSD: number) => {
+    // Convert USD to EUR using live exchange rate
+    const amountEUR = amountUSD * (exchangeRate || 0.92);
     return new Intl.NumberFormat('de-DE', {
       style: 'currency',
       currency: 'EUR',
-    }).format(amount);
+    }).format(amountEUR);
   };
 
   if (!user) {
