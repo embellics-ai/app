@@ -11,10 +11,14 @@ const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool);
 
-// Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-11-17.clover',
-});
+// Lazy initialization function for Stripe client
+function getStripeClient(): Stripe {
+  const apiKey = process.env.STRIPE_SECRET_KEY;
+  if (!apiKey) {
+    throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+  }
+  return new Stripe(apiKey, { apiVersion: '2025-11-17.clover' });
+}
 
 /**
  * POST /api/webhooks/stripe
@@ -45,7 +49,7 @@ router.post(
 
     try {
       // Verify webhook signature
-      event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+      event = getStripeClient().webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
       console.error('[Stripe Webhook] Signature verification failed:', err);
       return res
