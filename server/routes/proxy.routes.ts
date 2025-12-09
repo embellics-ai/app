@@ -502,9 +502,14 @@ router.all(
       console.log(`[Proxy] Query parameters:`, req.query);
 
       // Prepare headers
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
+      const headers: Record<string, string> = {};
+      
+      // Stripe requires form-encoded data, others use JSON
+      if (serviceName === 'stripe') {
+        headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      } else {
+        headers['Content-Type'] = 'application/json';
+      }
 
       // Add authentication headers based on authType
       if (apiConfig.encryptedCredentials) {
@@ -571,7 +576,16 @@ router.all(
 
       // Only include body for methods that support it (not GET or HEAD)
       if (httpMethod !== 'GET' && httpMethod !== 'HEAD' && requestData) {
-        fetchOptions.body = JSON.stringify(requestData);
+        // Stripe requires form-encoded data
+        if (serviceName === 'stripe') {
+          const formData = new URLSearchParams();
+          Object.entries(requestData).forEach(([key, value]) => {
+            formData.append(key, String(value));
+          });
+          fetchOptions.body = formData.toString();
+        } else {
+          fetchOptions.body = JSON.stringify(requestData);
+        }
       }
 
       console.log(`[Proxy] Calling ${httpMethod} ${fullUrl}`);
