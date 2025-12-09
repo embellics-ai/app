@@ -12,17 +12,32 @@ export function useHeartbeat() {
   const { user } = useAuth();
 
   useEffect(() => {
-    // Only run for agents (support_staff and client_admin)
-    if (!user || (user.role !== 'support_staff' && user.role !== 'client_admin')) {
+    // Wait for user to load
+    if (!user) {
       return;
     }
 
+    // Only run for agents (support_staff and client_admin)
+    if (user.role !== 'support_staff' && user.role !== 'client_admin') {
+      return;
+    }
+
+    console.log('[Heartbeat] Starting for', user.role);
+
+    let intervalId: NodeJS.Timeout | null = null;
+    let failureCount = 0;
+    const MAX_FAILURES = 3; // Stop after 3 consecutive 401s
+
     const sendHeartbeat = async () => {
       try {
-        // Get token from localStorage
+        // Get fresh token from localStorage each time
         const token = localStorage.getItem('auth_token');
         if (!token) {
-          console.error('[Heartbeat] No auth token found');
+          console.error('[Heartbeat] No auth token found - stopping');
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
           return;
         }
 
@@ -34,13 +49,27 @@ export function useHeartbeat() {
             Authorization: `Bearer ${token}`,
           },
         });
+
         if (response.ok) {
-          console.log('[Heartbeat] Ping successful');
+          console.log('[Heartbeat] ✓ Successful');
+          failureCount = 0; // Reset failure count on success
+        } else if (response.status === 401) {
+          failureCount++;
+          console.warn(`[Heartbeat] ✗ Auth failed (${failureCount}/${MAX_FAILURES})`);
+
+          // Stop after multiple consecutive failures
+          if (failureCount >= MAX_FAILURES) {
+            console.error('[Heartbeat] Too many auth failures - stopping');
+            if (intervalId) {
+              clearInterval(intervalId);
+              intervalId = null;
+            }
+          }
         } else {
           console.error('[Heartbeat] Failed with status:', response.status);
         }
       } catch (error) {
-        console.error('[Heartbeat] Error:', error);
+        console.error('[Heartbeat] Network error:', error);
       }
     };
 
@@ -48,9 +77,15 @@ export function useHeartbeat() {
     sendHeartbeat();
 
     // Then send every 30 seconds
-    const interval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
+    intervalId = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
 
-    // Cleanup on unmount
-    return () => clearInterval(interval);
+    // Cleanup on unmount or when user changes
+    return () => {
+      console.log('[Heartbeat] Stopping');
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
   }, [user]);
 }

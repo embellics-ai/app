@@ -91,6 +91,23 @@ export default function EnhancedChatAnalytics({
   endDate,
   agentId,
 }: EnhancedChatAnalyticsProps) {
+  // Fetch live USD to EUR exchange rate
+  const { data: exchangeRate } = useQuery({
+    queryKey: ['exchange-rate'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        const data = await response.json();
+        return data.rates.EUR as number;
+      } catch (error) {
+        console.error('Failed to fetch exchange rate, using fallback:', error);
+        return 0.92; // Fallback rate if API fails
+      }
+    },
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour
+    refetchInterval: 1000 * 60 * 60, // Refetch every hour
+  });
+
   // Fetch time-series data
   const { data: timeSeriesData, isLoading } = useQuery<TimeSeriesData>({
     queryKey: ['chat-time-series', tenantId, startDate, endDate, agentId],
@@ -139,13 +156,26 @@ export default function EnhancedChatAnalytics({
   const totalChats = timeSeriesData.chatCounts.reduce((sum, d) => sum + d.count, 0);
   const totalSuccessful = timeSeriesData.chatCounts.reduce((sum, d) => sum + d.successful, 0);
   const successRate = totalChats > 0 ? ((totalSuccessful / totalChats) * 100).toFixed(1) : '0';
-  const totalCost = timeSeriesData.costData.reduce((sum, d) => sum + d.totalCost, 0);
-  const avgCost = totalChats > 0 ? totalCost / totalChats : 0;
+  const totalCostUSD = timeSeriesData.costData.reduce((sum, d) => sum + d.totalCost, 0);
+  const avgCostUSD = totalChats > 0 ? totalCostUSD / totalChats : 0;
+
+  // Convert USD to EUR
+  const rate = exchangeRate || 0.92;
+  const totalCost = totalCostUSD * rate;
+  const avgCost = avgCostUSD * rate;
+
   const avgDuration =
     timeSeriesData.durationData.length > 0
       ? timeSeriesData.durationData.reduce((sum, d) => sum + d.averageDuration, 0) /
         timeSeriesData.durationData.length
       : 0;
+
+  // Convert cost data to EUR
+  const costDataEUR = timeSeriesData.costData.map((d) => ({
+    date: d.date,
+    totalCost: d.totalCost * rate,
+    averageCost: d.averageCost * rate,
+  }));
 
   // Format date for display
   const formatDate = (dateStr: string) => {
@@ -369,11 +399,11 @@ export default function EnhancedChatAnalytics({
         <Card>
           <CardHeader>
             <CardTitle>Cost Analysis</CardTitle>
-            <CardDescription>Daily cost breakdown</CardDescription>
+            <CardDescription>Daily cost breakdown (in EUR)</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={timeSeriesData.costData}>
+              <BarChart data={costDataEUR}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tickFormatter={formatDate} />
                 <YAxis tickFormatter={(value) => `€${value.toFixed(2)}`} />

@@ -35,8 +35,6 @@ router.get(
       const { tenantId } = req.params;
       const { startDate, endDate, agentId } = req.query;
 
-      console.log('[Analytics Overview] Request:', { tenantId, startDate, endDate, agentId });
-
       // Authorization: Platform admin can access any tenant, client admin only their own
       if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
         return res.status(403).json({ error: "Access denied to this tenant's analytics" });
@@ -48,15 +46,11 @@ router.get(
         agentId: agentId as string | undefined,
       };
 
-      console.log('[Analytics Overview] Filters:', filters);
-
       // Get chat analytics summary
       const chatSummary = await storage.getChatAnalyticsSummary(tenantId, filters);
-      console.log('[Analytics Overview] Chat Summary:', chatSummary);
 
       // Get voice analytics summary
       const voiceSummary = await storage.getVoiceAnalyticsSummary(tenantId, filters);
-      console.log('[Analytics Overview] Voice Summary:', voiceSummary);
 
       const response = {
         chat: chatSummary,
@@ -72,7 +66,6 @@ router.get(
         },
       };
 
-      console.log('[Analytics Overview] Response:', response);
       res.json(response);
     } catch (error) {
       console.error('Error fetching analytics overview:', error);
@@ -173,18 +166,12 @@ router.get(
         return res.status(403).json({ error: "Access denied to this tenant's analytics" });
       }
 
-      console.log('[Analytics Agent Breakdown] Querying for tenant:', tenantId);
-
       const filters = {
         startDate: startDate ? new Date(startDate as string) : undefined,
         endDate: endDate ? new Date(endDate as string) : undefined,
       };
 
       const agentBreakdown = await storage.getChatAnalyticsAgentBreakdown(tenantId, filters);
-
-      console.log('[Analytics Agent Breakdown] Returning data:', {
-        agentCount: agentBreakdown.length,
-      });
 
       res.json(agentBreakdown);
     } catch (error) {
@@ -985,5 +972,99 @@ router.get('/retell', requireAuth, requireClientAdmin, async (req: Authenticated
     res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });
+
+/**
+ * POST /api/platform/admin/fix-costs
+ * One-time backfill endpoint to fix cost values
+ * PLATFORM ADMIN ONLY
+ * Divides all costs > 10 by 100 (converts cents to dollars)
+ */
+router.post(
+  '/admin/fix-costs',
+  requirePlatformAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      console.log('[Admin] Cost backfill requested by:', req.user!.email);
+
+      // Create a direct database connection
+      const pg = await import('pg');
+      const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+      try {
+        // Get current state
+        const before = await pool.query(`
+          SELECT 
+            COUNT(*) as total_records,
+            MIN(combined_cost) as min_cost,
+            MAX(combined_cost) as max_cost,
+            AVG(combined_cost) as avg_cost,
+            SUM(combined_cost) as total_cost
+          FROM chat_analytics
+          WHERE combined_cost IS NOT NULL AND combined_cost > 0
+        `);
+
+        const likelyCents = await pool.query(`
+          SELECT COUNT(*) as count
+          FROM chat_analytics
+          WHERE combined_cost > 10
+        `);
+
+        const recordsToFix = parseInt(String(likelyCents.rows[0].count));
+
+        if (recordsToFix === 0) {
+          await pool.end();
+          return res.json({
+            message: 'No records need fixing',
+            before: before.rows[0],
+          });
+        }
+
+        // Update costs: Divide by 100 if > 10 (cents), leave as-is if <= 10 (already in dollars)
+        const result = await pool.query(`
+          UPDATE chat_analytics
+          SET combined_cost = CASE
+            WHEN combined_cost > 10 THEN combined_cost / 100
+            ELSE combined_cost
+          END
+          WHERE combined_cost IS NOT NULL AND combined_cost > 0
+        `);
+
+        // Get after state
+        const after = await pool.query(`
+          SELECT 
+            COUNT(*) as total_records,
+            MIN(combined_cost) as min_cost,
+            MAX(combined_cost) as max_cost,
+            AVG(combined_cost) as avg_cost,
+            SUM(combined_cost) as total_cost
+          FROM chat_analytics
+          WHERE combined_cost IS NOT NULL AND combined_cost > 0
+        `);
+
+        await pool.end();
+
+        console.log('[Admin] Cost backfill completed:', {
+          recordsUpdated: result.rowCount,
+          before: before.rows[0],
+          after: after.rows[0],
+        });
+
+        res.json({
+          success: true,
+          message: `Successfully updated ${result.rowCount} records`,
+          recordsUpdated: result.rowCount,
+          before: before.rows[0],
+          after: after.rows[0],
+        });
+      } catch (error) {
+        await pool.end();
+        throw error;
+      }
+    } catch (error) {
+      console.error('[Admin] Error during cost backfill:', error);
+      res.status(500).json({ error: 'Failed to fix costs' });
+    }
+  },
+);
 
 export default router;
