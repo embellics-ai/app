@@ -731,3 +731,39 @@ export const settingsSchema = z.object({
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
+
+// ============================================
+// PAYMENT LINKS (Stripe Integration)
+// ============================================
+export const paymentLinks = pgTable('payment_links', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  tenantId: varchar('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  bookingReference: varchar('booking_reference', { length: 255 }).notNull(),
+  stripeSessionId: varchar('stripe_session_id', { length: 255 }).notNull().unique(),
+  stripePaymentIntentId: varchar('stripe_payment_intent_id', { length: 255 }),
+  amount: real('amount').notNull(),
+  currency: varchar('currency', { length: 3 }).notNull().default('eur'),
+  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, completed, expired, failed
+  customerEmail: varchar('customer_email', { length: 255 }),
+  customerPhone: varchar('customer_phone', { length: 50 }),
+  customerName: varchar('customer_name', { length: 255 }),
+  phorestBookingId: varchar('phorest_booking_id', { length: 255 }),
+  phorestClientId: varchar('phorest_client_id', { length: 255 }),
+  phorestPurchaseId: varchar('phorest_purchase_id', { length: 255 }),
+  description: text('description'),
+  metadata: jsonb('metadata').default({}),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const insertPaymentLinkSchema = createInsertSchema(paymentLinks).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPaymentLink = z.infer<typeof insertPaymentLinkSchema>;
+export type PaymentLink = typeof paymentLinks.$inferSelect;
