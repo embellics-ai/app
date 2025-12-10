@@ -592,22 +592,24 @@ router.all(
 
       const response = await fetch(fullUrl, fetchOptions);
 
-      // Try to parse as JSON, but handle non-JSON responses
+      // Try to parse as JSON, but handle non-JSON responses gracefully
       let responseData: any;
-      const contentType = response.headers.get('content-type');
-      
+      const responseText = await response.text();
+
       try {
-        if (contentType && contentType.includes('application/json')) {
-          responseData = await response.json();
-        } else {
-          // For non-JSON responses (like Phorest activate), get text
-          const textData = await response.text();
-          responseData = textData ? { data: textData } : { success: true };
-        }
+        // Try to parse as JSON first (most APIs return JSON)
+        responseData = JSON.parse(responseText);
       } catch (parseError) {
-        // If JSON parsing fails, treat as success if status is OK
-        console.log('[Proxy] Response is not JSON, treating as success');
-        responseData = { success: true, status: response.status };
+        // If JSON parsing fails, check if we have any content
+        if (responseText && responseText.trim().length > 0) {
+          // Non-JSON response with content (like plain text)
+          responseData = { data: responseText };
+          console.log('[Proxy] Non-JSON response, wrapping in data object');
+        } else {
+          // Empty response or whitespace only (like Phorest activate endpoint)
+          responseData = { success: true };
+          console.log('[Proxy] Empty response, treating as success');
+        }
       }
 
       // Update usage statistics
