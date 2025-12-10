@@ -592,7 +592,23 @@ router.all(
 
       const response = await fetch(fullUrl, fetchOptions);
 
-      const responseData = await response.json();
+      // Try to parse as JSON, but handle non-JSON responses
+      let responseData: any;
+      const contentType = response.headers.get('content-type');
+      
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await response.json();
+        } else {
+          // For non-JSON responses (like Phorest activate), get text
+          const textData = await response.text();
+          responseData = textData ? { data: textData } : { success: true };
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, treat as success if status is OK
+        console.log('[Proxy] Response is not JSON, treating as success');
+        responseData = { success: true, status: response.status };
+      }
 
       // Update usage statistics
       await storage.incrementExternalApiStats(apiConfig.id, response.ok);

@@ -198,7 +198,15 @@ function ProtectedAppContent() {
   return <AuthenticatedContent location={location} setLocation={setLocation} style={style} />;
 }
 
-function AuthenticatedContent({ location, setLocation, style }: { location: string; setLocation: (path: string) => void; style: any }) {
+function AuthenticatedContent({
+  location,
+  setLocation,
+  style,
+}: {
+  location: string;
+  setLocation: (path: string) => void;
+  style: any;
+}) {
   const { user, isLoading } = useAuth();
 
   // Initialize heartbeat for agents (support_staff and client_admin)
