@@ -39,12 +39,9 @@ export default function PaymentCancelled() {
             </p>
           </div>
 
-          <div className="pt-4 space-y-2">
-            <Button className="w-full" variant="outline" onClick={() => window.close()}>
-              Close Window
-            </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              You can safely close this page
+          <div className="pt-4">
+            <p className="text-sm text-center text-muted-foreground">
+              You can safely close this page now
             </p>
           </div>
         </CardContent>

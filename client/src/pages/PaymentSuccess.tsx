@@ -51,19 +51,16 @@ export default function PaymentSuccess() {
           <div className="space-y-2 text-center">
             <p className="text-sm text-muted-foreground">✅ Your booking has been confirmed</p>
             <p className="text-sm text-muted-foreground">
-              📧 You will receive a confirmation email shortly
+              📧 You will receive a confirmation SMS shortly
             </p>
             <p className="text-sm text-muted-foreground">
               💬 Please check your WhatsApp/SMS for booking details
             </p>
           </div>
 
-          <div className="pt-4 space-y-2">
-            <Button className="w-full" onClick={() => window.close()}>
-              Close Window
-            </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              You can safely close this page
+          <div className="pt-4">
+            <p className="text-sm text-center text-muted-foreground">
+              You can safely close this page now
             </p>
           </div>
         </CardContent>
