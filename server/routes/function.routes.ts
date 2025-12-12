@@ -27,8 +27,11 @@ router.post('/:functionName', async (req: Request, res: Response) => {
     console.log('[Function Proxy] Function called:', functionName);
     console.log('[Function Proxy] Request body:', JSON.stringify(req.body, null, 2));
 
-    // Extract agent_id from request (Retell sends this in the function call)
-    const { agent_id, call_id, args } = req.body;
+    // Extract identifiers from request
+    // Retell sends different fields for voice calls vs chat:
+    // - Voice calls: agent_id, call_id
+    // - Chat: agent_id, chat_id (no call_id)
+    const { agent_id, call_id, chat_id, args, ...restParams } = req.body;
 
     if (!agent_id) {
       console.error('[Function Proxy] Missing agent_id in request');
@@ -37,6 +40,15 @@ router.post('/:functionName', async (req: Request, res: Response) => {
         message: 'Retell must send agent_id with function calls',
       });
     }
+
+    // Use call_id for voice, chat_id for chat, or null
+    const conversationId = call_id || chat_id || null;
+
+    // Extract function parameters
+    // Support both formats:
+    // 1. Flat format: { "businessId": "...", "branchId": "..." }
+    // 2. Nested format: { "args": { "businessId": "...", "branchId": "..." } }
+    const functionParams = args || restParams;
 
     // Lookup tenant from agent configuration
     const widgetConfig = await storage.getWidgetConfigByAgentId(agent_id);
@@ -78,11 +90,14 @@ router.post('/:functionName', async (req: Request, res: Response) => {
         id: tenantId,
         name: tenant?.name || 'Unknown',
       },
-      call: {
-        id: call_id,
+      conversation: {
+        id: conversationId, // call_id for voice, chat_id for chat
+        call_id: call_id || null, // Only present for voice calls
+        chat_id: chat_id || null, // Only present for chat
         agent_id: agent_id,
+        type: call_id ? 'voice' : 'chat', // Indicate type for N8N
       },
-      args: args || {},
+      args: functionParams, // Function parameters (flat or nested)
       timestamp: new Date().toISOString(),
       originalPayload: req.body,
     };
