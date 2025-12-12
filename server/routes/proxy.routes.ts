@@ -1,12 +1,13 @@
 /**
  * Proxy Routes
- * Handles proxying of external API requests (WhatsApp, Retell AI, Generic HTTP)
+ * Handles proxying of external API requests (WhatsApp, Retell AI, Google Sheets, Generic HTTP)
  * Authenticates N8N requests and forwards to external services with encrypted credentials
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { storage } from '../storage';
 import { decrypt, decryptWhatsAppConfig } from '../encryption';
+import { getGoogleSheetsAccessToken, parseServiceAccount } from '../google-sheets-auth';
 
 const router = Router();
 
@@ -435,6 +436,115 @@ router.post(
       console.error('[Proxy] Error calling Retell API:', error);
       res.status(500).json({
         error: 'Failed to call Retell API',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  },
+);
+
+// ============================================
+// GOOGLE SHEETS PROXY API ENDPOINTS
+// ============================================
+
+/**
+ * ALL /:tenantId/google-sheets/:endpoint(*)
+ * Google Sheets Proxy with Service Account Authentication
+ *
+ * Special handling for Google Service Account (JWT-based auth)
+ * Automatically generates access tokens from service account key
+ * Tokens are cached for ~55 minutes to avoid unnecessary token generation
+ *
+ * Examples:
+ * - GET  /spreadsheets/{id}/values/{range}
+ * - POST /spreadsheets/{id}/values/{range}:append
+ * - PUT  /spreadsheets/{id}/values/{range}
+ */
+router.all(
+  '/:tenantId/google-sheets/:endpoint(*)',
+  validateN8NSecret,
+  async (req: Request, res: Response) => {
+    try {
+      const { tenantId, endpoint } = req.params;
+      const requestData = req.body;
+      const httpMethod = req.method;
+
+      console.log(
+        `[Proxy] Google Sheets ${httpMethod} request for tenant: ${tenantId}, endpoint: ${endpoint}`,
+      );
+
+      // Get Google Sheets configuration from database
+      const apiConfig = await storage.getExternalApiConfig(tenantId, 'google_sheets');
+
+      if (!apiConfig || !apiConfig.isActive) {
+        console.error('[Proxy] Google Sheets not configured for tenant:', tenantId);
+        return res.status(404).json({
+          error: 'Google Sheets integration not configured',
+          message: 'Please configure Google Sheets in Integration Management → External APIs',
+        });
+      }
+
+      // Parse and validate service account credentials
+      if (!apiConfig.encryptedCredentials) {
+        throw new Error('No credentials found for Google Sheets');
+      }
+
+      const serviceAccount = parseServiceAccount(apiConfig.encryptedCredentials, decrypt);
+
+      // Get access token (auto-cached for ~55 minutes)
+      const accessToken = await getGoogleSheetsAccessToken(serviceAccount);
+
+      // Construct full URL
+      const baseUrl = 'https://sheets.googleapis.com/v4';
+      const endpointPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+      // Preserve query parameters
+      const queryString =
+        Object.keys(req.query).length > 0
+          ? '?' + new URLSearchParams(req.query as any).toString()
+          : '';
+
+      const fullUrl = `${baseUrl}${endpointPath}${queryString}`;
+
+      console.log(`[Proxy] Calling Google Sheets API: ${httpMethod} ${fullUrl}`);
+
+      // Prepare headers
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Forward request to Google Sheets API
+      const fetchOptions: RequestInit = {
+        method: httpMethod,
+        headers,
+      };
+
+      // Add body for POST/PUT/PATCH
+      if (httpMethod !== 'GET' && httpMethod !== 'HEAD' && requestData) {
+        fetchOptions.body = JSON.stringify(requestData);
+      }
+
+      const response = await fetch(fullUrl, fetchOptions);
+      const responseData = await response.json();
+
+      // Update usage statistics
+      await storage.incrementExternalApiStats(apiConfig.id, response.ok);
+
+      if (!response.ok) {
+        console.error('[Proxy] Google Sheets API error:', responseData);
+        return res.status(response.status).json({
+          error: 'Google Sheets API request failed',
+          details: responseData,
+        });
+      }
+
+      console.log(`[Proxy] Google Sheets API call successful`);
+
+      res.json(responseData);
+    } catch (error) {
+      console.error('[Proxy] Error calling Google Sheets API:', error);
+      res.status(500).json({
+        error: 'Failed to call Google Sheets API',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }

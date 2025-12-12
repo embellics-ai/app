@@ -1256,6 +1256,20 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
   // Helper function to get the base URL - simply use current origin
   const getBaseUrl = () => window.location.origin;
 
+  // Helper function to format auth type labels
+  const formatAuthType = (authType: string) => {
+    const authTypeLabels: Record<string, string> = {
+      bearer: 'Bearer Token',
+      api_key: 'API Key',
+      basic: 'Basic Auth',
+      oauth2: 'OAuth2',
+      google_service_account: 'Google Service Account',
+      custom_header: 'Custom Header',
+      none: 'None',
+    };
+    return authTypeLabels[authType] || authType;
+  };
+
   // Simple form state
   const [formData, setFormData] = useState({
     serviceName: '',
@@ -1463,7 +1477,7 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                       <code className="text-xs bg-muted px-2 py-1 rounded">{api.baseUrl}</code>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{api.authType}</Badge>
+                      <Badge variant="outline">{formatAuthType(api.authType)}</Badge>
                     </TableCell>
                     <TableCell>
                       {api.isActive ? (
@@ -1612,6 +1626,9 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                     <SelectItem value="api_key">API Key (Custom Header)</SelectItem>
                     <SelectItem value="basic">Basic Auth</SelectItem>
                     <SelectItem value="oauth2">OAuth2</SelectItem>
+                    <SelectItem value="google_service_account">
+                      Google Service Account (JSON)
+                    </SelectItem>
                     <SelectItem value="custom_header">Custom Header</SelectItem>
                     <SelectItem value="none">None</SelectItem>
                   </SelectContent>
@@ -1734,6 +1751,86 @@ function ExternalAPIsTab({ tenantId }: { tenantId: string }) {
                     />
                   </div>
                 </>
+              )}
+
+              {formData.authType === 'google_service_account' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Service Account JSON</label>
+                  {editingApi && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-950 rounded-md border border-green-200 dark:border-green-800 mb-2">
+                      <Settings className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-sm text-green-700 dark:text-green-300">
+                        Current: {editingApi.serviceName}_service_account (encrypted)
+                      </span>
+                      <Badge variant="secondary" className="ml-auto">
+                        Configured
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            try {
+                              const json = event.target?.result as string;
+                              const parsed = JSON.parse(json);
+
+                              // Validate required fields
+                              if (
+                                !parsed.client_email ||
+                                !parsed.private_key ||
+                                !parsed.project_id
+                              ) {
+                                toast({
+                                  variant: 'destructive',
+                                  title: 'Invalid Service Account',
+                                  description:
+                                    'JSON must contain client_email, private_key, and project_id',
+                                });
+                                return;
+                              }
+
+                              updateCredential('serviceAccountJson', json);
+                              toast({
+                                title: 'File Loaded',
+                                description: `Service account: ${parsed.client_email}`,
+                              });
+                            } catch (error) {
+                              toast({
+                                variant: 'destructive',
+                                title: 'Invalid JSON',
+                                description: 'Please upload a valid service account JSON file',
+                              });
+                            }
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                      required={!editingApi}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {editingApi
+                        ? 'Upload a new service account JSON to update, or leave empty to keep existing.'
+                        : 'Upload the Google service account JSON key file'}
+                    </p>
+                  </div>
+                  {formData.credentials.serviceAccountJson && (
+                    <Alert>
+                      <Settings className="h-4 w-4" />
+                      <AlertDescription>
+                        Service Account:{' '}
+                        <code className="font-mono text-xs">
+                          {JSON.parse(formData.credentials.serviceAccountJson).client_email}
+                        </code>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               )}
 
               <div className="space-y-2">
