@@ -892,6 +892,33 @@ export default function IntegrationManagement({
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  onClick={async () => {
+                                    const functionUrl =
+                                      webhook.webhookType === 'function_call'
+                                        ? `https://embellics-app.onrender.com/api/functions/${webhook.functionName}`
+                                        : webhook.webhookUrl;
+
+                                    try {
+                                      await navigator.clipboard.writeText(functionUrl);
+                                      toast({
+                                        title: 'URL Copied!',
+                                        description: 'Webhook URL copied to clipboard',
+                                      });
+                                    } catch (err) {
+                                      toast({
+                                        title: 'Copy Failed',
+                                        description: 'Failed to copy URL to clipboard',
+                                        variant: 'destructive',
+                                      });
+                                    }
+                                  }}
+                                  title="Copy URL"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => {
                                     webhookForm.reset({
                                       workflowName: webhook.workflowName,
@@ -1074,34 +1101,78 @@ export default function IntegrationManagement({
               />
 
               {webhookForm.watch('webhookType') === 'event_listener' && (
-                <FormField
-                  control={webhookForm.control}
-                  name="eventType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Event Type</FormLabel>
-                      <FormControl>
-                        <select
-                          {...field}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                <>
+                  <FormField
+                    control={webhookForm.control}
+                    name="eventType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Event Type</FormLabel>
+                        <FormControl>
+                          <select
+                            {...field}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <option value="chat_analyzed">Chat Analyzed</option>
+                            <option value="call_analyzed">Call Analyzed</option>
+                            <option value="chat_started">Chat Started</option>
+                            <option value="chat_ended">Chat Ended</option>
+                            <option value="call_started">Call Started</option>
+                            <option value="call_ended">Call Ended</option>
+                            <option value="whatsapp_message">WhatsApp Message</option>
+                            <option value="*">All Events (*)</option>
+                          </select>
+                        </FormControl>
+                        <FormDescription>
+                          Which Retell event should trigger this webhook?
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Event Webhook URL Display */}
+                  {webhookForm.watch('webhookUrl') && (
+                    <div className="space-y-2 rounded-lg border border-purple-200 bg-purple-50 p-4">
+                      <div className="flex items-center gap-2 text-sm font-medium text-purple-900">
+                        <Webhook className="h-4 w-4" />
+                        N8N Webhook URL:
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 rounded bg-white px-3 py-2 text-xs text-gray-800 border border-purple-200 break-all">
+                          {webhookForm.watch('webhookUrl')}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const url = webhookForm.watch('webhookUrl');
+                            try {
+                              await navigator.clipboard.writeText(url);
+                              toast({
+                                title: 'URL Copied!',
+                                description: 'N8N webhook URL copied to clipboard',
+                              });
+                            } catch (err) {
+                              toast({
+                                title: 'Copy Failed',
+                                description: 'Failed to copy URL to clipboard',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
                         >
-                          <option value="chat_analyzed">Chat Analyzed</option>
-                          <option value="call_analyzed">Call Analyzed</option>
-                          <option value="chat_started">Chat Started</option>
-                          <option value="chat_ended">Chat Ended</option>
-                          <option value="call_started">Call Started</option>
-                          <option value="call_ended">Call Ended</option>
-                          <option value="whatsapp_message">WhatsApp Message</option>
-                          <option value="*">All Events (*)</option>
-                        </select>
-                      </FormControl>
-                      <FormDescription>
-                        Which Retell event should trigger this webhook?
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-purple-700">
+                        This is your N8N workflow webhook endpoint that receives{' '}
+                        {webhookForm.watch('eventType')} events
+                      </p>
+                    </div>
                   )}
-                />
+                </>
               )}
 
               {webhookForm.watch('webhookType') === 'function_call' && (
@@ -1127,6 +1198,48 @@ export default function IntegrationManagement({
                       </FormItem>
                     )}
                   />
+
+                  {/* Function Endpoint URL Display */}
+                  {webhookForm.watch('functionName') && (
+                    <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                      <div className="flex items-center gap-2 text-sm font-medium text-blue-900">
+                        <Settings className="h-4 w-4" />
+                        Function Endpoint URL:
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 rounded bg-white px-3 py-2 text-xs text-gray-800 border border-blue-200">
+                          https://embellics-app.onrender.com/api/functions/
+                          {webhookForm.watch('functionName')}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const url = `https://embellics-app.onrender.com/api/functions/${webhookForm.watch('functionName')}`;
+                            try {
+                              await navigator.clipboard.writeText(url);
+                              toast({
+                                title: 'URL Copied!',
+                                description: 'Function endpoint URL copied to clipboard',
+                              });
+                            } catch (err) {
+                              toast({
+                                title: 'Copy Failed',
+                                description: 'Failed to copy URL to clipboard',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-blue-700">
+                        Use this URL in Retell's custom function configuration
+                      </p>
+                    </div>
+                  )}
 
                   <FormField
                     control={webhookForm.control}
