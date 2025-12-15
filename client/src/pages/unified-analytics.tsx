@@ -159,7 +159,11 @@ export default function UnifiedAnalytics() {
     user?.role === 'owner' || user?.isPlatformAdmin ? selectedTenantId : user?.tenantId;
 
   // Fetch unified analytics overview (voice + chat from our database)
-  const { data: analyticsOverview, isLoading: overviewLoading, error: overviewError } = useQuery<UnifiedAnalytics>({
+  const {
+    data: analyticsOverview,
+    isLoading: overviewLoading,
+    error: overviewError,
+  } = useQuery<UnifiedAnalytics>({
     queryKey: [
       'analytics-overview',
       tenantId,
@@ -185,7 +189,7 @@ export default function UnifiedAnalytics() {
         console.error('[Unified Analytics] Overview API error:', {
           status: response.status,
           statusText: response.statusText,
-          error: errorData
+          error: errorData,
         });
         throw new Error(errorData.error || `Failed to fetch analytics: ${response.statusText}`);
       }
@@ -359,12 +363,15 @@ export default function UnifiedAnalytics() {
           <CardHeader>
             <CardTitle className="text-destructive">Failed to Load Analytics</CardTitle>
             <CardDescription>
-              {overviewError instanceof Error ? overviewError.message : 'An unexpected error occurred'}
+              {overviewError instanceof Error
+                ? overviewError.message
+                : 'An unexpected error occurred'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Please check the browser console for more details, or contact support if the problem persists.
+              Please check the browser console for more details, or contact support if the problem
+              persists.
             </p>
             <Button onClick={() => window.location.reload()}>Reload Page</Button>
           </CardContent>
