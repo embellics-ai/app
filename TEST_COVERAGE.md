@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides an overview of the comprehensive unit test coverage for the RetellChatFlow project.
+This document provides an overview of the comprehensive unit test coverage for the Embellics-AI project.
 
 ## Test Statistics
 

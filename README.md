@@ -1,4 +1,4 @@
-# RetellChatFlow - Platform Agnostic Setup
+# Embellics-AI - Platform Agnostic Setup
 
 A modern AI-powered chat widget platform with voice integration. Fully platform-agnostic and ready to deploy anywhere.
 

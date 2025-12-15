@@ -122,8 +122,8 @@ These keys are still in git history and need to be completely removed:
 pip install git-filter-repo
 
 # Backup your repository first
-cd /Users/animeshsingh/Documents/Embellics/RetellChatFlow
-git clone --mirror . ../RetellChatFlow-backup.git
+cd /Users/animeshsingh/Documents/Embellics/Embellics-AI
+git clone --mirror . ../Embellics-AI-backup.git
 
 # Create a file with patterns to remove
 cat > /tmp/api-keys-to-remove.txt << 'EOF'
@@ -155,8 +155,8 @@ git push origin --force --tags
 brew install bfg
 
 # Backup first
-cd /Users/animeshsingh/Documents/Embellics/RetellChatFlow
-git clone --mirror . ../RetellChatFlow-backup.git
+cd /Users/animeshsingh/Documents/Embellics/Embellics-AI
+git clone --mirror . ../Embellics-AI-backup.git
 
 # Create replacements file
 cat > /tmp/api-keys-replacements.txt << 'EOF'

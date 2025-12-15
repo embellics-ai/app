@@ -143,8 +143,8 @@ All credentials are still in git history!
 
 ```bash
 pip install git-filter-repo
-cd /Users/animeshsingh/Documents/Embellics/RetellChatFlow
-git clone --mirror . ../RetellChatFlow-backup.git
+cd /Users/animeshsingh/Documents/Embellics/Embellics-AI
+git clone --mirror . ../Embellics-AI-backup.git
 git filter-repo --invert-paths --path .env
 git push origin --force --all
 ```
