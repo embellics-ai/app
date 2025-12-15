@@ -120,6 +120,9 @@
         .embellics-contact-form input.error { border-color: hsl(0, 72%, 50%); }
         .embellics-contact-form input::placeholder { color: hsl(262, 10%, 60%); }
         .embellics-contact-form-full { grid-column: 1 / -1; }
+        .embellics-contact-form-phone-group { display: flex; gap: 0; grid-column: 1 / -1; width: 100%; }
+        .embellics-contact-form-phone-prefix { width: 65px !important; padding: 10px 12px; border: 1px solid hsl(262, 15%, 85%); border-right: none; border-radius: 0.5rem 0 0 0.5rem; font-size: 14px; box-sizing: border-box; background: hsl(0, 0%, 96%); color: hsl(0, 0%, 40%); cursor: not-allowed; font-weight: 600; text-align: center; font-family: inherit; flex-shrink: 0; }
+        .embellics-contact-form-phone-input { flex: 1 !important; width: auto !important; border-radius: 0 0.5rem 0.5rem 0 !important; }
         .embellics-contact-form-error { font-size: 12px; color: hsl(0, 72%, 42%); margin-top: 4px; display: none; }
         .embellics-contact-form-error.show { display: block; }
         .embellics-contact-form button { width: 100%; padding: 12px; background: hsl(262, 75%, 65%); color: hsl(262, 75%, 98%); border: none; border-radius: 0.5625rem; font-size: 14px; font-weight: 500; cursor: pointer; box-shadow: 0 4px 12px hsla(262, 75%, 65%, 0.3); transition: transform 0.2s, box-shadow 0.2s; margin-top: 8px; }
@@ -1245,8 +1248,9 @@
       <div class="embellics-contact-form-row">
         <input type="email" id="embellics-form-email" class="embellics-contact-form-full" placeholder="Email *" required autocomplete="email" maxlength="100" ${isHistorical ? 'disabled' : ''}>
       </div>
-      <div class="embellics-contact-form-row">
-        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-full" placeholder="Phone Number (10 digits) *" required autocomplete="tel" maxlength="15" ${isHistorical ? 'disabled' : ''}>
+      <div class="embellics-contact-form-phone-group">
+        <input type="text" value="353" class="embellics-contact-form-phone-prefix" disabled readonly>
+        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-phone-input" placeholder="812345678 (9 digits) *" required autocomplete="tel" maxlength="9" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-error" id="embellics-form-error"></div>
       <button type="button" id="embellics-form-submit" ${isHistorical ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>Submit Details</button>
@@ -1267,6 +1271,20 @@
     // Handle form submission
     const submitBtn = document.getElementById('embellics-form-submit');
     const errorDiv = document.getElementById('embellics-form-error');
+
+    // Add phone input helper - only allow digits and limit to 9
+    const phoneInput = document.getElementById('embellics-form-phone');
+    phoneInput.addEventListener('input', (e) => {
+      let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+
+      // Limit to 9 digits max
+      if (value.length > 9) {
+        value = value.slice(0, 9);
+      }
+
+      // Update input value
+      e.target.value = value;
+    });
 
     const handleSubmit = () => {
       const firstName = document.getElementById('embellics-form-firstname').value.trim();
@@ -1301,15 +1319,18 @@
         document.getElementById('embellics-form-email').classList.remove('error');
       }
 
-      // Phone validation (exactly 10 digits)
+      // Phone validation (Irish format: 9 digits after 353 prefix)
       const phoneDigits = phone.replace(/\D/g, '');
-      if (!phone || phoneDigits.length !== 10) {
+
+      if (!phone || phoneDigits.length !== 9) {
         document.getElementById('embellics-form-phone').classList.add('error');
         isValid = false;
-        if (phoneDigits.length > 0 && phoneDigits.length < 10) {
-          errorDiv.textContent = 'Phone number must be exactly 10 digits';
-        } else if (phoneDigits.length > 10) {
-          errorDiv.textContent = 'Phone number must be exactly 10 digits';
+        if (phoneDigits.length === 0) {
+          errorDiv.textContent = 'Phone number is required';
+        } else if (phoneDigits.length < 9) {
+          errorDiv.textContent = `Phone number must be exactly 9 digits. You entered ${phoneDigits.length} digit${phoneDigits.length === 1 ? '' : 's'}.`;
+        } else {
+          errorDiv.textContent = 'Phone number must be exactly 9 digits';
         }
       } else {
         document.getElementById('embellics-form-phone').classList.remove('error');
@@ -1331,19 +1352,20 @@
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
 
-      // Return formatted data
+      // Return formatted data with full Irish phone number (353 prefix + 9 digits)
+      const fullPhone = '353' + phone;
       const contactData = {
         firstName,
         lastName,
         email,
-        phone,
+        phone: fullPhone,
       };
 
       // Remove form and show confirmation
       formContainer.remove();
 
       // Add confirmation message
-      const confirmText = `✓ Contact details saved:\nName: ${firstName} ${lastName}\nEmail: ${email}\nPhone: ${phone}`;
+      const confirmText = `✓ Contact details saved:\nName: ${firstName} ${lastName}\nEmail: ${email}\nPhone: +${fullPhone}`;
       addMessageToUI('system', confirmText);
 
       // Call callback with data
