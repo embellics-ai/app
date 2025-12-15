@@ -315,8 +315,106 @@ router.get(
 // ============================================
 
 /**
+ * GET /api/platform/tenants/:tenantId/analytics/calls/time-series
+ * Get time-series voice analytics for visualizations
+ * IMPORTANT: This must come BEFORE the general /calls route
+ * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
+ */
+router.get(
+  '/:tenantId/analytics/calls/time-series',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { startDate, endDate, agentId, groupBy } = req.query;
+
+      // Authorization: Platform admin can access any tenant, client admin only their own
+      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Access denied to this tenant's analytics" });
+      }
+
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        agentId: agentId as string | undefined,
+        groupBy: (groupBy as 'hour' | 'day' | 'week') || 'day',
+      };
+
+      const timeSeriesData = await storage.getVoiceAnalyticsTimeSeries(tenantId, filters);
+
+      res.json(timeSeriesData);
+    } catch (error) {
+      console.error('Error fetching time-series voice analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch time-series analytics' });
+    }
+  },
+);
+
+/**
+ * GET /api/platform/tenants/:tenantId/analytics/calls/agent-breakdown
+ * Get agent breakdown for voice analytics
+ * IMPORTANT: This must come BEFORE the general /calls route
+ * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
+ */
+router.get(
+  '/:tenantId/analytics/calls/agent-breakdown',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { startDate, endDate } = req.query;
+
+      // Authorization: Platform admin can access any tenant, client admin only their own
+      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Access denied to this tenant's analytics" });
+      }
+
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      };
+
+      const agentBreakdown = await storage.getVoiceAnalyticsAgentBreakdown(tenantId, filters);
+
+      res.json(agentBreakdown);
+    } catch (error) {
+      console.error('Error fetching agent breakdown:', error);
+      res.status(500).json({ error: 'Failed to fetch agent breakdown' });
+    }
+  },
+);
+
+/**
+ * GET /api/platform/tenants/:tenantId/analytics/calls/:callId
+ * Get detailed analytics for a specific voice call
+ * IMPORTANT: This must come AFTER the specific routes (time-series, agent-breakdown)
+ */
+router.get(
+  '/:tenantId/analytics/calls/:callId',
+  requireAuth,
+  requirePlatformAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, callId } = req.params;
+
+      const call = await storage.getVoiceAnalytics(callId);
+
+      if (!call || call.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Call not found' });
+      }
+
+      res.json(call);
+    } catch (error) {
+      console.error('Error fetching call details:', error);
+      res.status(500).json({ error: 'Failed to fetch call details' });
+    }
+  },
+);
+
+/**
  * GET /api/platform/tenants/:tenantId/analytics/calls
  * Get list of voice call sessions with filters
+ * IMPORTANT: This must come AFTER all specific /calls/* routes
  * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
  */
 router.get(
@@ -367,32 +465,6 @@ router.get(
     } catch (error) {
       console.error('Error fetching voice analytics:', error);
       res.status(500).json({ error: 'Failed to fetch voice analytics' });
-    }
-  },
-);
-
-/**
- * GET /api/platform/tenants/:tenantId/analytics/calls/:callId
- * Get detailed analytics for a specific voice call
- */
-router.get(
-  '/:tenantId/analytics/calls/:callId',
-  requireAuth,
-  requirePlatformAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { tenantId, callId } = req.params;
-
-      const call = await storage.getVoiceAnalytics(callId);
-
-      if (!call || call.tenantId !== tenantId) {
-        return res.status(404).json({ error: 'Call not found' });
-      }
-
-      res.json(call);
-    } catch (error) {
-      console.error('Error fetching call details:', error);
-      res.status(500).json({ error: 'Failed to fetch call details' });
     }
   },
 );

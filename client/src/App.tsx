@@ -15,6 +15,7 @@ import { RoleProtectedRoute } from '@/components/role-protected-route';
 import { ChangePasswordRequired } from '@/components/change-password-required';
 import Chat from '@/pages/chat';
 import Analytics from '@/pages/analytics';
+import AnalyticsVoice from '@/pages/analytics-voice';
 import UnifiedAnalytics from '@/pages/unified-analytics';
 import PlatformAnalytics from '@/pages/platform-analytics';
 import WidgetConfigPage from '@/pages/widget-config';
@@ -61,6 +62,16 @@ function Router() {
       <Route path="/analytics">
         <ProtectedRoute path="/analytics">
           <UnifiedAnalytics />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/analytics/voice">
+        <ProtectedRoute path="/analytics/voice">
+          <AnalyticsVoice />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/analytics/chat">
+        <ProtectedRoute path="/analytics/chat">
+          <Analytics />
         </ProtectedRoute>
       </Route>
       <Route path="/platform-analytics">

@@ -282,6 +282,48 @@ export interface IStorage {
     averageCost: number;
     sentimentBreakdown: Record<string, number>;
   }>;
+  getVoiceAnalyticsTimeSeries(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      groupBy?: 'hour' | 'day' | 'week';
+    },
+  ): Promise<{
+    callCounts: { date: string; count: number; successful: number; unsuccessful: number }[];
+    durationData: { date: string; averageDuration: number; totalDuration: number }[];
+    sentimentData: {
+      date: string;
+      positive: number;
+      neutral: number;
+      negative: number;
+      unknown: number;
+    }[];
+    costData: { date: string; totalCost: number; averageCost: number }[];
+    statusBreakdown: Record<string, number>;
+  }>;
+  getVoiceAnalyticsAgentBreakdown(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+    },
+  ): Promise<
+    {
+      agentId: string;
+      agentName: string;
+      count: number;
+      totalCalls: number;
+      successfulCalls: number;
+      successRate: number;
+      totalDuration: number;
+      averageDuration: number;
+      totalCost: number;
+      averageCost: number;
+      sentimentBreakdown: Record<string, number>;
+    }[]
+  >;
   deleteOldVoiceAnalytics(olderThanDays: number): Promise<void>;
 
   // Chat Messages Methods - REMOVED (retell_transcript_messages table dropped in migration 0015)
@@ -1954,6 +1996,276 @@ export class DbStorage implements IStorage {
       averageCost,
       sentimentBreakdown,
     };
+  }
+
+  /**
+   * Get voice analytics time series data
+   */
+  async getVoiceAnalyticsTimeSeries(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      agentId?: string;
+      groupBy?: 'hour' | 'day' | 'week';
+    },
+  ): Promise<{
+    callCounts: { date: string; count: number; successful: number; unsuccessful: number }[];
+    durationData: { date: string; averageDuration: number; totalDuration: number }[];
+    sentimentData: {
+      date: string;
+      positive: number;
+      neutral: number;
+      negative: number;
+      unknown: number;
+    }[];
+    costData: { date: string; totalCost: number; averageCost: number }[];
+    statusBreakdown: Record<string, number>;
+  }> {
+    const conditions = [eq(voiceAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(voiceAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(voiceAnalytics.endTimestamp, filters.endDate), isNull(voiceAnalytics.endTimestamp))!,
+      );
+    }
+    if (filters?.agentId) {
+      conditions.push(eq(voiceAnalytics.agentId, filters.agentId));
+    }
+
+    const calls = await this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(and(...conditions))
+      .orderBy(voiceAnalytics.startTimestamp);
+
+    // Group by date
+    const groupBy = filters?.groupBy || 'day';
+    const getDateKey = (date: Date | null): string => {
+      if (!date) return 'Unknown';
+      const d = new Date(date);
+      if (groupBy === 'hour') {
+        return d.toISOString().slice(0, 13) + ':00:00';
+      } else if (groupBy === 'week') {
+        const startOfWeek = new Date(d);
+        startOfWeek.setDate(d.getDate() - d.getDay());
+        return startOfWeek.toISOString().slice(0, 10);
+      }
+      return d.toISOString().slice(0, 10); // day
+    };
+
+    // Initialize data structures
+    const callCountMap = new Map<
+      string,
+      { count: number; successful: number; unsuccessful: number }
+    >();
+    const durationMap = new Map<string, { durations: number[]; total: number }>();
+    const sentimentMap = new Map<
+      string,
+      { positive: number; neutral: number; negative: number; unknown: number }
+    >();
+    const costMap = new Map<string, { costs: number[]; total: number }>();
+    const statusBreakdown: Record<string, number> = {};
+
+    // Process each call
+    calls.forEach((call) => {
+      const dateKey = getDateKey(call.startTimestamp);
+
+      // Call counts
+      if (!callCountMap.has(dateKey)) {
+        callCountMap.set(dateKey, { count: 0, successful: 0, unsuccessful: 0 });
+      }
+      const countData = callCountMap.get(dateKey)!;
+      countData.count++;
+      if (call.callSuccessful) {
+        countData.successful++;
+      } else {
+        countData.unsuccessful++;
+      }
+
+      // Duration data
+      if (call.duration && call.duration > 0) {
+        if (!durationMap.has(dateKey)) {
+          durationMap.set(dateKey, { durations: [], total: 0 });
+        }
+        const durData = durationMap.get(dateKey)!;
+        durData.durations.push(call.duration);
+        durData.total += call.duration;
+      }
+
+      // Sentiment data
+      if (!sentimentMap.has(dateKey)) {
+        sentimentMap.set(dateKey, { positive: 0, neutral: 0, negative: 0, unknown: 0 });
+      }
+      const sentData = sentimentMap.get(dateKey)!;
+      const sentiment = (call.userSentiment?.toLowerCase() || 'unknown') as
+        | 'positive'
+        | 'neutral'
+        | 'negative'
+        | 'unknown';
+      if (sentiment in sentData) {
+        sentData[sentiment]++;
+      }
+
+      // Cost data
+      if (call.combinedCost && call.combinedCost > 0) {
+        if (!costMap.has(dateKey)) {
+          costMap.set(dateKey, { costs: [], total: 0 });
+        }
+        const costData = costMap.get(dateKey)!;
+        costData.costs.push(call.combinedCost);
+        costData.total += call.combinedCost;
+      }
+
+      // Status breakdown
+      const status = call.callStatus || 'unknown';
+      statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+    });
+
+    // Convert maps to arrays
+    const callCounts = Array.from(callCountMap.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const durationData = Array.from(durationMap.entries())
+      .map(([date, data]) => ({
+        date,
+        averageDuration: data.durations.length > 0 ? data.total / data.durations.length : 0,
+        totalDuration: data.total,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const sentimentData = Array.from(sentimentMap.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const costData = Array.from(costMap.entries())
+      .map(([date, data]) => ({
+        date,
+        totalCost: data.total,
+        averageCost: data.costs.length > 0 ? data.total / data.costs.length : 0,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      callCounts,
+      durationData,
+      sentimentData,
+      costData,
+      statusBreakdown,
+    };
+  }
+
+  /**
+   * Get voice analytics agent breakdown
+   */
+  async getVoiceAnalyticsAgentBreakdown(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+    },
+  ): Promise<
+    {
+      agentId: string;
+      agentName: string;
+      count: number;
+      totalCalls: number;
+      successfulCalls: number;
+      successRate: number;
+      totalDuration: number;
+      averageDuration: number;
+      totalCost: number;
+      averageCost: number;
+      sentimentBreakdown: Record<string, number>;
+    }[]
+  > {
+    const conditions = [eq(voiceAnalytics.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(voiceAnalytics.startTimestamp, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(
+        or(lte(voiceAnalytics.endTimestamp, filters.endDate), isNull(voiceAnalytics.endTimestamp))!,
+      );
+    }
+
+    const calls = await this.db
+      .select()
+      .from(voiceAnalytics)
+      .where(and(...conditions));
+
+    // Group by agent
+    const agentMap = new Map<
+      string,
+      {
+        agentId: string;
+        agentName: string;
+        totalCalls: number;
+        successfulCalls: number;
+        totalDuration: number;
+        totalCost: number;
+        sentiments: string[];
+      }
+    >();
+
+    calls.forEach((call) => {
+      const agentId = call.agentId || 'unknown';
+      const agentName = call.agentName || 'Unknown Agent';
+
+      if (!agentMap.has(agentId)) {
+        agentMap.set(agentId, {
+          agentId,
+          agentName,
+          totalCalls: 0,
+          successfulCalls: 0,
+          totalDuration: 0,
+          totalCost: 0,
+          sentiments: [],
+        });
+      }
+
+      const agent = agentMap.get(agentId)!;
+      agent.totalCalls++;
+      if (call.callSuccessful) {
+        agent.successfulCalls++;
+      }
+      if (call.duration) {
+        agent.totalDuration += call.duration;
+      }
+      if (call.combinedCost) {
+        agent.totalCost += call.combinedCost;
+      }
+      if (call.userSentiment) {
+        agent.sentiments.push(call.userSentiment.toLowerCase());
+      }
+    });
+
+    // Convert to array and calculate derived metrics
+    return Array.from(agentMap.values()).map((agent) => {
+      const sentimentBreakdown: Record<string, number> = {};
+      agent.sentiments.forEach((sentiment) => {
+        sentimentBreakdown[sentiment] = (sentimentBreakdown[sentiment] || 0) + 1;
+      });
+
+      return {
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        count: agent.totalCalls,
+        totalCalls: agent.totalCalls,
+        successfulCalls: agent.successfulCalls,
+        successRate: agent.totalCalls > 0 ? (agent.successfulCalls / agent.totalCalls) * 100 : 0,
+        totalDuration: agent.totalDuration,
+        averageDuration: agent.totalCalls > 0 ? agent.totalDuration / agent.totalCalls : 0,
+        totalCost: agent.totalCost,
+        averageCost: agent.totalCalls > 0 ? agent.totalCost / agent.totalCalls : 0,
+        sentimentBreakdown,
+      };
+    });
   }
 
   /**
