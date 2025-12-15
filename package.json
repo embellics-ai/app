@@ -20,7 +20,8 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:coverage:open": "./scripts/test-coverage.sh --open",
-    "add-files": "prettier --write . && git add -A"
+    "add-files": "prettier --write . && git add -A",
+    "check-voice-analytics": "tsx check-voice-analytics.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

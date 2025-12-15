@@ -56,7 +56,7 @@ This feature adds comprehensive chat analytics for Retell AI chat agents, fillin
 **Implementation:**
 
 - Full DbStorage implementations with complex SQL queries
-- Stub implementations in MemStorage
+- PostgreSQL only (MemStorage removed from codebase)
 - Type-safe with TypeScript interfaces
 
 **Commit:** "feat(chat-analytics): Database schema, storage layer, and Retell webhook endpoint (Tasks 1-3)"

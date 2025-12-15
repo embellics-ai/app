@@ -13,8 +13,12 @@ afterEach(() => {
 
 // Mock environment variables
 process.env.NODE_ENV = 'test';
-// Use in-memory storage for tests (avoid connecting to real DB)
-process.env.DATABASE_URL = '';
+// Tests now require a real PostgreSQL database (MemStorage removed)
+// Set DATABASE_URL in your test environment or use the same as .env.local
+if (!process.env.DATABASE_URL) {
+  console.warn('⚠️  DATABASE_URL not set for tests - tests may fail');
+  console.warn('⚠️  Set DATABASE_URL environment variable to run tests with PostgreSQL');
+}
 process.env.SESSION_SECRET = 'test-secret-key-for-testing-only';
 // Use a valid 32-byte hex string (64 hex characters) for tests
 process.env.ENCRYPTION_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

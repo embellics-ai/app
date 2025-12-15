@@ -184,6 +184,88 @@ router.post('/:workflowName', async (req: Request, res: Response) => {
       `[N8N Proxy] Success! Workflow: ${workflowName}, Tenant: ${tenantId}, Response time: ${responseTime}ms`,
     );
 
+    // Store voice analytics for completed calls (check call status, not workflow name)
+    const call = payload.call || payload;
+    const isCompletedCall =
+      call.call_status && call.call_status !== 'ongoing' && call.call_status !== 'registered';
+
+    if (n8nResponse.ok && isCompletedCall) {
+      try {
+        console.log('[N8N Proxy] 📊 ANALYTICS - Completed call detected:',call.call_id, 'Status:', call.call_status);
+        console.log('[N8N Proxy] 📊 ANALYTICS DEBUG - Raw call data:');
+        console.log(JSON.stringify(call, null, 2));
+
+        // Check if this call_id already exists
+        const existing = await storage.getVoiceAnalyticsByCallId(call.call_id);
+
+        if (existing) {
+          console.log('[N8N Proxy] Updating existing voice analytics for call:', call.call_id);
+        } else {
+          console.log('[N8N Proxy] Creating new voice analytics for call:', call.call_id);
+        }
+
+        // Extract timestamps
+          const startTimestamp = call.start_timestamp ? new Date(call.start_timestamp) : null;
+          const endTimestamp = call.end_timestamp ? new Date(call.end_timestamp) : null;
+
+          // Calculate duration in seconds if not provided by Retell
+          let duration = call.duration || null;
+          if (!duration && startTimestamp && endTimestamp) {
+            duration = Math.round((endTimestamp.getTime() - startTimestamp.getTime()) / 1000);
+          }
+
+          // Extract costs (Retell sends in cents, convert to dollars)
+          let combinedCost = 0;
+          let productCosts = null;
+
+          if (call.call_cost && typeof call.call_cost === 'object') {
+            // Costs are in cents - convert to dollars
+            const costInCents = call.call_cost.combined_cost || 0;
+            combinedCost = costInCents / 100;
+            productCosts = call.call_cost.product_costs || null;
+          } else if (call.cost_breakdown) {
+            // Alternative structure
+            combinedCost = call.cost_breakdown.total_cost || 0;
+            productCosts = call.cost_breakdown;
+          }
+
+          await storage.createVoiceAnalytics({
+            tenantId,
+            callId: call.call_id,
+            agentId: call.agent_id,
+            agentName: agentInfo?.agentName || call.agent_name || 'Unknown',
+            agentVersion: call.agent_version || null,
+            callType: call.call_type || null,
+            callStatus: call.call_status || call.disconnect_reason || null,
+            startTimestamp,
+            endTimestamp,
+            duration,
+            messageCount: call.transcript?.length || call.messages?.length || 0,
+            toolCallsCount: call.tool_calls?.length || 0,
+            dynamicVariables: call.collected_dynamic_variables || call.dynamic_variables || null,
+            userSentiment: call.call_analysis?.user_sentiment || null,
+            callSuccessful: call.call_analysis?.call_successful || null,
+            combinedCost,
+            productCosts,
+            metadata: {
+              disconnect_reason: call.disconnect_reason || null,
+              from_number: call.from_number || null,
+              to_number: call.to_number || null,
+              recording_url: call.recording_url || null,
+              public_log_url: call.public_log_url || null,
+              // Add any additional metadata
+              ...call.metadata,
+            },
+          });
+
+        console.log('[N8N Proxy] ✓ Voice analytics stored/updated successfully');
+      } catch (error: any) {
+        console.error('[N8N Proxy] Failed to store voice analytics:', error.message);
+        console.error('[N8N Proxy] Error stack:', error.stack);
+        // Don't fail the request if analytics storage fails
+      }
+    }
+
     // Return N8N's response (important for sync function calls)
     res.json(n8nData);
   } catch (error: any) {

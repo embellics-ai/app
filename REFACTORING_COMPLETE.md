@@ -43,7 +43,7 @@ All legacy code refactoring is now complete. The codebase has been cleaned up to
   - `ChatMessage` and `InsertChatMessage` type imports
   - Interface method declarations: `createChatMessage`, `getChatMessages`, `deleteChatMessages`
   - `DbStorage` implementations of removed methods
-  - `MemStorage` stub implementations of removed methods
+  - Note: MemStorage class completely removed from codebase (PostgreSQL required)
 
 ### 3. **Routes & Services**
 
