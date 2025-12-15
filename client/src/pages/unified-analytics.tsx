@@ -41,6 +41,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import EnhancedChatAnalytics from '@/components/EnhancedChatAnalytics';
+import EnhancedVoiceAnalytics from '@/components/EnhancedVoiceAnalytics';
 import {
   AreaChart,
   Area,
@@ -505,21 +506,22 @@ export default function UnifiedAnalytics() {
               </div>
             )}
 
-          {/* Voice Analytics - Show "no data" message only when viewing voice analytics */}
-          {analyticsType === 'voice' &&
-            analyticsOverview?.voice &&
-            analyticsOverview.voice.totalCalls === 0 && (
-              <Card className="mb-8">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Phone className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-                  <p className="text-lg font-medium mb-2">No Voice Analytics Data Yet</p>
-                  <p className="text-sm text-muted-foreground text-center max-w-md">
-                    Voice analytics will appear here once you configure Retell to send{' '}
-                    <code className="bg-muted px-1 py-0.5 rounded">call.ended</code> webhooks to{' '}
-                    <code className="bg-muted px-1 py-0.5 rounded">/api/retell/call-ended</code>
-                  </p>
-                </CardContent>
-              </Card>
+          {/* Enhanced Voice Visualizations */}
+          {(analyticsType === 'all' || analyticsType === 'voice') &&
+            tenantId &&
+            dateRange?.from &&
+            dateRange?.to && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-6 w-6" />
+                  <h2 className="text-2xl font-bold">Enhanced Voice Visualizations</h2>
+                </div>
+                <EnhancedVoiceAnalytics
+                  tenantId={tenantId}
+                  startDate={dateRange.from}
+                  endDate={dateRange.to}
+                />
+              </div>
             )}
 
           {/* Chat Analytics Charts */}
