@@ -7,6 +7,8 @@ import {
   type InsertApiKey,
   type WidgetConfig,
   type InsertWidgetConfig,
+  type TenantRetellAgent,
+  type InsertTenantRetellAgent,
   type HumanAgent,
   type InsertHumanAgent,
   type UserInvitation,
@@ -34,6 +36,7 @@ import {
   clientUsers,
   apiKeys,
   widgetConfigs,
+  tenantRetellAgents,
   humanAgents,
   userInvitations,
   passwordResetTokens,
@@ -92,6 +95,20 @@ export interface IStorage {
     tenantId: string,
     updates: Partial<InsertWidgetConfig>,
   ): Promise<WidgetConfig | undefined>;
+
+  // Tenant Retell Agents methods (multi-agent support with channel assignments)
+  getTenantAgents(tenantId: string): Promise<TenantRetellAgent[]>;
+  getTenantAgentsByChannel(tenantId: string, channel: string): Promise<TenantRetellAgent[]>;
+  getTenantByAgentId(
+    agentId: string,
+  ): Promise<{ tenantId: string; agent: TenantRetellAgent } | undefined>;
+  addTenantAgent(agent: InsertTenantRetellAgent): Promise<TenantRetellAgent>;
+  updateTenantAgent(
+    id: string,
+    updates: Partial<InsertTenantRetellAgent>,
+  ): Promise<TenantRetellAgent | undefined>;
+  removeTenantAgent(tenantId: string, agentId: string): Promise<void>;
+  clearTenantAgents(tenantId: string): Promise<void>;
 
   // Human Agent methods
   getHumanAgent(id: string): Promise<HumanAgent | undefined>;
@@ -331,6 +348,7 @@ export class MemStorage implements IStorage {
       phone: insertTenant.phone ?? null,
       plan: insertTenant.plan ?? 'free',
       status: insertTenant.status ?? 'active',
+      retellApiKey: null,
       createdAt: new Date(),
     };
     this.tenants.set(id, tenant);
@@ -567,6 +585,48 @@ export class MemStorage implements IStorage {
     }
 
     return updated;
+  }
+
+  // Tenant Retell Agents methods (stub - not implemented in memory storage)
+  async getTenantAgents(tenantId: string): Promise<TenantRetellAgent[]> {
+    return []; // Stub
+  }
+
+  async getTenantAgentsByChannel(tenantId: string, channel: string): Promise<TenantRetellAgent[]> {
+    return []; // Stub
+  }
+
+  async getTenantByAgentId(
+    agentId: string,
+  ): Promise<{ tenantId: string; agent: TenantRetellAgent } | undefined> {
+    return undefined; // Stub
+  }
+
+  async addTenantAgent(agent: InsertTenantRetellAgent): Promise<TenantRetellAgent> {
+    const id = randomUUID();
+    return {
+      id,
+      ...agent,
+      agentName: agent.agentName || null,
+      isActive: agent.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }; // Stub
+  }
+
+  async updateTenantAgent(
+    id: string,
+    updates: Partial<InsertTenantRetellAgent>,
+  ): Promise<TenantRetellAgent | undefined> {
+    return undefined; // Stub
+  }
+
+  async removeTenantAgent(tenantId: string, agentId: string): Promise<void> {
+    // Stub
+  }
+
+  async clearTenantAgents(tenantId: string): Promise<void> {
+    // Stub
   }
 
   // Human Agent methods
@@ -1546,6 +1606,74 @@ export class DbStorage implements IStorage {
     }
 
     return config;
+  }
+
+  // Tenant Retell Agents methods
+  async getTenantAgents(tenantId: string): Promise<TenantRetellAgent[]> {
+    return await this.db
+      .select()
+      .from(tenantRetellAgents)
+      .where(eq(tenantRetellAgents.tenantId, tenantId))
+      .orderBy(desc(tenantRetellAgents.createdAt));
+  }
+
+  async getTenantAgentsByChannel(tenantId: string, channel: string): Promise<TenantRetellAgent[]> {
+    return await this.db
+      .select()
+      .from(tenantRetellAgents)
+      .where(
+        and(
+          eq(tenantRetellAgents.tenantId, tenantId),
+          eq(tenantRetellAgents.channel, channel),
+          eq(tenantRetellAgents.isActive, true),
+        ),
+      );
+  }
+
+  async getTenantByAgentId(
+    agentId: string,
+  ): Promise<{ tenantId: string; agent: TenantRetellAgent } | undefined> {
+    const result = await this.db
+      .select()
+      .from(tenantRetellAgents)
+      .where(and(eq(tenantRetellAgents.agentId, agentId), eq(tenantRetellAgents.isActive, true)))
+      .limit(1);
+
+    if (!result[0]) return undefined;
+
+    return {
+      tenantId: result[0].tenantId,
+      agent: result[0],
+    };
+  }
+
+  async addTenantAgent(agent: InsertTenantRetellAgent): Promise<TenantRetellAgent> {
+    const result = await this.db.insert(tenantRetellAgents).values(agent).returning();
+    return result[0];
+  }
+
+  async updateTenantAgent(
+    id: string,
+    updates: Partial<InsertTenantRetellAgent>,
+  ): Promise<TenantRetellAgent | undefined> {
+    const result = await this.db
+      .update(tenantRetellAgents)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tenantRetellAgents.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async removeTenantAgent(tenantId: string, agentId: string): Promise<void> {
+    await this.db
+      .delete(tenantRetellAgents)
+      .where(
+        and(eq(tenantRetellAgents.tenantId, tenantId), eq(tenantRetellAgents.agentId, agentId)),
+      );
+  }
+
+  async clearTenantAgents(tenantId: string): Promise<void> {
+    await this.db.delete(tenantRetellAgents).where(eq(tenantRetellAgents.tenantId, tenantId));
   }
 
   // Human Agent methods

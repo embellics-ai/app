@@ -8,6 +8,7 @@ import {
   integer,
   boolean,
   uniqueIndex,
+  unique,
   real,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
@@ -27,6 +28,7 @@ export const tenants = pgTable('tenants', {
   phone: text('phone'), // Optional company phone number
   plan: text('plan').notNull().default('free'), // free, pro, enterprise
   status: text('status').notNull().default('active'), // active, suspended, cancelled
+  retellApiKey: varchar('retell_api_key', { length: 255 }), // Retell AI API key for this tenant
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -169,8 +171,8 @@ export const widgetConfigs = pgTable('widget_configs', {
     .notNull()
     .references(() => tenants.id, { onDelete: 'cascade' })
     .unique(),
-  retellAgentId: text('retell_agent_id'), // Tenant-specific Retell AI agent ID for chat widget
-  whatsappAgentId: text('whatsapp_agent_id'), // Tenant-specific Retell AI agent ID for WhatsApp
+  retellAgentId: text('retell_agent_id'), // Tenant-specific Retell AI agent ID for chat widget (deprecated - use tenant_retell_agents)
+  whatsappAgentId: text('whatsapp_agent_id'), // Tenant-specific Retell AI agent ID for WhatsApp (deprecated - use tenant_retell_agents)
   retellApiKey: text('retell_api_key'), // Tenant's own Retell AI API key for account-wide analytics (all voice agents)
   greeting: text('greeting').default('Hi! How can I help you today?'),
   allowedDomains: text('allowed_domains').array(), // Array of allowed domains
@@ -180,6 +182,39 @@ export const widgetConfigs = pgTable('widget_configs', {
   position: text('position').default('bottom-right'), // Widget position: top-left, top-center, top-right, middle-left, middle-right, bottom-left, bottom-center, bottom-right
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// Tenant Retell AI Agents (Multi-agent support with channel assignments)
+// Replaces individual agent_id columns in widget_configs for better scalability
+export const tenantRetellAgents = pgTable(
+  'tenant_retell_agents',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    agentId: varchar('agent_id', { length: 255 }).notNull(), // Retell AI agent_id (e.g., agent_abc123...)
+    agentName: varchar('agent_name', { length: 255 }), // Cached friendly name from Retell
+    channel: varchar('channel', { length: 50 }).notNull(), // 'web', 'whatsapp', 'voice-inbound', 'voice-outbound', 'sms'
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Prevent duplicate agent assignments to same tenant
+    uniqueTenantAgent: unique().on(table.tenantId, table.agentId),
+  }),
+);
+
+export const insertTenantRetellAgentSchema = createInsertSchema(tenantRetellAgents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTenantRetellAgent = z.infer<typeof insertTenantRetellAgentSchema>;
+export type TenantRetellAgent = typeof tenantRetellAgents.$inferSelect;
 
 // Widget Chat History (Store all chat messages for persistence across sessions)
 // Renamed from conversation_messages in migration 0014 for clarity

@@ -34,6 +34,8 @@ import integrationRoutes from './integration.routes';
 // Phase 2 routes
 import functionRoutes from './function.routes';
 import webhookRoutes from './webhook.routes';
+import n8nRoutes from './n8n.routes';
+import retellAgentRoutes from './retell-agent.routes';
 import conversationRoutes from './conversation.routes';
 import handoffRoutes from './handoff.routes';
 import widgetRoutes from './widget.routes';
@@ -65,6 +67,9 @@ export async function registerModularRoutes(app: Express): Promise<void> {
   // Integration routes (WhatsApp, SMS, N8N, webhooks)
   app.use('/api/platform/tenants', integrationRoutes);
 
+  // Retell agent management routes (sync agents from Retell API)
+  app.use('/api/platform/tenants', retellAgentRoutes);
+
   // ===== Phase 2: New Modular Routes =====
 
   // Function proxy routes (Retell AI function calls to N8N)
@@ -72,6 +77,9 @@ export async function registerModularRoutes(app: Express): Promise<void> {
 
   // Webhook receiver routes (Retell AI webhooks)
   app.use('/api/retell', webhookRoutes);
+
+  // Dynamic N8N webhook routes (unified handler for all workflows)
+  app.use('/api/n8n', n8nRoutes);
 
   // Conversation and message routes
   app.use('/', conversationRoutes); // Uses /api/messages, /api/conversations
@@ -98,7 +106,7 @@ export async function registerModularRoutes(app: Express): Promise<void> {
     '[Router] ✅ Registered Phase 1 routes: auth, analytics, proxy, tenant, user, integration',
   );
   console.log(
-    '[Router] ✅ Registered Phase 2 routes: function, webhook, conversation, handoff, widget, widget-test, widget-config, payment, stripe-webhook',
+    '[Router] ✅ Registered Phase 2 routes: function, webhook, n8n, conversation, handoff, widget, widget-test, widget-config, payment, stripe-webhook',
   );
   console.log('[Router] ✅ All modular routes registered successfully');
 }
