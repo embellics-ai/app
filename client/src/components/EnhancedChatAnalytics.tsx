@@ -51,6 +51,40 @@ const CustomTooltip = ({ active, payload, label, labelFormatter, formatter }: an
   );
 };
 
+// Custom pie chart label renderer - works in both light and dark mode
+const renderPieLabel = ({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }: any) => {
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 25;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const isDark = document.documentElement.classList.contains('dark');
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill={isDark ? '#ffffff' : '#111827'}
+      stroke={isDark ? '#000000' : '#ffffff'}
+      strokeWidth={isDark ? '0.5' : '0.5'}
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      style={{
+        fontWeight: 700,
+        fontSize: '15px',
+        paintOrder: 'stroke fill',
+      }}
+    >
+      {`${name}: ${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
+// Legend style that works in both light and dark mode
+const LEGEND_STYLE = {
+  color: 'inherit', // Will inherit from parent theme
+  fontWeight: 600,
+};
+
 interface EnhancedChatAnalyticsProps {
   tenantId: string;
   startDate: Date;
@@ -75,14 +109,14 @@ interface TimeSeriesData {
 }
 
 const COLORS = {
-  successful: '#10b981', // green
-  unsuccessful: '#ef4444', // red
-  positive: '#10b981', // green
-  neutral: '#3b82f6', // blue
-  negative: '#ef4444', // red
-  unknown: '#6b7280', // gray
-  primary: '#8b5cf6', // purple
-  secondary: '#ec4899', // pink
+  successful: '#8b5cf6', // medium purple
+  unsuccessful: '#c4b5fd', // light purple
+  positive: '#7c3aed', // darker purple
+  neutral: '#a78bfa', // light-medium purple
+  negative: '#c4b5fd', // light purple
+  unknown: '#ddd6fe', // very light purple
+  primary: '#8b5cf6', // medium purple
+  secondary: '#a78bfa', // light-medium purple
 };
 
 export default function EnhancedChatAnalytics({
@@ -302,7 +336,7 @@ export default function EnhancedChatAnalytics({
                   content={<CustomTooltip labelFormatter={formatDate} />}
                   cursor={{ fill: 'transparent' }}
                 />
-                <Legend />
+                <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
                 <Area
                   type="monotone"
                   dataKey="successful"
@@ -340,7 +374,7 @@ export default function EnhancedChatAnalytics({
                   content={<CustomTooltip labelFormatter={formatDate} formatter={formatDuration} />}
                   cursor={{ stroke: 'transparent' }}
                 />
-                <Legend />
+                <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
                 <Line
                   type="monotone"
                   dataKey="averageDuration"
@@ -368,7 +402,7 @@ export default function EnhancedChatAnalytics({
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={renderPieLabel}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -414,10 +448,15 @@ export default function EnhancedChatAnalytics({
                       formatter={(value: number) => `€${value.toFixed(3)}`}
                     />
                   }
-                  cursor={{ fill: 'transparent' }}
+                  cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }}
                 />
-                <Legend />
-                <Bar dataKey="totalCost" fill={COLORS.primary} name="Total Cost" />
+                <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
+                <Bar
+                  dataKey="totalCost"
+                  fill={COLORS.primary}
+                  name="Total Cost"
+                  activeBar={{ fill: '#7c3aed', stroke: '#7c3aed' }}
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -483,7 +522,7 @@ export default function EnhancedChatAnalytics({
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={renderPieLabel}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -527,12 +566,13 @@ export default function EnhancedChatAnalytics({
                     content={<CustomTooltip />}
                     cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
                   <Bar
                     dataKey="count"
                     fill={COLORS.primary}
                     name="Chat Count"
                     radius={[0, 4, 4, 0]}
+                    activeBar={{ fill: '#7c3aed', stroke: '#7c3aed' }}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -551,16 +591,16 @@ export default function EnhancedChatAnalytics({
               <AreaChart data={timeSeriesData?.sentimentData || []}>
                 <defs>
                   <linearGradient id="colorPositive" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorNegative" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#c4b5fd" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#c4b5fd" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorNeutral" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -579,13 +619,13 @@ export default function EnhancedChatAnalytics({
                     return date.toLocaleDateString();
                   }}
                 />
-                <Legend />
+                <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
                 <Area
                   type="monotone"
                   dataKey="positive"
                   name="Positive"
                   stackId="1"
-                  stroke="#10b981"
+                  stroke="#7c3aed"
                   fillOpacity={1}
                   fill="url(#colorPositive)"
                 />
@@ -594,7 +634,7 @@ export default function EnhancedChatAnalytics({
                   dataKey="neutral"
                   name="Neutral"
                   stackId="1"
-                  stroke="#f97316"
+                  stroke="#a78bfa"
                   fillOpacity={1}
                   fill="url(#colorNeutral)"
                 />
@@ -603,7 +643,7 @@ export default function EnhancedChatAnalytics({
                   dataKey="negative"
                   name="Negative"
                   stackId="1"
-                  stroke="#ef4444"
+                  stroke="#c4b5fd"
                   fillOpacity={1}
                   fill="url(#colorNegative)"
                 />

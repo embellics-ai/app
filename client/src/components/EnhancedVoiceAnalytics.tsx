@@ -51,6 +51,40 @@ const CustomTooltip = ({ active, payload, label, labelFormatter, formatter }: an
   );
 };
 
+// Custom pie chart label renderer - works in both light and dark mode
+const renderPieLabel = ({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }: any) => {
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 25;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const isDark = document.documentElement.classList.contains('dark');
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill={isDark ? '#ffffff' : '#111827'}
+      stroke={isDark ? '#000000' : '#ffffff'}
+      strokeWidth={isDark ? '0.5' : '0.5'}
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      style={{
+        fontWeight: 700,
+        fontSize: '15px',
+        paintOrder: 'stroke fill',
+      }}
+    >
+      {`${name}: ${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
+// Legend style that works in both light and dark mode
+const LEGEND_STYLE = {
+  color: 'inherit', // Will inherit from parent theme
+  fontWeight: 600,
+};
+
 interface EnhancedVoiceAnalyticsProps {
   tenantId: string;
   startDate: Date;
@@ -73,14 +107,14 @@ interface TimeSeriesData {
 }
 
 const COLORS = {
-  successful: '#10b981', // green
-  unsuccessful: '#ef4444', // red
-  positive: '#10b981', // green
-  neutral: '#3b82f6', // blue
-  negative: '#ef4444', // red
-  unknown: '#6b7280', // gray
-  primary: '#8b5cf6', // purple
-  secondary: '#ec4899', // pink
+  successful: '#8b5cf6', // medium purple
+  unsuccessful: '#c4b5fd', // light purple
+  positive: '#7c3aed', // darker purple
+  neutral: '#a78bfa', // light-medium purple
+  negative: '#c4b5fd', // light purple
+  unknown: '#ddd6fe', // very light purple
+  primary: '#8b5cf6', // medium purple
+  secondary: '#a78bfa', // light-medium purple
 };
 
 export default function EnhancedVoiceAnalytics({
@@ -307,10 +341,18 @@ export default function EnhancedVoiceAnalytics({
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Bar dataKey="Successful" fill={COLORS.successful} />
-              <Bar dataKey="Unsuccessful" fill={COLORS.unsuccessful} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }} />
+              <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
+              <Bar
+                dataKey="Successful"
+                fill={COLORS.successful}
+                activeBar={{ fill: '#7c3aed', stroke: '#7c3aed' }}
+              />
+              <Bar
+                dataKey="Unsuccessful"
+                fill={COLORS.unsuccessful}
+                activeBar={{ fill: '#a78bfa', stroke: '#a78bfa' }}
+              />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -329,7 +371,7 @@ export default function EnhancedVoiceAnalytics({
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
               <Line
                 type="monotone"
                 dataKey="Avg Duration (sec)"
@@ -356,7 +398,7 @@ export default function EnhancedVoiceAnalytics({
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
               <Area
                 type="monotone"
                 dataKey="Positive"
@@ -405,7 +447,7 @@ export default function EnhancedVoiceAnalytics({
               <Tooltip
                 content={<CustomTooltip formatter={(value: number) => formatCurrency(value)} />}
               />
-              <Legend />
+              <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
               <Line
                 type="monotone"
                 dataKey="Total Cost (€)"
@@ -440,9 +482,14 @@ export default function EnhancedVoiceAnalytics({
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis type="number" stroke="#9ca3af" />
                 <YAxis dataKey="agentName" type="category" stroke="#9ca3af" width={150} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Bar dataKey="count" fill={COLORS.primary} name="Total Calls" />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }} />
+                <Legend wrapperStyle={LEGEND_STYLE} iconType="rect" />
+                <Bar
+                  dataKey="count"
+                  fill={COLORS.primary}
+                  name="Total Calls"
+                  activeBar={{ fill: '#7c3aed', stroke: '#7c3aed' }}
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -464,7 +511,7 @@ export default function EnhancedVoiceAnalytics({
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={renderPieLabel}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"

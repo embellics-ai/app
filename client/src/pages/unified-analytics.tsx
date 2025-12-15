@@ -593,19 +593,19 @@ export default function UnifiedAnalytics() {
                         <TableCell>{chat.messageCount}</TableCell>
                         <TableCell>
                           {chat.userSentiment?.toLowerCase() === 'positive' && (
-                            <Badge className="bg-green-100 text-green-800">
+                            <Badge className="bg-purple-100 text-purple-800">
                               <Smile className="h-3 w-3 mr-1" />
                               Positive
                             </Badge>
                           )}
                           {chat.userSentiment?.toLowerCase() === 'neutral' && (
-                            <Badge className="bg-gray-100 text-gray-800">
+                            <Badge className="bg-purple-200 text-purple-900">
                               <Meh className="h-3 w-3 mr-1" />
                               Neutral
                             </Badge>
                           )}
                           {chat.userSentiment?.toLowerCase() === 'negative' && (
-                            <Badge className="bg-red-100 text-red-800">
+                            <Badge className="bg-purple-300 text-purple-950">
                               <Frown className="h-3 w-3 mr-1" />
                               Negative
                             </Badge>
@@ -620,7 +620,7 @@ export default function UnifiedAnalytics() {
                         <TableCell>{formatCurrency(chat.combinedCost)}</TableCell>
                         <TableCell>
                           {chat.chatSuccessful ? (
-                            <Badge className="bg-green-100 text-green-800">
+                            <Badge className="bg-purple-500 text-white">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Success
                             </Badge>
@@ -676,19 +676,19 @@ export default function UnifiedAnalytics() {
                         <TableCell>{formatDuration(call.duration)}</TableCell>
                         <TableCell>
                           {call.userSentiment?.toLowerCase() === 'positive' && (
-                            <Badge className="bg-green-100 text-green-800">
+                            <Badge className="bg-purple-100 text-purple-800">
                               <Smile className="h-3 w-3 mr-1" />
                               Positive
                             </Badge>
                           )}
                           {call.userSentiment?.toLowerCase() === 'neutral' && (
-                            <Badge className="bg-gray-100 text-gray-800">
+                            <Badge className="bg-purple-200 text-purple-900">
                               <Meh className="h-3 w-3 mr-1" />
                               Neutral
                             </Badge>
                           )}
                           {call.userSentiment?.toLowerCase() === 'negative' && (
-                            <Badge className="bg-red-100 text-red-800">
+                            <Badge className="bg-purple-300 text-purple-950">
                               <Frown className="h-3 w-3 mr-1" />
                               Negative
                             </Badge>
@@ -703,7 +703,7 @@ export default function UnifiedAnalytics() {
                         <TableCell>{formatCurrency(call.combinedCost)}</TableCell>
                         <TableCell>
                           {call.callSuccessful ? (
-                            <Badge className="bg-green-100 text-green-800">
+                            <Badge className="bg-purple-500 text-white">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Success
                             </Badge>

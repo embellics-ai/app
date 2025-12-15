@@ -103,9 +103,9 @@ export function AppSidebar() {
           icon: Headphones,
         },
         {
-          title: 'Test Chat',
-          url: '/test-chat',
-          icon: MessageSquare,
+          title: 'Analytics',
+          url: '/analytics',
+          icon: BarChart3,
         },
       ];
     }
@@ -116,11 +116,6 @@ export function AppSidebar() {
         title: 'Analytics',
         url: '/analytics',
         icon: BarChart3,
-      },
-      {
-        title: 'Test Chat',
-        url: '/',
-        icon: MessageSquare,
       },
     ];
   };

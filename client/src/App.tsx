@@ -13,7 +13,6 @@ import { useHeartbeat } from '@/hooks/use-heartbeat';
 import { ProtectedRoute } from '@/components/protected-route';
 import { RoleProtectedRoute } from '@/components/role-protected-route';
 import { ChangePasswordRequired } from '@/components/change-password-required';
-import Chat from '@/pages/chat';
 import Analytics from '@/pages/analytics';
 import AnalyticsVoice from '@/pages/analytics-voice';
 import UnifiedAnalytics from '@/pages/unified-analytics';
@@ -51,12 +50,7 @@ function Router() {
       {/* Protected routes - wrapped with ProtectedRoute */}
       <Route path="/">
         <ProtectedRoute path="/">
-          <Chat />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/test-chat">
-        <ProtectedRoute path="/test-chat">
-          <Chat />
+          <UnifiedAnalytics />
         </ProtectedRoute>
       </Route>
       <Route path="/analytics">
