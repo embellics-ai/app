@@ -335,6 +335,8 @@ export default function EnhancedVoiceAnalytics({
                 dataKey="Avg Duration (sec)"
                 stroke={COLORS.primary}
                 strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -409,12 +411,16 @@ export default function EnhancedVoiceAnalytics({
                 dataKey="Total Cost (€)"
                 stroke={COLORS.primary}
                 strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
               />
               <Line
                 type="monotone"
                 dataKey="Avg Cost (€)"
                 stroke={COLORS.secondary}
                 strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>

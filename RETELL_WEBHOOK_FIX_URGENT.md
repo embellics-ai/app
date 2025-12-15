@@ -6,7 +6,7 @@ Your analytics show **"2 calls"** but **NO detailed data** (0% success, €0.00 
 
 1. ✅ Webhooks ARE reaching the server (4 records in database)
 2. ❌ But they're **"ongoing"** status (call.started events)
-3. ❌ **NOT "ended"** or "analyzed"** status (which have analytics data)
+3. ❌ **NOT "ended"** or "analyzed"\*\* status (which have analytics data)
 
 ### Database Evidence:
 
@@ -33,6 +33,7 @@ Messages: NULL
 ### Step 2: Check Current Configuration
 
 Your current webhook is probably set to:
+
 ```
 ❌ Event: call.started
 ❌ URL: https://your-domain.com/api/n8n/your-workflow-name
@@ -43,19 +44,23 @@ Your current webhook is probably set to:
 Change to one of these events:
 
 **Option 1: call.ended (Recommended)**
+
 ```
 ✅ Event: call.ended
 ✅ URL: https://your-domain.com/api/n8n/your-workflow-name
 ```
+
 - Fires immediately when call ends
 - Contains: duration, transcript, cost, sentiment, success
 - Best for real-time N8N workflows
 
 **Option 2: call.analyzed**
+
 ```
 ✅ Event: call.analyzed
 ✅ URL: https://your-domain.com/api/n8n/your-workflow-name
 ```
+
 - Fires after AI analysis completes (~30s delay)
 - Contains: full analysis, sentiment, extracted variables
 - Best if you need AI-analyzed data
@@ -68,6 +73,7 @@ Change to one of these events:
    - Wait 5-10 seconds
 
 2. **Check Server Logs**:
+
    ```bash
    # Look for these messages:
    [N8N Proxy] 📊 ANALYTICS - Completed call detected: call_xxx Status: ended
@@ -75,9 +81,10 @@ Change to one of these events:
    ```
 
 3. **Verify Database**:
+
    ```bash
    npm run check-voice-analytics
-   
+
    # Should show:
    Duration: 45s ✅ (not NULL)
    Cost: €0.15 ✅ (not NULL)
@@ -98,6 +105,7 @@ If you want BOTH events (for different purposes):
 ### Setup in Retell:
 
 1. **Webhook 1 - Call Started** (for live monitoring):
+
    ```
    Event: call.started
    URL: https://your-domain.com/api/n8n/live-call-monitor
@@ -110,6 +118,7 @@ If you want BOTH events (for different purposes):
    ```
 
 The system will now:
+
 - Save initial record when call starts (with basic info)
 - **UPDATE** that record when call ends (with full analytics)
 
@@ -118,6 +127,7 @@ The system will now:
 I've updated `server/routes/n8n.routes.ts` to:
 
 ### Before:
+
 ```typescript
 // Only stored if workflow name included "call-analyzed" or "call-ended"
 if (workflowName.includes('call-analyzed') || workflowName.includes('call-ended')) {
@@ -126,11 +136,11 @@ if (workflowName.includes('call-analyzed') || workflowName.includes('call-ended'
 ```
 
 ### After:
+
 ```typescript
 // Checks call STATUS instead of workflow name
-const isCompletedCall = call.call_status && 
-                       call.call_status !== 'ongoing' && 
-                       call.call_status !== 'registered';
+const isCompletedCall =
+  call.call_status && call.call_status !== 'ongoing' && call.call_status !== 'registered';
 
 if (isCompletedCall) {
   // Store/update analytics with UPSERT
@@ -138,6 +148,7 @@ if (isCompletedCall) {
 ```
 
 **Benefits:**
+
 - ✅ Works with ANY workflow name
 - ✅ Detects completed calls by status, not name
 - ✅ Updates existing records (if call.started was received first)
@@ -146,11 +157,13 @@ if (isCompletedCall) {
 ## Verification Commands
 
 ### Check What's in Database:
+
 ```bash
 npm run check-voice-analytics
 ```
 
 ### Watch Server Logs:
+
 ```bash
 # In terminal where npm run dev is running, look for:
 [N8N Proxy] 📊 ANALYTICS - Completed call detected
@@ -158,6 +171,7 @@ npm run check-voice-analytics
 ```
 
 ### Make Test Call:
+
 1. Call your Retell number
 2. Have a short conversation
 3. Hang up
@@ -169,6 +183,7 @@ npm run check-voice-analytics
 ### ✅ Success Indicators:
 
 **Server Logs:**
+
 ```
 [N8N Proxy] 📊 ANALYTICS - Completed call detected: call_abc123 Status: ended
 [N8N Proxy] Updating existing voice analytics for call: call_abc123
@@ -176,6 +191,7 @@ npm run check-voice-analytics
 ```
 
 **Database:**
+
 ```
 Duration:    45s          ✅
 Cost:        €0.15        ✅
@@ -185,6 +201,7 @@ Messages:    12           ✅
 ```
 
 **Analytics Dashboard:**
+
 ```
 Total Interactions:    3 calls
 Voice Success Rate:    66.7%
@@ -194,6 +211,7 @@ Total Cost:           €0.45
 ### ❌ Failure Indicators:
 
 **Server Logs:**
+
 ```
 [N8N Proxy] 🚀 REQUEST RECEIVED
 [N8N Proxy] Workflow Name: booking-call
@@ -201,6 +219,7 @@ Total Cost:           €0.45
 ```
 
 **Database:**
+
 ```
 Duration:    NULL     ❌
 Cost:        NULL     ❌
@@ -208,6 +227,7 @@ Status:      ongoing  ❌
 ```
 
 **Analytics Dashboard:**
+
 ```
 Voice Success Rate:  0.0%  ❌
 Total Cost:         0,00 €  ❌
@@ -224,12 +244,12 @@ Total Cost:         0,00 €  ❌
 
 For reference, here are all Retell webhook events:
 
-| Event | When Fired | Has Analytics Data? |
-|-------|-----------|---------------------|
-| `call.started` | Call begins | ❌ No (only basic info) |
-| `call.ended` | Call completes | ✅ Yes (full data) |
-| `call.analyzed` | After AI analysis | ✅ Yes (with AI insights) |
-| `call.registered` | Phone number registered | ❌ No |
+| Event             | When Fired              | Has Analytics Data?       |
+| ----------------- | ----------------------- | ------------------------- |
+| `call.started`    | Call begins             | ❌ No (only basic info)   |
+| `call.ended`      | Call completes          | ✅ Yes (full data)        |
+| `call.analyzed`   | After AI analysis       | ✅ Yes (with AI insights) |
+| `call.registered` | Phone number registered | ❌ No                     |
 
 **You MUST use `call.ended` or `call.analyzed` for analytics to work!**
 
