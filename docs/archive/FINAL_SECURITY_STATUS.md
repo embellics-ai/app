@@ -65,7 +65,7 @@ fcba7f5a  |  915f494a  |  d310fe4e
 
 ### ✅ .env File
 
-**Location:** `/Users/animeshsingh/Documents/Embellics/RetellChatFlow/.env`
+**Location:** `/Users/animeshsingh/Documents/Embellics/Embellics-AI/.env`
 
 **Status:**
 

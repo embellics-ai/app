@@ -175,8 +175,8 @@ All exposed credentials still exist in git history and must be removed.
 pip install git-filter-repo
 
 # 2. Backup your repository
-cd /Users/animeshsingh/Documents/Embellics/RetellChatFlow
-git clone --mirror . ../RetellChatFlow-backup.git
+cd /Users/animeshsingh/Documents/Embellics/Embellics-AI
+git clone --mirror . ../Embellics-AI-backup.git
 
 # 3. Create a patterns file for all exposed secrets
 cat > /tmp/secrets-to-remove.txt << 'EOF'
@@ -221,7 +221,7 @@ git push origin --force --tags
 brew install bfg
 
 # 2. Backup repository
-git clone --mirror . ../RetellChatFlow-backup.git
+git clone --mirror . ../Embellics-AI-backup.git
 
 # 3. Remove .env file
 bfg --delete-files .env

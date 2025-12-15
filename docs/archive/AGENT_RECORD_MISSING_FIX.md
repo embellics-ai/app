@@ -150,7 +150,7 @@ if (user.role === 'support_staff' || user.role === 'admin') {
 Run the script I created:
 
 ```bash
-cd /Users/animeshsingh/Documents/Embellics/RetellChatFlow
+cd /Users/animeshsingh/Documents/Embellics/Embellics-AI
 npx tsx create-agent-now.ts
 ```
 

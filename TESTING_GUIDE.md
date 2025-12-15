@@ -1,4 +1,4 @@
-# Testing Guide for RetellChatFlow
+# Testing Guide for Embellics-AI
 
 ## Overview
 

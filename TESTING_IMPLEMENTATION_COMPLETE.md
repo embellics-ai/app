@@ -2,7 +2,7 @@
 
 ## Summary
 
-I have successfully created a comprehensive unit testing suite for your RetellChatFlow project following industry best practices. Here's what was delivered:
+I have successfully created a comprehensive unit testing suite for your Embellics-AI project following industry best practices. Here's what was delivered:
 
 ## 📊 Test Statistics
 

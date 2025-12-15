@@ -4,8 +4,8 @@
 # Compares each modular route file against original routes.ts
 
 ORIGINAL="/tmp/original_routes.ts"
-CURRENT_DIR="/Users/animeshsingh/Documents/Embellics/RetellChatFlow/server/routes"
-AUDIT_FILE="/Users/animeshsingh/Documents/Embellics/RetellChatFlow/REFACTORING_AUDIT.md"
+CURRENT_DIR="/Users/animeshsingh/Documents/Embellics/Embellics-AI/server/routes"
+AUDIT_FILE="/Users/animeshsingh/Documents/Embellics/Embellics-AI/REFACTORING_AUDIT.md"
 
 echo "=== Route Refactoring Audit ==="
 echo ""
