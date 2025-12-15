@@ -1586,13 +1586,33 @@ function AgentManagementDialog({
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeAgent(agent.agentId)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                // Get the ngrok URL from the environment or current window location
+                                const baseUrl = window.location.origin.includes('localhost')
+                                  ? 'https://stirrable-zita-flatly.ngrok-free.dev'
+                                  : window.location.origin;
+                                const webhookUrl = `${baseUrl}/api/n8n/inbound-booking-call-analyzed`;
+                                navigator.clipboard.writeText(webhookUrl);
+                                toast({
+                                  title: 'Webhook URL Copied',
+                                  description: 'N8N webhook URL copied to clipboard',
+                                });
+                              }}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeAgent(agent.agentId)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

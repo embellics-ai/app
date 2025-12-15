@@ -222,7 +222,33 @@ export default function UnifiedAnalytics() {
     enabled: !!tenantId && (analyticsType === 'all' || analyticsType === 'chat'),
   });
 
-  const isLoading = overviewLoading || chatSessionsLoading;
+  // Fetch voice call sessions
+  const { data: voiceSessions = [], isLoading: voiceSessionsLoading } = useQuery({
+    queryKey: [
+      'voice-sessions',
+      tenantId,
+      dateRange?.from?.toISOString(),
+      dateRange?.to?.toISOString(),
+    ],
+    queryFn: async () => {
+      if (!tenantId || !dateRange?.from || !dateRange?.to) return [];
+      const params = new URLSearchParams({
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
+        limit: '50',
+      });
+      const response = await apiRequest(
+        'GET',
+        `/api/platform/tenants/${tenantId}/analytics/calls?${params}`,
+      );
+      const data = await response.json();
+      console.log('[Unified Analytics] Voice sessions data:', data);
+      return data;
+    },
+    enabled: !!tenantId && (analyticsType === 'all' || analyticsType === 'voice'),
+  });
+
+  const isLoading = overviewLoading || chatSessionsLoading || voiceSessionsLoading;
 
   // Calculate combined metrics
   const getCombinedMetrics = () => {
@@ -594,6 +620,89 @@ export default function UnifiedAnalytics() {
                         <TableCell>{formatCurrency(chat.combinedCost)}</TableCell>
                         <TableCell>
                           {chat.chatSuccessful ? (
+                            <Badge className="bg-green-100 text-green-800">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Success
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Incomplete</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Voice Call Sessions */}
+          {(analyticsType === 'all' || analyticsType === 'voice') && voiceSessions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Voice Call Sessions</CardTitle>
+                <CardDescription>Latest voice call interactions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Call ID</TableHead>
+                      <TableHead>Agent</TableHead>
+                      <TableHead>Date/Time</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Sentiment</TableHead>
+                      <TableHead>Cost</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {voiceSessions.slice(0, 10).map((call: any) => (
+                      <TableRow key={call.id}>
+                        <TableCell className="font-mono text-xs">
+                          {call.callId ? call.callId.substring(0, 12) + '...' : 'N/A'}
+                        </TableCell>
+                        <TableCell>{call.agentName || 'Unknown'}</TableCell>
+                        <TableCell className="text-xs">
+                          {call.startTimestamp
+                            ? new Date(call.startTimestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>{formatDuration(call.duration)}</TableCell>
+                        <TableCell>
+                          {call.userSentiment?.toLowerCase() === 'positive' && (
+                            <Badge className="bg-green-100 text-green-800">
+                              <Smile className="h-3 w-3 mr-1" />
+                              Positive
+                            </Badge>
+                          )}
+                          {call.userSentiment?.toLowerCase() === 'neutral' && (
+                            <Badge className="bg-gray-100 text-gray-800">
+                              <Meh className="h-3 w-3 mr-1" />
+                              Neutral
+                            </Badge>
+                          )}
+                          {call.userSentiment?.toLowerCase() === 'negative' && (
+                            <Badge className="bg-red-100 text-red-800">
+                              <Frown className="h-3 w-3 mr-1" />
+                              Negative
+                            </Badge>
+                          )}
+                          {(!call.userSentiment ||
+                            (call.userSentiment?.toLowerCase() !== 'positive' &&
+                              call.userSentiment?.toLowerCase() !== 'neutral' &&
+                              call.userSentiment?.toLowerCase() !== 'negative')) && (
+                            <Badge variant="outline">Unknown</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{formatCurrency(call.combinedCost)}</TableCell>
+                        <TableCell>
+                          {call.callSuccessful ? (
                             <Badge className="bg-green-100 text-green-800">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Success
