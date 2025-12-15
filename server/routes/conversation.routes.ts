@@ -216,6 +216,7 @@ router.post('/api/messages', requireAuth, async (req: AuthenticatedRequest, res)
 });
 
 // Get all handoffs for authenticated tenant (PROTECTED)
+// Note: This is used by the Agent Queue to see pending/active handoffs
 router.get('/api/conversations', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     // Validate tenant ID exists in token
@@ -230,30 +231,10 @@ router.get('/api/conversations', requireAuth, async (req: AuthenticatedRequest, 
   }
 });
 
-// Create a new handoff (PROTECTED)
-router.post('/api/conversations', requireAuth, async (req: AuthenticatedRequest, res) => {
-  try {
-    // Validate tenant ID exists in token
-    const tenantId = assertTenant(req, res);
-    if (!tenantId) return;
-
-    // Parse and validate request body
-    const validatedData = insertWidgetHandoffSchema.parse(req.body);
-    const handoff = await storage.createWidgetHandoff({
-      ...validatedData,
-      tenantId,
-      status: 'active',
-    });
-    res.json(handoff);
-  } catch (error) {
-    console.error('Error creating handoff:', error);
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ error: error.errors });
-    } else {
-      res.status(500).json({ error: 'Failed to create handoff' });
-    }
-  }
-});
+// ⚠️ ENDPOINT REMOVED: POST /api/conversations
+// Handoffs should ONLY be created through the widget via POST /api/widget/handoff
+// The widget creates handoffs when users click "Talk to Human" button with a real chatId
+// See: server/routes/handoff.routes.ts for the proper handoff creation endpoint
 
 // End a conversation (and its Retell chat session)
 router.post(
