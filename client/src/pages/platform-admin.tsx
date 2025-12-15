@@ -49,6 +49,7 @@ import {
   Copy,
   Webhook,
   BarChart3,
+  Save,
 } from 'lucide-react';
 import IntegrationManagement from '@/components/IntegrationManagement';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -118,6 +119,13 @@ export default function PlatformAdminPage() {
     id: string;
     name: string;
   } | null>(null);
+  const [agentManagementDialog, setAgentManagementDialog] = useState<{
+    open: boolean;
+    tenant: any | null;
+  }>({
+    open: false,
+    tenant: null,
+  });
 
   // Access control: Only platform admins can view this page
   useEffect(() => {
@@ -1142,6 +1150,27 @@ export default function PlatformAdminPage() {
                     : "The agent ID to use for this tenant's WhatsApp integration."}
                 </p>
               </div>
+
+              <div className="pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setAgentManagementDialog({
+                      open: true,
+                      tenant: editApiKeyDialog.tenant,
+                    });
+                    setEditApiKeyDialog({ open: false, tenant: null });
+                  }}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Manage All Agents (Advanced)
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Configure multiple agents with channel assignments, sync from Retell API
+                </p>
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -1206,7 +1235,383 @@ export default function PlatformAdminPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Agent Management Dialog */}
+        <AgentManagementDialog
+          open={agentManagementDialog.open}
+          tenant={agentManagementDialog.tenant}
+          onClose={() => {
+            setAgentManagementDialog({ open: false, tenant: null });
+          }}
+          onBack={() => {
+            setEditApiKeyDialog({
+              open: true,
+              tenant: agentManagementDialog.tenant,
+            });
+            setAgentManagementDialog({ open: false, tenant: null });
+          }}
+        />
       </div>
     </div>
+  );
+}
+
+// Agent Management Dialog Component
+function AgentManagementDialog({
+  open,
+  tenant,
+  onClose,
+  onBack,
+}: {
+  open: boolean;
+  tenant: any | null;
+  onClose: () => void;
+  onBack: () => void;
+}) {
+  const { toast } = useToast();
+  const [retellAgents, setRetellAgents] = useState<any[]>([]);
+  const [configuredAgents, setConfiguredAgents] = useState<any[]>([]);
+  const [selectedAgents, setSelectedAgents] = useState<Record<string, 'inbound' | 'outbound'>>({});
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showRetellAgents, setShowRetellAgents] = useState(false);
+
+  // Fetch configured agents when dialog opens
+  useEffect(() => {
+    if (open && tenant?.id) {
+      fetchConfiguredAgents();
+    }
+  }, [open, tenant]);
+
+  const fetchConfiguredAgents = async () => {
+    try {
+      const response = await apiRequest(
+        'GET',
+        `/api/platform/tenants/${tenant.id}/retell/agents/configured`,
+      );
+      const data = await response.json();
+      // API returns { agents: [...], count: ... }
+      const agents = Array.isArray(data.agents) ? data.agents : Array.isArray(data) ? data : [];
+      setConfiguredAgents(agents);
+    } catch (error) {
+      console.error('Failed to fetch configured agents:', error);
+      setConfiguredAgents([]);
+    }
+  };
+
+  const syncFromRetell = async () => {
+    if (!tenant?.hasRetellApiKey) {
+      toast({
+        title: 'Retell API Key Required',
+        description: 'Please configure a Retell API key first to sync agents.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const response = await apiRequest('GET', `/api/platform/tenants/${tenant.id}/retell/agents`);
+      const data = await response.json();
+      // API returns { agents: [...], totalAgents, configuredCount }
+      const agents = Array.isArray(data.agents) ? data.agents : [];
+      setRetellAgents(agents);
+      setShowRetellAgents(true);
+
+      // Pre-select already configured agents
+      const preselected: Record<string, 'inbound' | 'outbound'> = {};
+      agents.forEach((agent: any) => {
+        if (agent.enabled) {
+          preselected[agent.agentId] = agent.channel || 'inbound';
+        }
+      });
+      setSelectedAgents(preselected);
+
+      toast({
+        title: 'Agents synced successfully',
+        description: `Found ${agents.length} agents from Retell AI`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to sync agents',
+        description: error.message || 'Could not fetch agents from Retell AI',
+        variant: 'destructive',
+      });
+      setRetellAgents([]);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const saveAgentConfiguration = async () => {
+    const agentsToSave = Object.entries(selectedAgents).map(([agentId, channel]) => ({
+      agentId,
+      channel,
+    }));
+
+    if (agentsToSave.length === 0) {
+      toast({
+        title: 'No agents selected',
+        description: 'Please select at least one agent to configure.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await apiRequest('POST', `/api/platform/tenants/${tenant.id}/retell/agents/sync`, {
+        agents: agentsToSave,
+      });
+
+      toast({
+        title: 'Agents configured successfully',
+        description: `Configured ${agentsToSave.length} agent(s) for webhook routing.`,
+      });
+
+      // Refresh configured agents list
+      await fetchConfiguredAgents();
+      setShowRetellAgents(false);
+      setRetellAgents([]);
+    } catch (error: any) {
+      toast({
+        title: 'Failed to save configuration',
+        description: error.message || 'Could not save agent configuration',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const removeAgent = async (agentId: string) => {
+    try {
+      await apiRequest('DELETE', `/api/platform/tenants/${tenant.id}/retell/agents/${agentId}`);
+
+      toast({
+        title: 'Agent removed',
+        description: 'Agent has been removed from configuration.',
+      });
+
+      await fetchConfiguredAgents();
+    } catch (error: any) {
+      toast({
+        title: 'Failed to remove agent',
+        description: error.message || 'Could not remove agent',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Manage Retell AI Agents - {tenant?.name}
+          </DialogTitle>
+          <DialogDescription>
+            Configure multiple agents with channel assignments. Sync agents from your Retell AI
+            account or manage existing configurations.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button onClick={syncFromRetell} disabled={isSyncing || !tenant?.hasRetellApiKey}>
+              {isSyncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <Users className="w-4 h-4 mr-2" />
+                  Sync from Retell AI
+                </>
+              )}
+            </Button>
+            {!tenant?.hasRetellApiKey && (
+              <p className="text-sm text-muted-foreground my-auto">
+                Configure Retell API key first to sync agents
+              </p>
+            )}
+          </div>
+
+          {/* Retell Agents Selection (after sync) */}
+          {showRetellAgents && retellAgents.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Select Agents to Configure</CardTitle>
+                <CardDescription>
+                  Choose which agents to enable and specify their call direction
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Enable</TableHead>
+                      <TableHead>Agent Name</TableHead>
+                      <TableHead>Agent ID</TableHead>
+                      <TableHead className="w-40">Direction</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {retellAgents.map((agent) => (
+                      <TableRow key={agent.agentId}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={!!selectedAgents[agent.agentId]}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedAgents({
+                                  ...selectedAgents,
+                                  [agent.agentId]: agent.channel || 'inbound',
+                                });
+                              } else {
+                                const { [agent.agentId]: _, ...rest } = selectedAgents;
+                                setSelectedAgents(rest);
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{agent.agentName}</TableCell>
+                        <TableCell className="font-mono text-sm">{agent.agentId}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={selectedAgents[agent.agentId] || 'inbound'}
+                            onValueChange={(value: 'inbound' | 'outbound') => {
+                              setSelectedAgents({
+                                ...selectedAgents,
+                                [agent.agentId]: value,
+                              });
+                            }}
+                            disabled={!selectedAgents[agent.agentId]}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="inbound">
+                                <span className="inline-flex items-center">
+                                  <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                                  Inbound
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="outbound">
+                                <span className="inline-flex items-center">
+                                  <span className="w-2 h-2 rounded-full bg-purple-500 mr-2"></span>
+                                  Outbound
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={saveAgentConfiguration} disabled={isSaving}>
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Configuration
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowRetellAgents(false);
+                      setRetellAgents([]);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Currently Configured Agents */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Currently Configured Agents</CardTitle>
+              <CardDescription>
+                Agents that are actively configured for webhook routing
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {configuredAgents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No agents configured yet. Sync from Retell AI to get started.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Agent Name</TableHead>
+                      <TableHead>Agent ID</TableHead>
+                      <TableHead>Channel</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-24">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {configuredAgents.map((agent) => (
+                      <TableRow key={agent.agentId}>
+                        <TableCell className="font-medium">{agent.agentName}</TableCell>
+                        <TableCell className="font-mono text-sm">{agent.agentId}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{agent.channel}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {agent.isActive ? (
+                            <Badge variant="default" className="bg-green-500">
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactive</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAgent(agent.agentId)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onBack}>
+            Back to Basic Configuration
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
