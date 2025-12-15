@@ -20,10 +20,10 @@ Added a new chart to the Enhanced Chat Analytics dashboard that displays the dis
   - Uses agentName from chat data (falls back to agentId if not available)
   - Sorts results by count (descending)
 
-#### Added Stub Implementation
+#### Implementation Notes
 
-- **Location**: MemStorage class (line ~1453)
-- **Returns**: Empty array for in-memory storage
+- **Storage**: PostgreSQL only (MemStorage removed from codebase)
+- **Location**: DbStorage class in `server/storage.ts`
 
 ### 2. Backend - API Routes (`server/routes.ts`)
 

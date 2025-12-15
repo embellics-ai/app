@@ -174,7 +174,7 @@ The original tabs (Overview, Chat Sessions, Sentiment, Cost Tracking) remain unc
 
 1. **`server/storage.ts`**
    - Added `getChatAnalyticsTimeSeries()` method to `DbStorage` class
-   - Added stub implementation to `MemStorage` class
+   - PostgreSQL implementation only (MemStorage removed from codebase)
    - ~180 lines of new aggregation logic
 
 2. **`server/routes.ts`**
