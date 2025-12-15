@@ -159,7 +159,11 @@ export default function UnifiedAnalytics() {
     user?.role === 'owner' || user?.isPlatformAdmin ? selectedTenantId : user?.tenantId;
 
   // Fetch unified analytics overview (voice + chat from our database)
-  const { data: analyticsOverview, isLoading: overviewLoading } = useQuery<UnifiedAnalytics>({
+  const {
+    data: analyticsOverview,
+    isLoading: overviewLoading,
+    error: overviewError,
+  } = useQuery<UnifiedAnalytics>({
     queryKey: [
       'analytics-overview',
       tenantId,
@@ -167,18 +171,32 @@ export default function UnifiedAnalytics() {
       dateRange?.to?.toISOString(),
     ],
     queryFn: async () => {
-      if (!tenantId || !dateRange?.from || !dateRange?.to) return null as any;
+      if (!tenantId || !dateRange?.from || !dateRange?.to) {
+        console.warn('[Unified Analytics] Missing tenantId or dateRange for overview query');
+        return null as any;
+      }
       const params = new URLSearchParams({
         startDate: dateRange.from.toISOString(),
         endDate: dateRange.to.toISOString(),
       });
+      console.log(`[Unified Analytics] Fetching overview for tenant: ${tenantId}`);
       const response = await apiRequest(
         'GET',
         `/api/platform/tenants/${tenantId}/analytics/overview?${params}`,
       );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[Unified Analytics] Overview API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        throw new Error(errorData.error || `Failed to fetch analytics: ${response.statusText}`);
+      }
       return await response.json();
     },
     enabled: !!tenantId && !!dateRange?.from && !!dateRange?.to,
+    retry: 1,
   });
 
   // Fetch chat analytics - DEPRECATED, use analyticsOverview instead
@@ -333,6 +351,31 @@ export default function UnifiedAnalytics() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-muted-foreground">Please log in to view analytics</div>
+      </div>
+    );
+  }
+
+  // Show error if analytics overview failed to load
+  if (overviewError) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Failed to Load Analytics</CardTitle>
+            <CardDescription>
+              {overviewError instanceof Error
+                ? overviewError.message
+                : 'An unexpected error occurred'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Please check the browser console for more details, or contact support if the problem
+              persists.
+            </p>
+            <Button onClick={() => window.location.reload()}>Reload Page</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
