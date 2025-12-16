@@ -42,9 +42,11 @@ export default function PaymentSuccess() {
         </CardHeader>
         <CardContent className="space-y-4">
           {sessionId && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">Transaction ID</p>
-              <p className="text-xs font-mono break-all">{sessionId}</p>
+            <div className="bg-white border border-gray-200 p-4 rounded-lg">
+              <p className="text-xs uppercase tracking-wide text-gray-500 mb-1.5">Transaction ID</p>
+              <p className="text-xs font-mono break-all text-gray-900 leading-relaxed bg-gray-50 p-2 rounded border border-gray-200">
+                {sessionId}
+              </p>
             </div>
           )}
 
