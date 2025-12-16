@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiRequest } from '@/lib/queryClient';
+import { useTheme } from '@/components/theme-provider';
 import {
   LineChart,
   Line,
@@ -52,31 +53,32 @@ const CustomTooltip = ({ active, payload, label, labelFormatter, formatter }: an
 };
 
 // Custom pie chart label renderer - works in both light and dark mode
-const renderPieLabel = ({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }: any) => {
-  const RADIAN = Math.PI / 180;
-  const radius = outerRadius + 25;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  const isDark = document.documentElement.classList.contains('dark');
+const createPieLabelRenderer = (isDark: boolean) => {
+  return ({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 25;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-  return (
-    <text
-      x={x}
-      y={y}
-      fill={isDark ? '#ffffff' : '#111827'}
-      stroke={isDark ? '#000000' : '#ffffff'}
-      strokeWidth={isDark ? '0.5' : '0.5'}
-      textAnchor={x > cx ? 'start' : 'end'}
-      dominantBaseline="central"
-      style={{
-        fontWeight: 700,
-        fontSize: '15px',
-        paintOrder: 'stroke fill',
-      }}
-    >
-      {`${name}: ${(percent * 100).toFixed(0)}%`}
-    </text>
-  );
+    return (
+      <text
+        x={x}
+        y={y}
+        fill={isDark ? '#ffffff' : '#111827'}
+        stroke={isDark ? '#000000' : '#ffffff'}
+        strokeWidth="2"
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        style={{
+          fontWeight: 700,
+          fontSize: '15px',
+          paintOrder: 'stroke fill',
+        }}
+      >
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
 };
 
 // Legend style that works in both light and dark mode
@@ -125,6 +127,8 @@ export default function EnhancedChatAnalytics({
   endDate,
   agentId,
 }: EnhancedChatAnalyticsProps) {
+  const { theme } = useTheme();
+
   // Fetch live USD to EUR exchange rate
   const { data: exchangeRate } = useQuery({
     queryKey: ['exchange-rate'],
@@ -185,6 +189,9 @@ export default function EnhancedChatAnalytics({
   if (isLoading || !timeSeriesData) {
     return <div className="text-center p-8">Loading analytics...</div>;
   }
+
+  // Create label renderer with current theme
+  const renderPieLabel = createPieLabelRenderer(theme === 'dark');
 
   // Calculate aggregate metrics
   const totalChats = timeSeriesData.chatCounts.reduce((sum, d) => sum + d.count, 0);
@@ -477,7 +484,7 @@ export default function EnhancedChatAnalytics({
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    label={renderPieLabel}
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
