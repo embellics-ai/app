@@ -479,9 +479,7 @@ export class DbStorage implements IStorage {
   }
 
   async deleteApiKey(id: string, tenantId: string): Promise<void> {
-    await this.db
-      .delete(apiKeys)
-      .where(and(eq(apiKeys.id, id), eq(apiKeys.tenantId, tenantId)));
+    await this.db.delete(apiKeys).where(and(eq(apiKeys.id, id), eq(apiKeys.tenantId, tenantId)));
   }
 
   // Widget Config methods
