@@ -1,5 +1,16 @@
 -- Migration: Add webhook type fields for event listeners and function calls
 -- Date: 2025-12-01
+-- Updated: 2025-12-17 - Added table creation if it doesn't exist
+
+-- Create n8n_webhooks table if it doesn't exist
+CREATE TABLE IF NOT EXISTS n8n_webhooks (
+  id SERIAL PRIMARY KEY,
+  tenant_id VARCHAR(255) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  webhook_url TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Add new columns to n8n_webhooks table
 ALTER TABLE n8n_webhooks
