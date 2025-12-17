@@ -40,9 +40,14 @@ router.post('/login', async (req: Request, res: Response) => {
 
     // STEP 2: If user doesn't exist, check for pending invitation
     if (!user) {
+      console.log(`[Login] User not found, checking for pending invitation: ${email}`);
       const pendingInvitation = await storage.getPendingInvitationByEmail(email);
 
       if (pendingInvitation) {
+        console.log(
+          `[Login] Found pending invitation for: ${email}, role: ${pendingInvitation.role}`,
+        );
+
         // Verify password matches temporary password
         const isValidTempPassword = await verifyPassword(
           password,
@@ -50,8 +55,11 @@ router.post('/login', async (req: Request, res: Response) => {
         );
 
         if (!isValidTempPassword) {
+          console.log(`[Login] ✗ Invalid temporary password for: ${email}`);
           return res.status(401).json({ error: 'Invalid credentials' });
         }
+
+        console.log(`[Login] ✓ Valid temporary password for: ${email}`);
 
         // STEP 3: Create user account from invitation
         let tenantId: string | null = pendingInvitation.tenantId;
@@ -100,12 +108,11 @@ router.post('/login', async (req: Request, res: Response) => {
         }
 
         // Create user account from invitation (first login using temporary password)
-        // Hash the provided temporary password and create the user record.
-        const hashedPassword = await hashPassword(password);
-
+        // Use the hashed password from the invitation (already hashed when invitation was created)
+        // DO NOT re-hash the password - that would create a double-hash mismatch
         user = await storage.createClientUser({
           email: pendingInvitation.email,
-          password: hashedPassword,
+          password: pendingInvitation.temporaryPassword, // Already hashed
           firstName: pendingInvitation.firstName,
           lastName: pendingInvitation.lastName,
           tenantId: tenantId,
