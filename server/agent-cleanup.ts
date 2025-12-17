@@ -6,20 +6,27 @@ const CLEANUP_INTERVAL = 60 * 1000; // Run every 1 minute
 /**
  * Wait for database to be ready (migrations completed)
  */
-async function waitForDatabase(storage: IStorage, maxAttempts = 30): Promise<boolean> {
+async function waitForDatabase(storage: IStorage, maxAttempts = 60): Promise<boolean> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       // Try to query tenants table - if it works, database is ready
       await storage.getAllTenants();
-      console.log('[Agent Cleanup] Database ready');
+      console.log('[Agent Cleanup] ✓ Database connection established');
       return true;
     } catch (error) {
+      // Log progress every 10 attempts
+      if (attempt % 10 === 0) {
+        console.log(
+          `[Agent Cleanup] Still waiting for database... (attempt ${attempt}/${maxAttempts})`,
+        );
+      }
+
       if (attempt === maxAttempts) {
-        console.error('[Agent Cleanup] Database not ready after maximum attempts');
+        console.error('[Agent Cleanup] ✗ Database not ready after maximum attempts:', error);
         return false;
       }
-      // Wait 1 second before retrying
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Wait 500ms before retrying (shorter delay for faster startup)
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
   return false;
@@ -30,18 +37,30 @@ async function waitForDatabase(storage: IStorage, maxAttempts = 30): Promise<boo
  * as offline if they haven't sent a heartbeat in the last 2 minutes.
  */
 export async function startAgentCleanupJob(storage: IStorage) {
-  console.log('[Agent Cleanup] Waiting for database to be ready...');
+  console.log('[Agent Cleanup] Starting background job...');
 
-  // Wait for database to be ready before starting cleanup
-  const isReady = await waitForDatabase(storage);
-  if (!isReady) {
-    console.error('[Agent Cleanup] Failed to start - database not ready');
-    return () => {}; // Return empty cleanup function
-  }
+  let isReady = false;
+  let intervalId: NodeJS.Timeout | null = null;
 
-  console.log('[Agent Cleanup] Starting background job (runs every 60 seconds)');
+  // Try to connect to database asynchronously (non-blocking)
+  waitForDatabase(storage).then((ready) => {
+    isReady = ready;
+    if (ready) {
+      console.log('[Agent Cleanup] ✓ Database connected, cleanup job active');
+    } else {
+      console.error('[Agent Cleanup] ✗ Could not connect to database, cleanup disabled');
+    }
+  });
+
+  // Don't wait for database - start the interval immediately
+  // The cleanup function will simply skip if database isn't ready yet
 
   const cleanupStaleAgents = async () => {
+    // Skip if database isn't ready yet
+    if (!isReady) {
+      return;
+    }
+
     try {
       // Get all tenants
       const allTenants = await storage.getAllTenants();
@@ -78,15 +97,17 @@ export async function startAgentCleanupJob(storage: IStorage) {
     }
   };
 
-  // Run cleanup immediately on startup
+  // Run cleanup immediately (will skip if DB not ready)
   cleanupStaleAgents();
 
   // Then run every minute
-  const interval = setInterval(cleanupStaleAgents, CLEANUP_INTERVAL);
+  intervalId = setInterval(cleanupStaleAgents, CLEANUP_INTERVAL);
 
   // Return cleanup function to stop the job (for graceful shutdown)
   return () => {
     console.log('[Agent Cleanup] Stopping background job');
-    clearInterval(interval);
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
   };
 }
