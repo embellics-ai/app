@@ -21,17 +21,17 @@ GET /api/proxy/lookup?email=tenant@example.com
 
 | Field             | Type           | Source                           | Description                             | Example Value                        |
 | ----------------- | -------------- | -------------------------------- | --------------------------------------- | ------------------------------------ |
-| `agentId`         | string \| null | `widget_configs.retellAgentId`   | Retell AI agent ID for web chat widget  | `"agent_8f74c4d6238bdf91c725aa0034"` |
-| `whatsappAgentId` | string \| null | `widget_configs.whatsappAgentId` | Retell AI agent ID for WhatsApp channel | `"agent_9g85d5e7349ceg02d836bb0045"` |
+| `agentId`         | string \| null | `widget_configs.retellAgentId`   | Retell AI agent ID for web chat widget  | `"agent_abc123xyz456def789ghi012"` |
+| `whatsappAgentId` | string \| null | `widget_configs.whatsappAgentId` | Retell AI agent ID for WhatsApp channel | `"agent_def456abc789ghi012jkl345"` |
 
 ### 💬 **WhatsApp Configuration**
 
 | Field               | Type           | Source                                                 | Description                            | Example Value        |
 | ------------------- | -------------- | ------------------------------------------------------ | -------------------------------------- | -------------------- |
 | `whatsappEnabled`   | boolean        | `tenant_integrations.whatsappEnabled`                  | Whether WhatsApp is enabled for tenant | `true`               |
-| `whatsappPhone`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumber`       | Display phone number (decrypted)       | `"+91 599 8021 588"` |
-| `phoneNumberId`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumberId`     | Meta WhatsApp phone number ID          | `"915998021588678"`  |
-| `businessAccountId` | string \| null | `tenant_integrations.whatsappConfig.businessAccountId` | Meta WhatsApp business account ID      | `"1471345127284298"` |
+| `whatsappPhone`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumber`       | Display phone number (decrypted)       | `"+1 555 123 4567"` |
+| `phoneNumberId`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumberId`     | Meta WhatsApp phone number ID          | `"123456789012345"`  |
+| `businessAccountId` | string \| null | `tenant_integrations.whatsappConfig.businessAccountId` | Meta WhatsApp business account ID      | `"987654321098765"` |
 
 ### 📱 **SMS/Twilio Configuration**
 
@@ -117,15 +117,15 @@ GET /api/proxy/abc-123-uuid/config
 ```json
 {
   "tenantId": "abc-123-uuid",
-  "agentId": "agent_8f74c4d6238bdf91c725aa0034",
-  "whatsappAgentId": "agent_9g85d5e7349ceg02d836bb0045",
+  "agentId": "agent_abc123xyz456def789ghi012",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345",
   "greeting": "Hi! How can I help you today?",
   "primaryColor": "#9b7ddd",
   "widgetPosition": "bottom-right",
   "whatsappEnabled": true,
-  "whatsappPhone": "+91 599 8021 588",
-  "phoneNumberId": "915998021588678",
-  "businessAccountId": "1471345127284298",
+  "whatsappPhone": "+1 555 123 4567",
+  "phoneNumberId": "123456789012345",
+  "businessAccountId": "987654321098765",
   "smsEnabled": true,
   "smsProvider": "twilio",
   "smsPhoneNumber": "+1234567890",
@@ -145,8 +145,8 @@ GET /api/proxy/abc-123-uuid/config?fields=whatsappAgentId,phoneNumberId
 ```json
 {
   "tenantId": "abc-123-uuid",
-  "whatsappAgentId": "agent_9g85d5e7349ceg02d836bb0045",
-  "phoneNumberId": "915998021588678"
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345",
+  "phoneNumberId": "123456789012345"
 }
 ```
 
@@ -161,8 +161,8 @@ GET /api/proxy/abc-123-uuid/config?fields=agentId,whatsappAgentId
 ```json
 {
   "tenantId": "abc-123-uuid",
-  "agentId": "agent_8f74c4d6238bdf91c725aa0034",
-  "whatsappAgentId": "agent_9g85d5e7349ceg02d836bb0045"
+  "agentId": "agent_abc123xyz456def789ghi012",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345"
 }
 ```
 
@@ -245,6 +245,12 @@ Authentication: Header Auth
   Name: Authorization
   Value: Bearer {{ $env.N8N_WEBHOOK_SECRET }}
 
+// Response example:
+{
+  "tenantId": "abc-123-uuid",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345"
+}
+
 // Use in next node:
 {{ $json.whatsappAgentId }}
 ```
@@ -254,6 +260,14 @@ Authentication: Header Auth
 ```javascript
 // HTTP Request Node
 URL: https://embellics-app.onrender.com/api/proxy/{{ $env.TENANT_ID }}/config?fields=whatsappAgentId,phoneNumberId,tenantName
+
+// Response example:
+{
+  "tenantId": "abc-123-uuid",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345",
+  "phoneNumberId": "123456789012345",
+  "tenantName": "Acme Corporation"
+}
 
 // Use in next node:
 {
