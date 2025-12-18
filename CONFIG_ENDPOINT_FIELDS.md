@@ -3,11 +3,13 @@
 ## Endpoints
 
 ### Get Tenant Config
+
 ```
 GET /api/proxy/:tenantId/config?fields=<field1>,<field2>,...
 ```
 
 ### Lookup Tenant ID (New!)
+
 ```
 GET /api/proxy/lookup?name=TenantName
 GET /api/proxy/lookup?email=tenant@example.com
@@ -17,54 +19,56 @@ GET /api/proxy/lookup?email=tenant@example.com
 
 ### 🤖 **Agent Configuration**
 
-| Field | Type | Source | Description | Example Value |
-|-------|------|--------|-------------|---------------|
-| `agentId` | string \| null | `widget_configs.retellAgentId` | Retell AI agent ID for web chat widget | `"agent_8f74c4d6238bdf91c725aa0034"` |
-| `whatsappAgentId` | string \| null | `widget_configs.whatsappAgentId` | Retell AI agent ID for WhatsApp channel | `"agent_9g85d5e7349ceg02d836bb0045"` |
+| Field             | Type           | Source                           | Description                             | Example Value                        |
+| ----------------- | -------------- | -------------------------------- | --------------------------------------- | ------------------------------------ |
+| `agentId`         | string \| null | `widget_configs.retellAgentId`   | Retell AI agent ID for web chat widget  | `"agent_abc123xyz456def789ghi012"` |
+| `whatsappAgentId` | string \| null | `widget_configs.whatsappAgentId` | Retell AI agent ID for WhatsApp channel | `"agent_def456abc789ghi012jkl345"` |
 
 ### 💬 **WhatsApp Configuration**
 
-| Field | Type | Source | Description | Example Value |
-|-------|------|--------|-------------|---------------|
-| `whatsappEnabled` | boolean | `tenant_integrations.whatsappEnabled` | Whether WhatsApp is enabled for tenant | `true` |
-| `whatsappPhone` | string \| null | `tenant_integrations.whatsappConfig.phoneNumber` | Display phone number (decrypted) | `"+91 599 8021 588"` |
-| `phoneNumberId` | string \| null | `tenant_integrations.whatsappConfig.phoneNumberId` | Meta WhatsApp phone number ID | `"915998021588678"` |
-| `businessAccountId` | string \| null | `tenant_integrations.whatsappConfig.businessAccountId` | Meta WhatsApp business account ID | `"1471345127284298"` |
+| Field               | Type           | Source                                                 | Description                            | Example Value        |
+| ------------------- | -------------- | ------------------------------------------------------ | -------------------------------------- | -------------------- |
+| `whatsappEnabled`   | boolean        | `tenant_integrations.whatsappEnabled`                  | Whether WhatsApp is enabled for tenant | `true`               |
+| `whatsappPhone`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumber`       | Display phone number (decrypted)       | `"+1 555 123 4567"` |
+| `phoneNumberId`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumberId`     | Meta WhatsApp phone number ID          | `"123456789012345"`  |
+| `businessAccountId` | string \| null | `tenant_integrations.whatsappConfig.businessAccountId` | Meta WhatsApp business account ID      | `"987654321098765"` |
 
 ### 📱 **SMS/Twilio Configuration**
 
-| Field | Type | Source | Description | Example Value |
-|-------|------|--------|-------------|---------------|
-| `smsEnabled` | boolean | `tenant_integrations.smsEnabled` | Whether SMS is enabled for tenant | `true` |
-| `smsProvider` | string \| null | `tenant_integrations.smsConfig.provider` | SMS provider name | `"twilio"` / `"vonage"` / `"aws_sns"` |
-| `smsPhoneNumber` | string \| null | `tenant_integrations.smsConfig.phoneNumber` | SMS sending phone number (decrypted) | `"+1234567890"` |
-| `messagingServiceSid` | string \| null | `tenant_integrations.smsConfig.messagingServiceSid` | Twilio Messaging Service SID (optional) | `"MG..."` |
+| Field                 | Type           | Source                                              | Description                             | Example Value                         |
+| --------------------- | -------------- | --------------------------------------------------- | --------------------------------------- | ------------------------------------- |
+| `smsEnabled`          | boolean        | `tenant_integrations.smsEnabled`                    | Whether SMS is enabled for tenant       | `true`                                |
+| `smsProvider`         | string \| null | `tenant_integrations.smsConfig.provider`            | SMS provider name                       | `"twilio"` / `"vonage"` / `"aws_sns"` |
+| `smsPhoneNumber`      | string \| null | `tenant_integrations.smsConfig.phoneNumber`         | SMS sending phone number (decrypted)    | `"+1234567890"`                       |
+| `messagingServiceSid` | string \| null | `tenant_integrations.smsConfig.messagingServiceSid` | Twilio Messaging Service SID (optional) | `"MG..."`                             |
 
 ### 🎨 **Widget Styling**
 
-| Field | Type | Source | Description | Example Value |
-|-------|------|--------|-------------|---------------|
-| `greeting` | string \| null | `widget_configs.greeting` | Widget greeting message | `"Hi! How can I help you today?"` |
-| `primaryColor` | string \| null | `widget_configs.primaryColor` | Widget primary color (hex) | `"#9b7ddd"` |
-| `widgetPosition` | string \| null | `widget_configs.position` | Widget position on page | `"bottom-right"` |
+| Field            | Type           | Source                        | Description                | Example Value                     |
+| ---------------- | -------------- | ----------------------------- | -------------------------- | --------------------------------- |
+| `greeting`       | string \| null | `widget_configs.greeting`     | Widget greeting message    | `"Hi! How can I help you today?"` |
+| `primaryColor`   | string \| null | `widget_configs.primaryColor` | Widget primary color (hex) | `"#9b7ddd"`                       |
+| `widgetPosition` | string \| null | `widget_configs.position`     | Widget position on page    | `"bottom-right"`                  |
 
 ### 🏢 **Tenant Information**
 
-| Field | Type | Source | Description | Example Value |
-|-------|------|--------|-------------|---------------|
-| `tenantId` | string | Request parameter | Tenant UUID (always included) | `"abc-123-uuid"` |
-| `tenantName` | string \| null | `tenants.name` | Tenant company name | `"Acme Corporation"` |
+| Field        | Type           | Source            | Description                   | Example Value        |
+| ------------ | -------------- | ----------------- | ----------------------------- | -------------------- |
+| `tenantId`   | string         | Request parameter | Tenant UUID (always included) | `"abc-123-uuid"`     |
+| `tenantName` | string \| null | `tenants.name`    | Tenant company name           | `"Acme Corporation"` |
 
 ---
 
 ## Tenant Lookup (Get tenantId by Name/Email)
 
 ### Lookup by Company Name
+
 ```bash
 GET /api/proxy/lookup?name=Acme Corporation
 ```
 
 **Response:**
+
 ```json
 {
   "tenantId": "abc-123-uuid",
@@ -74,11 +78,13 @@ GET /api/proxy/lookup?name=Acme Corporation
 ```
 
 ### Lookup by Email
+
 ```bash
 GET /api/proxy/lookup?email=admin@acme.com
 ```
 
 **Response:**
+
 ```json
 {
   "tenantId": "abc-123-uuid",
@@ -88,6 +94,7 @@ GET /api/proxy/lookup?email=admin@acme.com
 ```
 
 ### Error Response (Tenant Not Found)
+
 ```json
 {
   "error": "Tenant not found",
@@ -100,23 +107,25 @@ GET /api/proxy/lookup?email=admin@acme.com
 ## Usage Examples
 
 ### Get All Fields
+
 ```bash
 GET /api/proxy/abc-123-uuid/config
 ```
 
 **Response:**
+
 ```json
 {
   "tenantId": "abc-123-uuid",
-  "agentId": "agent_8f74c4d6238bdf91c725aa0034",
-  "whatsappAgentId": "agent_9g85d5e7349ceg02d836bb0045",
+  "agentId": "agent_abc123xyz456def789ghi012",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345",
   "greeting": "Hi! How can I help you today?",
   "primaryColor": "#9b7ddd",
   "widgetPosition": "bottom-right",
   "whatsappEnabled": true,
-  "whatsappPhone": "+91 599 8021 588",
-  "phoneNumberId": "915998021588678",
-  "businessAccountId": "1471345127284298",
+  "whatsappPhone": "+1 555 123 4567",
+  "phoneNumberId": "123456789012345",
+  "businessAccountId": "987654321098765",
   "smsEnabled": true,
   "smsProvider": "twilio",
   "smsPhoneNumber": "+1234567890",
@@ -126,30 +135,34 @@ GET /api/proxy/abc-123-uuid/config
 ```
 
 ### Get Specific Fields Only
+
 ```bash
 GET /api/proxy/abc-123-uuid/config?fields=whatsappAgentId,phoneNumberId
 ```
 
 **Response:**
+
 ```json
 {
   "tenantId": "abc-123-uuid",
-  "whatsappAgentId": "agent_9g85d5e7349ceg02d836bb0045",
-  "phoneNumberId": "915998021588678"
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345",
+  "phoneNumberId": "123456789012345"
 }
 ```
 
 ### Get Agent IDs Only
+
 ```bash
 GET /api/proxy/abc-123-uuid/config?fields=agentId,whatsappAgentId
 ```
 
 **Response:**
+
 ```json
 {
   "tenantId": "abc-123-uuid",
-  "agentId": "agent_8f74c4d6238bdf91c725aa0034",
-  "whatsappAgentId": "agent_9g85d5e7349ceg02d836bb0045"
+  "agentId": "agent_abc123xyz456def789ghi012",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345"
 }
 ```
 
@@ -158,33 +171,43 @@ GET /api/proxy/abc-123-uuid/config?fields=agentId,whatsappAgentId
 ## Common Use Cases
 
 ### 1. **WhatsApp Workflow - Get Agent ID**
+
 ```
 ?fields=whatsappAgentId
 ```
+
 Use when: Creating Retell chat for WhatsApp messages
 
 ### 2. **Web Widget - Get Agent ID & Styling**
+
 ```
 ?fields=agentId,greeting,primaryColor,widgetPosition
 ```
+
 Use when: Initializing chat widget dynamically
 
 ### 3. **Voice Call - Get Agent & Tenant Info**
+
 ```
 ?fields=agentId,tenantName,whatsappPhone
 ```
+
 Use when: Making outbound calls with context
 
 ### 4. **Integration Check - Get WhatsApp Status**
+
 ```
 ?fields=whatsappEnabled,phoneNumberId,businessAccountId
 ```
+
 Use when: Validating WhatsApp integration before sending
 
 ### 5. **SMS/Twilio Workflow - Get SMS Config**
+
 ```
 ?fields=smsEnabled,smsProvider,smsPhoneNumber,messagingServiceSid
 ```
+
 Use when: Sending SMS via Twilio or other providers
 
 ---
@@ -192,6 +215,7 @@ Use when: Sending SMS via Twilio or other providers
 ## N8N Examples
 
 ### Example 0: Lookup Tenant ID by Name (NEW!)
+
 ```javascript
 // Step 1: HTTP Request Node - Lookup Tenant
 URL: https://embellics-app.onrender.com/api/proxy/lookup?name=Acme Corporation
@@ -212,6 +236,7 @@ Authentication: Header Auth
 ```
 
 ### Example 1: Get WhatsApp Agent ID
+
 ```javascript
 // HTTP Request Node
 URL: https://embellics-app.onrender.com/api/proxy/{{ $env.TENANT_ID }}/config?fields=whatsappAgentId
@@ -220,14 +245,29 @@ Authentication: Header Auth
   Name: Authorization
   Value: Bearer {{ $env.N8N_WEBHOOK_SECRET }}
 
+// Response example:
+{
+  "tenantId": "abc-123-uuid",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345"
+}
+
 // Use in next node:
 {{ $json.whatsappAgentId }}
 ```
 
 ### Example 2: Get Multiple Config Values
+
 ```javascript
 // HTTP Request Node
 URL: https://embellics-app.onrender.com/api/proxy/{{ $env.TENANT_ID }}/config?fields=whatsappAgentId,phoneNumberId,tenantName
+
+// Response example:
+{
+  "tenantId": "abc-123-uuid",
+  "whatsappAgentId": "agent_def456abc789ghi012jkl345",
+  "phoneNumberId": "123456789012345",
+  "tenantName": "Acme Corporation"
+}
 
 // Use in next node:
 {
@@ -240,6 +280,7 @@ URL: https://embellics-app.onrender.com/api/proxy/{{ $env.TENANT_ID }}/config?fi
 ```
 
 ### Example 3: Get All Config (Debug Mode)
+
 ```javascript
 // HTTP Request Node
 URL: https://embellics-app.onrender.com/api/proxy/{{ $env.TENANT_ID }}/config
@@ -252,6 +293,7 @@ URL: https://embellics-app.onrender.com/api/proxy/{{ $env.TENANT_ID }}/config
 ## Security Notes
 
 ✅ **Included (Safe):**
+
 - Agent IDs
 - Phone numbers (display only)
 - Business account IDs
@@ -259,6 +301,7 @@ URL: https://embellics-app.onrender.com/api/proxy/{{ $env.TENANT_ID }}/config
 - Tenant name
 
 ❌ **Excluded (Sensitive):**
+
 - Retell API keys
 - WhatsApp access tokens
 - Encryption keys
