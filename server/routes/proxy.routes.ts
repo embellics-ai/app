@@ -6,7 +6,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { storage } from '../storage';
-import { decrypt, decryptWhatsAppConfig } from '../encryption';
+import { decrypt, decryptWhatsAppConfig, decryptSMSConfig } from '../encryption';
 import { getGoogleSheetsAccessToken, parseServiceAccount } from '../google-sheets-auth';
 
 const router = Router();
@@ -115,6 +115,10 @@ router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Res
       'whatsappPhone',
       'phoneNumberId',
       'businessAccountId',
+      'smsEnabled',
+      'smsProvider',
+      'smsPhoneNumber',
+      'messagingServiceSid',
     ];
     const tenantFields = ['tenantName'];
 
@@ -149,7 +153,11 @@ router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Res
       const whatsappConfig = integration?.whatsappConfig
         ? decryptWhatsAppConfig(integration.whatsappConfig as any)
         : null;
+      const smsConfig = integration?.smsConfig
+        ? decryptSMSConfig(integration.smsConfig as any)
+        : null;
 
+      // WhatsApp fields
       if (returnAll || requestedFields.includes('whatsappEnabled')) {
         response.whatsappEnabled = integration?.whatsappEnabled || false;
       }
@@ -161,6 +169,20 @@ router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Res
       }
       if (returnAll || requestedFields.includes('businessAccountId')) {
         response.businessAccountId = whatsappConfig?.businessAccountId || null;
+      }
+
+      // SMS/Twilio fields
+      if (returnAll || requestedFields.includes('smsEnabled')) {
+        response.smsEnabled = integration?.smsEnabled || false;
+      }
+      if (returnAll || requestedFields.includes('smsProvider')) {
+        response.smsProvider = smsConfig?.provider || null;
+      }
+      if (returnAll || requestedFields.includes('smsPhoneNumber')) {
+        response.smsPhoneNumber = smsConfig?.phoneNumber || null;
+      }
+      if (returnAll || requestedFields.includes('messagingServiceSid')) {
+        response.messagingServiceSid = smsConfig?.messagingServiceSid || null;
       }
     }
 
