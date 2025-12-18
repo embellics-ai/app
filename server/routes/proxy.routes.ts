@@ -6,7 +6,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { storage } from '../storage';
-import { decrypt, decryptWhatsAppConfig } from '../encryption';
+import { decrypt, decryptWhatsAppConfig, decryptSMSConfig } from '../encryption';
 import { getGoogleSheetsAccessToken, parseServiceAccount } from '../google-sheets-auth';
 
 const router = Router();
@@ -82,6 +82,57 @@ async function getWhatsAppConfig(tenantId: string) {
 // TENANT CONFIG ENDPOINT
 // ============================================
 
+router.get('/lookup', validateN8NSecret, async (req: Request, res: Response) => {
+  try {
+    const tenantName = req.query.name as string | undefined;
+    const tenantEmail = req.query.email as string | undefined;
+
+    if (!tenantName && !tenantEmail) {
+      return res.status(400).json({
+        error: 'Missing required parameter',
+        message: 'Provide either ?name=TenantName or ?email=tenant@example.com',
+      });
+    }
+
+    console.log('[Proxy] Tenant lookup request:', { tenantName, tenantEmail });
+
+    let tenant;
+
+    if (tenantEmail) {
+      tenant = await storage.getTenantByEmail(tenantEmail);
+    } else if (tenantName) {
+      // Search by name (case-insensitive)
+      const allTenants = await storage.getAllTenants();
+      tenant = allTenants.find(
+        (t) => t.name.toLowerCase() === tenantName.toLowerCase(),
+      );
+    }
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: tenantName
+          ? `No tenant found with name: ${tenantName}`
+          : `No tenant found with email: ${tenantEmail}`,
+      });
+    }
+
+    console.log('[Proxy] Tenant found:', tenant.id, tenant.name);
+
+    res.json({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantEmail: tenant.email,
+    });
+  } catch (error) {
+    console.error('[Proxy] Error looking up tenant:', error);
+    res.status(500).json({
+      error: 'Failed to lookup tenant',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
@@ -115,6 +166,10 @@ router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Res
       'whatsappPhone',
       'phoneNumberId',
       'businessAccountId',
+      'smsEnabled',
+      'smsProvider',
+      'smsPhoneNumber',
+      'messagingServiceSid',
     ];
     const tenantFields = ['tenantName'];
 
@@ -149,7 +204,11 @@ router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Res
       const whatsappConfig = integration?.whatsappConfig
         ? decryptWhatsAppConfig(integration.whatsappConfig as any)
         : null;
+      const smsConfig = integration?.smsConfig
+        ? decryptSMSConfig(integration.smsConfig as any)
+        : null;
 
+      // WhatsApp fields
       if (returnAll || requestedFields.includes('whatsappEnabled')) {
         response.whatsappEnabled = integration?.whatsappEnabled || false;
       }
@@ -161,6 +220,20 @@ router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Res
       }
       if (returnAll || requestedFields.includes('businessAccountId')) {
         response.businessAccountId = whatsappConfig?.businessAccountId || null;
+      }
+
+      // SMS/Twilio fields
+      if (returnAll || requestedFields.includes('smsEnabled')) {
+        response.smsEnabled = integration?.smsEnabled || false;
+      }
+      if (returnAll || requestedFields.includes('smsProvider')) {
+        response.smsProvider = smsConfig?.provider || null;
+      }
+      if (returnAll || requestedFields.includes('smsPhoneNumber')) {
+        response.smsPhoneNumber = smsConfig?.phoneNumber || null;
+      }
+      if (returnAll || requestedFields.includes('messagingServiceSid')) {
+        response.messagingServiceSid = smsConfig?.messagingServiceSid || null;
       }
     }
 
