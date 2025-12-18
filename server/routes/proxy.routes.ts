@@ -82,6 +82,57 @@ async function getWhatsAppConfig(tenantId: string) {
 // TENANT CONFIG ENDPOINT
 // ============================================
 
+router.get('/lookup', validateN8NSecret, async (req: Request, res: Response) => {
+  try {
+    const tenantName = req.query.name as string | undefined;
+    const tenantEmail = req.query.email as string | undefined;
+
+    if (!tenantName && !tenantEmail) {
+      return res.status(400).json({
+        error: 'Missing required parameter',
+        message: 'Provide either ?name=TenantName or ?email=tenant@example.com',
+      });
+    }
+
+    console.log('[Proxy] Tenant lookup request:', { tenantName, tenantEmail });
+
+    let tenant;
+
+    if (tenantEmail) {
+      tenant = await storage.getTenantByEmail(tenantEmail);
+    } else if (tenantName) {
+      // Search by name (case-insensitive)
+      const allTenants = await storage.getAllTenants();
+      tenant = allTenants.find(
+        (t) => t.name.toLowerCase() === tenantName.toLowerCase(),
+      );
+    }
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: tenantName
+          ? `No tenant found with name: ${tenantName}`
+          : `No tenant found with email: ${tenantEmail}`,
+      });
+    }
+
+    console.log('[Proxy] Tenant found:', tenant.id, tenant.name);
+
+    res.json({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantEmail: tenant.email,
+    });
+  } catch (error) {
+    console.error('[Proxy] Error looking up tenant:', error);
+    res.status(500).json({
+      error: 'Failed to lookup tenant',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
