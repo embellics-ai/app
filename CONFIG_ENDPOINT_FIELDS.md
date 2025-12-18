@@ -19,18 +19,18 @@ GET /api/proxy/lookup?email=tenant@example.com
 
 ### 🤖 **Agent Configuration**
 
-| Field             | Type           | Source                           | Description                             | Example Value                        |
-| ----------------- | -------------- | -------------------------------- | --------------------------------------- | ------------------------------------ |
+| Field             | Type           | Source                           | Description                             | Example Value                      |
+| ----------------- | -------------- | -------------------------------- | --------------------------------------- | ---------------------------------- |
 | `agentId`         | string \| null | `widget_configs.retellAgentId`   | Retell AI agent ID for web chat widget  | `"agent_abc123xyz456def789ghi012"` |
 | `whatsappAgentId` | string \| null | `widget_configs.whatsappAgentId` | Retell AI agent ID for WhatsApp channel | `"agent_def456abc789ghi012jkl345"` |
 
 ### 💬 **WhatsApp Configuration**
 
-| Field               | Type           | Source                                                 | Description                            | Example Value        |
-| ------------------- | -------------- | ------------------------------------------------------ | -------------------------------------- | -------------------- |
-| `whatsappEnabled`   | boolean        | `tenant_integrations.whatsappEnabled`                  | Whether WhatsApp is enabled for tenant | `true`               |
+| Field               | Type           | Source                                                 | Description                            | Example Value       |
+| ------------------- | -------------- | ------------------------------------------------------ | -------------------------------------- | ------------------- |
+| `whatsappEnabled`   | boolean        | `tenant_integrations.whatsappEnabled`                  | Whether WhatsApp is enabled for tenant | `true`              |
 | `whatsappPhone`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumber`       | Display phone number (decrypted)       | `"+1 555 123 4567"` |
-| `phoneNumberId`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumberId`     | Meta WhatsApp phone number ID          | `"123456789012345"`  |
+| `phoneNumberId`     | string \| null | `tenant_integrations.whatsappConfig.phoneNumberId`     | Meta WhatsApp phone number ID          | `"123456789012345"` |
 | `businessAccountId` | string \| null | `tenant_integrations.whatsappConfig.businessAccountId` | Meta WhatsApp business account ID      | `"987654321098765"` |
 
 ### 📱 **SMS/Twilio Configuration**

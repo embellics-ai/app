@@ -45,9 +45,9 @@ async function wipeDatabase() {
   console.log('  - ALL schemas');
   console.log('  - ALL migrations history');
   console.log('═'.repeat(50));
-  
+
   const confirmed = await askConfirmation('\nType "yes" to proceed: ');
-  
+
   if (!confirmed) {
     console.log('❌ Operation cancelled');
     rl.close();
@@ -55,7 +55,7 @@ async function wipeDatabase() {
   }
 
   const doubleCheck = await askConfirmation('\n⚠️  Are you ABSOLUTELY sure? Type "yes" again: ');
-  
+
   if (!doubleCheck) {
     console.log('❌ Operation cancelled');
     rl.close();
@@ -87,11 +87,10 @@ async function wipeDatabase() {
 
     console.log(`\n✅ Database wiped successfully!`);
     console.log(`📊 Tables remaining: ${result.rows.length}`);
-    
+
     if (result.rows.length === 0) {
       console.log('✨ Database is completely empty and ready for fresh migrations');
     }
-
   } catch (error) {
     console.error('❌ Error wiping database:', error);
     process.exit(1);
