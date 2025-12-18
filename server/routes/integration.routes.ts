@@ -228,10 +228,10 @@ router.put(
       const smsConfigSchema = z.object({
         enabled: z.boolean(),
         provider: z.enum(['twilio', 'vonage', 'aws_sns']).optional(),
-        accountSid: z.string().min(1).optional(),
-        authToken: z.string().min(1).optional(),
-        phoneNumber: z.string().min(1).optional(),
-        messagingServiceSid: z.string().optional(),
+        accountSid: z.union([z.string().min(1), z.literal('')]).optional(),
+        authToken: z.union([z.string().min(1), z.literal('')]).optional(),
+        phoneNumber: z.union([z.string().min(1), z.literal('')]).optional(),
+        messagingServiceSid: z.union([z.string().min(1), z.literal('')]).optional(),
       });
 
       const data = smsConfigSchema.parse(req.body);
@@ -259,8 +259,28 @@ router.put(
         return res.json({ success: true, message: 'SMS integration disabled' });
       }
 
+      // Get existing config if updating
+      const existingConfig = integration?.smsConfig
+        ? decryptSMSConfig(integration.smsConfig as any)
+        : null;
+
+      // Merge with existing config (use existing values if empty string provided)
+      const provider = data.provider || existingConfig?.provider;
+      const accountSid =
+        data.accountSid && data.accountSid !== '' ? data.accountSid : existingConfig?.accountSid;
+      const authToken =
+        data.authToken && data.authToken !== '' ? data.authToken : existingConfig?.authToken;
+      const phoneNumber =
+        data.phoneNumber && data.phoneNumber !== ''
+          ? data.phoneNumber
+          : existingConfig?.phoneNumber;
+      const messagingServiceSid =
+        data.messagingServiceSid && data.messagingServiceSid !== ''
+          ? data.messagingServiceSid
+          : existingConfig?.messagingServiceSid;
+
       // Validate required fields when enabling
-      if (!data.provider || !data.accountSid || !data.authToken || !data.phoneNumber) {
+      if (!provider || !accountSid || !authToken || !phoneNumber) {
         return res.status(400).json({
           error: 'Provider, accountSid, authToken, and phoneNumber are required when enabling SMS',
         });
@@ -268,11 +288,11 @@ router.put(
 
       // Create SMS config object
       const smsConfig: SMSConfig = {
-        provider: data.provider,
-        accountSid: data.accountSid,
-        authToken: data.authToken,
-        phoneNumber: data.phoneNumber,
-        messagingServiceSid: data.messagingServiceSid,
+        provider,
+        accountSid,
+        authToken,
+        phoneNumber,
+        messagingServiceSid,
       };
 
       // Encrypt sensitive fields
