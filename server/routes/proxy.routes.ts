@@ -79,6 +79,112 @@ async function getWhatsAppConfig(tenantId: string) {
 }
 
 // ============================================
+// TENANT CONFIG ENDPOINT
+// ============================================
+
+router.get('/:tenantId/config', validateN8NSecret, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const fieldsParam = req.query.fields as string | undefined;
+
+    console.log('[Proxy] Config request for tenant:', tenantId, 'fields:', fieldsParam || 'all');
+
+    // Parse requested fields
+    const requestedFields = fieldsParam
+      ? fieldsParam
+          .split(',')
+          .map((f) => f.trim())
+          .filter(Boolean)
+      : ['*']; // Default: return all
+
+    const returnAll = requestedFields.includes('*') || requestedFields.length === 0;
+
+    // Build response object dynamically
+    const response: Record<string, any> = { tenantId };
+
+    // Determine which data sources we need to query
+    const agentFields = [
+      'agentId',
+      'whatsappAgentId',
+      'greeting',
+      'primaryColor',
+      'widgetPosition',
+    ];
+    const integrationFields = [
+      'whatsappEnabled',
+      'whatsappPhone',
+      'phoneNumberId',
+      'businessAccountId',
+    ];
+    const tenantFields = ['tenantName'];
+
+    const needWidgetConfig = returnAll || requestedFields.some((f) => agentFields.includes(f));
+    const needIntegration = returnAll || requestedFields.some((f) => integrationFields.includes(f));
+    const needTenant = returnAll || requestedFields.includes('tenantName');
+
+    // Fetch widget config if needed
+    if (needWidgetConfig) {
+      const widgetConfig = await storage.getWidgetConfig(tenantId);
+
+      if (returnAll || requestedFields.includes('agentId')) {
+        response.agentId = widgetConfig?.retellAgentId || null;
+      }
+      if (returnAll || requestedFields.includes('whatsappAgentId')) {
+        response.whatsappAgentId = widgetConfig?.whatsappAgentId || null;
+      }
+      if (returnAll || requestedFields.includes('greeting')) {
+        response.greeting = widgetConfig?.greeting || null;
+      }
+      if (returnAll || requestedFields.includes('primaryColor')) {
+        response.primaryColor = widgetConfig?.primaryColor || null;
+      }
+      if (returnAll || requestedFields.includes('widgetPosition')) {
+        response.widgetPosition = widgetConfig?.position || null;
+      }
+    }
+
+    // Fetch integration config if needed
+    if (needIntegration) {
+      const integration = await storage.getTenantIntegration(tenantId);
+      const whatsappConfig = integration?.whatsappConfig
+        ? decryptWhatsAppConfig(integration.whatsappConfig as any)
+        : null;
+
+      if (returnAll || requestedFields.includes('whatsappEnabled')) {
+        response.whatsappEnabled = integration?.whatsappEnabled || false;
+      }
+      if (returnAll || requestedFields.includes('whatsappPhone')) {
+        response.whatsappPhone = whatsappConfig?.phoneNumber || null;
+      }
+      if (returnAll || requestedFields.includes('phoneNumberId')) {
+        response.phoneNumberId = whatsappConfig?.phoneNumberId || null;
+      }
+      if (returnAll || requestedFields.includes('businessAccountId')) {
+        response.businessAccountId = whatsappConfig?.businessAccountId || null;
+      }
+    }
+
+    // Fetch tenant info if needed
+    if (needTenant) {
+      const tenant = await storage.getTenant(tenantId);
+      if (returnAll || requestedFields.includes('tenantName')) {
+        response.tenantName = tenant?.name || null;
+      }
+    }
+
+    console.log('[Proxy] Config response fields:', Object.keys(response).join(', '));
+
+    res.json(response);
+  } catch (error) {
+    console.error('[Proxy] Error fetching tenant config:', error);
+    res.status(500).json({
+      error: 'Failed to fetch tenant configuration',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ============================================
 // WHATSAPP PROXY API ENDPOINTS
 // ============================================
 
