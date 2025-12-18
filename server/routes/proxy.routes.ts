@@ -103,9 +103,7 @@ router.get('/lookup', validateN8NSecret, async (req: Request, res: Response) => 
     } else if (tenantName) {
       // Search by name (case-insensitive)
       const allTenants = await storage.getAllTenants();
-      tenant = allTenants.find(
-        (t) => t.name.toLowerCase() === tenantName.toLowerCase(),
-      );
+      tenant = allTenants.find((t) => t.name.toLowerCase() === tenantName.toLowerCase());
     }
 
     if (!tenant) {
