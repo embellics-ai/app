@@ -1055,47 +1055,71 @@ export default function IntegrationManagement({
                 )}
               />
 
-              {/* Platform Webhook URL - Dynamic based on workflow name */}
-              {webhookForm.watch('workflowName') && (
-                <div className="space-y-2 rounded-lg border border-purple-200 bg-purple-50 p-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-purple-900">
-                    <Webhook className="h-4 w-4" />
-                    Platform Webhook URL (Copy to Retell):
+              <FormField
+                control={webhookForm.control}
+                name="eventType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select event type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="whatsapp_message">WhatsApp Message</SelectItem>
+                        <SelectItem value="custom_event">Custom Event</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Choose which events trigger this webhook</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Platform Webhook URL - Only show for non-WhatsApp events */}
+              {webhookForm.watch('workflowName') &&
+                webhookForm.watch('eventType') !== 'whatsapp_message' && (
+                  <div className="space-y-2 rounded-lg border border-purple-200 bg-purple-50 p-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-purple-900">
+                      <Webhook className="h-4 w-4" />
+                      Platform Webhook URL:
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 rounded bg-white px-3 py-2 text-xs text-gray-800 border border-purple-200 break-all">
+                        {window.location.origin}/api/n8n/{webhookForm.watch('workflowName')}
+                      </code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const url = `${window.location.origin}/api/n8n/${webhookForm.watch('workflowName')}`;
+                          try {
+                            await navigator.clipboard.writeText(url);
+                            toast({
+                              title: 'URL Copied!',
+                              description: 'Platform webhook URL copied to clipboard',
+                            });
+                          } catch (err) {
+                            toast({
+                              title: 'Copy Failed',
+                              description: 'Failed to copy URL to clipboard',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-purple-700">
+                      Use this URL in your external platform's webhook configuration. The platform
+                      will forward requests to your N8N workflow.
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded bg-white px-3 py-2 text-xs text-gray-800 border border-purple-200 break-all">
-                      {window.location.origin}/api/n8n/{webhookForm.watch('workflowName')}
-                    </code>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        const url = `${window.location.origin}/api/n8n/${webhookForm.watch('workflowName')}`;
-                        try {
-                          await navigator.clipboard.writeText(url);
-                          toast({
-                            title: 'URL Copied!',
-                            description: 'Platform webhook URL copied to clipboard',
-                          });
-                        } catch (err) {
-                          toast({
-                            title: 'Copy Failed',
-                            description: 'Failed to copy URL to clipboard',
-                            variant: 'destructive',
-                          });
-                        }
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-purple-700">
-                    Use this URL in Retell's webhook configuration. Platform will forward requests
-                    to your N8N workflow.
-                  </p>
-                </div>
-              )}
+                )}
 
               <FormField
                 control={webhookForm.control}
