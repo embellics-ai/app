@@ -231,7 +231,10 @@ router.put(
         accountSid: z.string().min(1).optional(),
         authToken: z.string().min(1).optional(),
         phoneNumber: z.string().min(1).optional(),
-        messagingServiceSid: z.string().optional(),
+        messagingServiceSid: z
+          .string()
+          .optional()
+          .transform((val) => (val === '' ? undefined : val)),
       });
 
       const data = smsConfigSchema.parse(req.body);
