@@ -802,3 +802,92 @@ export const insertPaymentLinkSchema = createInsertSchema(paymentLinks).omit({
 
 export type InsertPaymentLink = z.infer<typeof insertPaymentLinkSchema>;
 export type PaymentLink = typeof paymentLinks.$inferSelect;
+
+// ============================================
+// TENANT BUSINESSES & BRANCHES
+// Multi-location support for external API integrations
+// ============================================
+
+/**
+ * Tenant Businesses
+ * Stores business entity information for each tenant's external API service
+ * One tenant can have multiple businesses (one per service)
+ */
+export const tenantBusinesses = pgTable(
+  'tenant_businesses',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    serviceName: text('service_name').notNull(),
+    // Must match external_api_configs.service_name (e.g., 'phorest_api', 'stripe')
+    businessId: text('business_id').notNull(),
+    // The business ID from the external service
+    businessName: text('business_name').notNull(),
+    // Human-readable business name
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Each tenant can have only ONE business per service
+    tenantServiceIdx: uniqueIndex('tenant_businesses_tenant_service_idx').on(
+      table.tenantId,
+      table.serviceName,
+    ),
+  }),
+);
+
+export const insertTenantBusinessSchema = createInsertSchema(tenantBusinesses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTenantBusiness = z.infer<typeof insertTenantBusinessSchema>;
+export type TenantBusiness = typeof tenantBusinesses.$inferSelect;
+
+/**
+ * Tenant Branches
+ * Stores branch/location information for each business
+ * One business can have multiple branches (e.g., multiple clinic locations)
+ */
+export const tenantBranches = pgTable(
+  'tenant_branches',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    businessId: varchar('business_id')
+      .notNull()
+      .references(() => tenantBusinesses.id, { onDelete: 'cascade' }),
+    branchId: text('branch_id').notNull(),
+    // The branch ID from the external service
+    branchName: text('branch_name').notNull(),
+    // Human-readable branch name
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    // Whether this is the primary/default branch
+    isActive: boolean('is_active').default(true).notNull(),
+    // Whether this branch is currently active
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // Each business can have only ONE branch with a specific branch_id
+    businessBranchIdx: uniqueIndex('tenant_branches_business_branch_idx').on(
+      table.businessId,
+      table.branchId,
+    ),
+  }),
+);
+
+export const insertTenantBranchSchema = createInsertSchema(tenantBranches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTenantBranch = z.infer<typeof insertTenantBranchSchema>;
+export type TenantBranch = typeof tenantBranches.$inferSelect;

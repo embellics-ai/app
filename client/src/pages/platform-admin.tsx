@@ -74,6 +74,7 @@ import {
 } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/auth-context';
 import { useLocation } from 'wouter';
+import BusinessBranchModal from '@/components/BusinessBranchModal';
 
 const inviteUserSchema = z
   .object({
@@ -125,6 +126,15 @@ export default function PlatformAdminPage() {
   }>({
     open: false,
     tenant: null,
+  });
+  const [businessBranchModal, setBusinessBranchModal] = useState<{
+    open: boolean;
+    tenantId: string | null;
+    tenantName: string | null;
+  }>({
+    open: false,
+    tenantId: null,
+    tenantName: null,
   });
 
   // Access control: Only platform admins can view this page
@@ -600,6 +610,25 @@ export default function PlatformAdminPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
+                                <Button
+                                  onClick={() =>
+                                    setBusinessBranchModal({
+                                      open: true,
+                                      tenantId: tenant.id,
+                                      tenantName: tenant.name,
+                                    })
+                                  }
+                                  className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-1.5 h-auto"
+                                  data-testid={`button-manage-branches-${tenant.id}`}
+                                >
+                                  <Building2 className="w-4 h-4 mr-1.5" />
+                                  <span>Branches</span>
+                                  {tenant.branchCount > 0 && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 bg-purple-800 rounded text-xs">
+                                      {tenant.branchCount}
+                                    </span>
+                                  )}
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -1251,6 +1280,20 @@ export default function PlatformAdminPage() {
             setAgentManagementDialog({ open: false, tenant: null });
           }}
         />
+
+        {/* Business & Branch Management Modal */}
+        {businessBranchModal.tenantId && businessBranchModal.tenantName && (
+          <BusinessBranchModal
+            tenantId={businessBranchModal.tenantId}
+            tenantName={businessBranchModal.tenantName}
+            open={businessBranchModal.open}
+            onOpenChange={(open) => {
+              if (!open) {
+                setBusinessBranchModal({ open: false, tenantId: null, tenantName: null });
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -925,4 +925,367 @@ router.delete(
   },
 );
 
+// ============================================
+// BUSINESS & BRANCH MANAGEMENT
+// ============================================
+
+/**
+ * Get all businesses for a tenant
+ * GET /api/platform/tenants/:tenantId/businesses
+ */
+router.get(
+  '/:tenantId/businesses',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const businesses = await storage.getTenantBusinessesByTenant(tenantId);
+
+      // Fetch branches for each business
+      const businessesWithBranches = await Promise.all(
+        businesses.map(async (business) => {
+          const branches = await storage.getTenantBranchesByBusiness(business.id);
+          return {
+            ...business,
+            branches,
+          };
+        }),
+      );
+
+      res.json(businessesWithBranches);
+    } catch (error) {
+      console.error('[Business] Error fetching businesses:', error);
+      res.status(500).json({ error: 'Failed to fetch businesses' });
+    }
+  },
+);
+
+/**
+ * Create a new business for a tenant
+ * POST /api/platform/tenants/:tenantId/businesses
+ */
+router.post(
+  '/:tenantId/businesses',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { serviceName, businessId, businessName } = req.body;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      // Validate input
+      if (!serviceName || !businessId || !businessName) {
+        return res.status(400).json({
+          error: 'Missing required fields: serviceName, businessId, businessName',
+        });
+      }
+
+      // Check if business already exists for this service
+      const existing = await storage.getTenantBusinessByService(tenantId, serviceName);
+      if (existing) {
+        return res.status(409).json({
+          error: 'Business already exists for this service',
+          message: `A business is already configured for ${serviceName}`,
+        });
+      }
+
+      const business = await storage.createTenantBusiness({
+        tenantId,
+        serviceName,
+        businessId,
+        businessName,
+      });
+
+      console.log('[Business] Created business:', business.id, serviceName);
+
+      res.status(201).json(business);
+    } catch (error) {
+      console.error('[Business] Error creating business:', error);
+      res.status(500).json({ error: 'Failed to create business' });
+    }
+  },
+);
+
+/**
+ * Update a business
+ * PUT /api/platform/tenants/:tenantId/businesses/:businessId
+ */
+router.put(
+  '/:tenantId/businesses/:businessId',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, businessId } = req.params;
+      const { businessName } = req.body;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const business = await storage.getTenantBusiness(businessId);
+      if (!business || business.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Business not found' });
+      }
+
+      const updated = await storage.updateTenantBusiness(businessId, {
+        businessName,
+      });
+
+      console.log('[Business] Updated business:', businessId);
+
+      res.json(updated);
+    } catch (error) {
+      console.error('[Business] Error updating business:', error);
+      res.status(500).json({ error: 'Failed to update business' });
+    }
+  },
+);
+
+/**
+ * Delete a business (and all its branches)
+ * DELETE /api/platform/tenants/:tenantId/businesses/:businessId
+ */
+router.delete(
+  '/:tenantId/businesses/:businessId',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, businessId } = req.params;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const business = await storage.getTenantBusiness(businessId);
+      if (!business || business.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Business not found' });
+      }
+
+      await storage.deleteTenantBusiness(businessId);
+
+      console.log('[Business] Deleted business:', businessId);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Business] Error deleting business:', error);
+      res.status(500).json({ error: 'Failed to delete business' });
+    }
+  },
+);
+
+/**
+ * Get branches for a business
+ * GET /api/platform/tenants/:tenantId/businesses/:businessId/branches
+ */
+router.get(
+  '/:tenantId/businesses/:businessId/branches',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, businessId } = req.params;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const business = await storage.getTenantBusiness(businessId);
+      if (!business || business.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Business not found' });
+      }
+
+      const branches = await storage.getTenantBranchesByBusiness(businessId);
+
+      res.json(branches);
+    } catch (error) {
+      console.error('[Branch] Error fetching branches:', error);
+      res.status(500).json({ error: 'Failed to fetch branches' });
+    }
+  },
+);
+
+/**
+ * Create a new branch for a business
+ * POST /api/platform/tenants/:tenantId/businesses/:businessId/branches
+ */
+router.post(
+  '/:tenantId/businesses/:businessId/branches',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, businessId } = req.params;
+      const { branchId, branchName, isPrimary, isActive } = req.body;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const business = await storage.getTenantBusiness(businessId);
+      if (!business || business.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Business not found' });
+      }
+
+      // Validate input
+      if (!branchId || !branchName) {
+        return res.status(400).json({
+          error: 'Missing required fields: branchId, branchName',
+        });
+      }
+
+      // Check if branch already exists
+      const existing = await storage.getTenantBranchByBranchId(businessId, branchId);
+      if (existing) {
+        return res.status(409).json({
+          error: 'Branch already exists',
+          message: `Branch with ID ${branchId} already exists for this business`,
+        });
+      }
+
+      const branch = await storage.createTenantBranch({
+        businessId,
+        branchId,
+        branchName,
+        isPrimary: isPrimary || false,
+        isActive: isActive !== undefined ? isActive : true,
+      });
+
+      // If this is set as primary, update other branches
+      if (isPrimary) {
+        await storage.setPrimaryBranch(businessId, branchId);
+      }
+
+      console.log('[Branch] Created branch:', branch.id, branchName);
+
+      res.status(201).json(branch);
+    } catch (error) {
+      console.error('[Branch] Error creating branch:', error);
+      res.status(500).json({ error: 'Failed to create branch' });
+    }
+  },
+);
+
+/**
+ * Update a branch
+ * PUT /api/platform/tenants/:tenantId/businesses/:businessId/branches/:branchDbId
+ */
+router.put(
+  '/:tenantId/businesses/:businessId/branches/:branchDbId',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, businessId, branchDbId } = req.params;
+      const { branchName, isPrimary, isActive } = req.body;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const business = await storage.getTenantBusiness(businessId);
+      if (!business || business.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Business not found' });
+      }
+
+      const branch = await storage.getTenantBranch(branchDbId);
+      if (!branch || branch.businessId !== businessId) {
+        return res.status(404).json({ error: 'Branch not found' });
+      }
+
+      const updates: any = {};
+      if (branchName !== undefined) updates.branchName = branchName;
+      if (isActive !== undefined) updates.isActive = isActive;
+      if (isPrimary !== undefined) updates.isPrimary = isPrimary;
+
+      const updated = await storage.updateTenantBranch(branchDbId, updates);
+
+      // If setting as primary, update other branches
+      if (isPrimary === true) {
+        await storage.setPrimaryBranch(businessId, branch.branchId);
+      }
+
+      console.log('[Branch] Updated branch:', branchDbId);
+
+      res.json(updated);
+    } catch (error) {
+      console.error('[Branch] Error updating branch:', error);
+      res.status(500).json({ error: 'Failed to update branch' });
+    }
+  },
+);
+
+/**
+ * Delete a branch
+ * DELETE /api/platform/tenants/:tenantId/businesses/:businessId/branches/:branchDbId
+ */
+router.delete(
+  '/:tenantId/businesses/:businessId/branches/:branchDbId',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { tenantId, businessId, branchDbId } = req.params;
+
+      // Platform admins can access any tenant, regular users only their own
+      if (!req.user?.isPlatformAdmin) {
+        const userTenantId = req.user?.tenantId;
+        if (!userTenantId || userTenantId !== tenantId) {
+          return res.status(403).json({ error: 'Access denied to this tenant' });
+        }
+      }
+
+      const business = await storage.getTenantBusiness(businessId);
+      if (!business || business.tenantId !== tenantId) {
+        return res.status(404).json({ error: 'Business not found' });
+      }
+
+      const branch = await storage.getTenantBranch(branchDbId);
+      if (!branch || branch.businessId !== businessId) {
+        return res.status(404).json({ error: 'Branch not found' });
+      }
+
+      await storage.deleteTenantBranch(branchDbId);
+
+      console.log('[Branch] Deleted branch:', branchDbId);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Branch] Error deleting branch:', error);
+      res.status(500).json({ error: 'Failed to delete branch' });
+    }
+  },
+);
+
 export default router;

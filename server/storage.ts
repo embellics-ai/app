@@ -32,6 +32,10 @@ import {
   type InsertVoiceAnalytics,
   type ExternalApiConfig,
   type InsertExternalApiConfig,
+  type TenantBusiness,
+  type InsertTenantBusiness,
+  type TenantBranch,
+  type InsertTenantBranch,
   tenants,
   clientUsers,
   apiKeys,
@@ -48,6 +52,8 @@ import {
   chatAnalytics,
   voiceAnalytics,
   externalApiConfigs,
+  tenantBusinesses,
+  tenantBranches,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -343,6 +349,36 @@ export interface IStorage {
   deleteExternalApiConfig(id: string): Promise<void>;
   markExternalApiConfigUsed(id: string): Promise<void>;
   incrementExternalApiStats(id: string, success: boolean): Promise<void>;
+
+  // Tenant Business methods
+  getTenantBusiness(id: string): Promise<TenantBusiness | undefined>;
+  getTenantBusinessByService(
+    tenantId: string,
+    serviceName: string,
+  ): Promise<TenantBusiness | undefined>;
+  getTenantBusinessesByTenant(tenantId: string): Promise<TenantBusiness[]>;
+  createTenantBusiness(business: InsertTenantBusiness): Promise<TenantBusiness>;
+  updateTenantBusiness(
+    id: string,
+    updates: Partial<InsertTenantBusiness>,
+  ): Promise<TenantBusiness | undefined>;
+  deleteTenantBusiness(id: string): Promise<void>;
+
+  // Tenant Branch methods
+  getTenantBranch(id: string): Promise<TenantBranch | undefined>;
+  getTenantBranchByBranchId(
+    businessId: string,
+    branchId: string,
+  ): Promise<TenantBranch | undefined>;
+  getTenantBranchesByBusiness(businessId: string): Promise<TenantBranch[]>;
+  getPrimaryBranch(businessId: string): Promise<TenantBranch | undefined>;
+  createTenantBranch(branch: InsertTenantBranch): Promise<TenantBranch>;
+  updateTenantBranch(
+    id: string,
+    updates: Partial<InsertTenantBranch>,
+  ): Promise<TenantBranch | undefined>;
+  setPrimaryBranch(businessId: string, branchId: string): Promise<void>;
+  deleteTenantBranch(id: string): Promise<void>;
 }
 
 // Database storage implementation using PostgreSQL
@@ -2384,6 +2420,181 @@ export class DbStorage implements IStorage {
         })
         .where(eq(externalApiConfigs.id, id));
     }
+  }
+
+  // ============================================
+  // TENANT BUSINESS METHODS
+  // ============================================
+
+  /**
+   * Get tenant business by ID
+   */
+  async getTenantBusiness(id: string): Promise<TenantBusiness | undefined> {
+    const [business] = await this.db
+      .select()
+      .from(tenantBusinesses)
+      .where(eq(tenantBusinesses.id, id))
+      .limit(1);
+    return business;
+  }
+
+  /**
+   * Get tenant business by service name
+   */
+  async getTenantBusinessByService(
+    tenantId: string,
+    serviceName: string,
+  ): Promise<TenantBusiness | undefined> {
+    const [business] = await this.db
+      .select()
+      .from(tenantBusinesses)
+      .where(
+        and(eq(tenantBusinesses.tenantId, tenantId), eq(tenantBusinesses.serviceName, serviceName)),
+      )
+      .limit(1);
+    return business;
+  }
+
+  /**
+   * Get all businesses for a tenant
+   */
+  async getTenantBusinessesByTenant(tenantId: string): Promise<TenantBusiness[]> {
+    return await this.db
+      .select()
+      .from(tenantBusinesses)
+      .where(eq(tenantBusinesses.tenantId, tenantId))
+      .orderBy(tenantBusinesses.createdAt);
+  }
+
+  /**
+   * Create a new tenant business
+   */
+  async createTenantBusiness(business: InsertTenantBusiness): Promise<TenantBusiness> {
+    const [created] = await this.db.insert(tenantBusinesses).values(business).returning();
+    return created!;
+  }
+
+  /**
+   * Update tenant business
+   */
+  async updateTenantBusiness(
+    id: string,
+    updates: Partial<InsertTenantBusiness>,
+  ): Promise<TenantBusiness | undefined> {
+    const [updated] = await this.db
+      .update(tenantBusinesses)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tenantBusinesses.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Delete tenant business (cascades to branches)
+   */
+  async deleteTenantBusiness(id: string): Promise<void> {
+    await this.db.delete(tenantBusinesses).where(eq(tenantBusinesses.id, id));
+  }
+
+  // ============================================
+  // TENANT BRANCH METHODS
+  // ============================================
+
+  /**
+   * Get tenant branch by ID
+   */
+  async getTenantBranch(id: string): Promise<TenantBranch | undefined> {
+    const [branch] = await this.db
+      .select()
+      .from(tenantBranches)
+      .where(eq(tenantBranches.id, id))
+      .limit(1);
+    return branch;
+  }
+
+  /**
+   * Get tenant branch by branch ID
+   */
+  async getTenantBranchByBranchId(
+    businessId: string,
+    branchId: string,
+  ): Promise<TenantBranch | undefined> {
+    const [branch] = await this.db
+      .select()
+      .from(tenantBranches)
+      .where(and(eq(tenantBranches.businessId, businessId), eq(tenantBranches.branchId, branchId)))
+      .limit(1);
+    return branch;
+  }
+
+  /**
+   * Get all branches for a business
+   */
+  async getTenantBranchesByBusiness(businessId: string): Promise<TenantBranch[]> {
+    return await this.db
+      .select()
+      .from(tenantBranches)
+      .where(eq(tenantBranches.businessId, businessId))
+      .orderBy(desc(tenantBranches.isPrimary), tenantBranches.createdAt);
+  }
+
+  /**
+   * Get primary branch for a business
+   */
+  async getPrimaryBranch(businessId: string): Promise<TenantBranch | undefined> {
+    const [branch] = await this.db
+      .select()
+      .from(tenantBranches)
+      .where(and(eq(tenantBranches.businessId, businessId), eq(tenantBranches.isPrimary, true)))
+      .limit(1);
+    return branch;
+  }
+
+  /**
+   * Create a new tenant branch
+   */
+  async createTenantBranch(branch: InsertTenantBranch): Promise<TenantBranch> {
+    const [created] = await this.db.insert(tenantBranches).values(branch).returning();
+    return created!;
+  }
+
+  /**
+   * Update tenant branch
+   */
+  async updateTenantBranch(
+    id: string,
+    updates: Partial<InsertTenantBranch>,
+  ): Promise<TenantBranch | undefined> {
+    const [updated] = await this.db
+      .update(tenantBranches)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tenantBranches.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Set a branch as primary (unsets other primary branches for the same business)
+   */
+  async setPrimaryBranch(businessId: string, branchId: string): Promise<void> {
+    // First, unset all primary branches for this business
+    await this.db
+      .update(tenantBranches)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(eq(tenantBranches.businessId, businessId));
+
+    // Then, set the specified branch as primary
+    await this.db
+      .update(tenantBranches)
+      .set({ isPrimary: true, updatedAt: new Date() })
+      .where(and(eq(tenantBranches.businessId, businessId), eq(tenantBranches.branchId, branchId)));
+  }
+
+  /**
+   * Delete tenant branch
+   */
+  async deleteTenantBranch(id: string): Promise<void> {
+    await this.db.delete(tenantBranches).where(eq(tenantBranches.id, id));
   }
 }
 
