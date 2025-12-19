@@ -117,10 +117,32 @@ router.get('/lookup', validateN8NSecret, async (req: Request, res: Response) => 
 
     console.log('[Proxy] Tenant found:', tenant.id, tenant.name);
 
+    // Fetch businesses and branches for this tenant
+    const businesses = await storage.getTenantBusinessesByTenant(tenant.id);
+
+    // Fetch branches for each business
+    const businessesWithBranches = await Promise.all(
+      businesses.map(async (business) => {
+        const branches = await storage.getTenantBranchesByBusiness(business.id);
+        return {
+          serviceName: business.serviceName,
+          businessId: business.businessId,
+          businessName: business.businessName,
+          branches: branches.map((branch) => ({
+            branchId: branch.branchId,
+            branchName: branch.branchName,
+            isPrimary: branch.isPrimary,
+            isActive: branch.isActive,
+          })),
+        };
+      }),
+    );
+
     res.json({
       tenantId: tenant.id,
       tenantName: tenant.name,
       tenantEmail: tenant.email,
+      businesses: businessesWithBranches,
     });
   } catch (error) {
     console.error('[Proxy] Error looking up tenant:', error);
