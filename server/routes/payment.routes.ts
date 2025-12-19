@@ -67,6 +67,7 @@ async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
  *   phorestBookingId?: string
  *   phorestClientId?: string
  *   description?: string
+ *   expiresInMinutes?: number (default: 5, max: 1440 = 24 hours)
  *   metadata?: object
  * }
  */
@@ -83,6 +84,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
       phorestBookingId,
       phorestClientId,
       description,
+      expiresInMinutes = 5,
       metadata = {},
     } = req.body;
 
@@ -98,6 +100,10 @@ router.post('/create-link', async (req: Request, res: Response) => {
         error: 'Amount must be greater than 0',
       });
     }
+
+    // Validate expiry time (min: 1 minute, max: 1440 minutes = 24 hours)
+    const expiryMinutes = Math.min(Math.max(expiresInMinutes, 1), 1440);
+    const expirySeconds = expiryMinutes * 60;
 
     // Get tenant's Stripe client
     const stripe = await getTenantStripeClient(tenantId);
@@ -132,7 +138,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
         phorestClientId: phorestClientId || '',
         ...metadata,
       },
-      expires_at: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+      expires_at: Math.floor(Date.now() / 1000) + expirySeconds,
     });
 
     // Store payment link in database
