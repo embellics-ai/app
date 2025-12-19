@@ -1031,8 +1031,8 @@ router.put(
   requireAuth,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { tenantId, businessId } = req.params;
-      const { businessName } = req.body;
+      const { tenantId, businessId: businessDbId } = req.params;
+      const { businessId, businessName } = req.body;
 
       // Platform admins can access any tenant, regular users only their own
       if (!req.user?.isPlatformAdmin) {
@@ -1042,14 +1042,16 @@ router.put(
         }
       }
 
-      const business = await storage.getTenantBusiness(businessId);
+      const business = await storage.getTenantBusiness(businessDbId);
       if (!business || business.tenantId !== tenantId) {
         return res.status(404).json({ error: 'Business not found' });
       }
 
-      const updated = await storage.updateTenantBusiness(businessId, {
-        businessName,
-      });
+      const updates: any = {};
+      if (businessId !== undefined) updates.businessId = businessId;
+      if (businessName !== undefined) updates.businessName = businessName;
+
+      const updated = await storage.updateTenantBusiness(businessDbId, updates);
 
       console.log('[Business] Updated business:', businessId);
 
@@ -1205,7 +1207,7 @@ router.put(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tenantId, businessId, branchDbId } = req.params;
-      const { branchName, isPrimary, isActive } = req.body;
+      const { branchId, branchName, isPrimary, isActive } = req.body;
 
       // Platform admins can access any tenant, regular users only their own
       if (!req.user?.isPlatformAdmin) {
@@ -1225,7 +1227,19 @@ router.put(
         return res.status(404).json({ error: 'Branch not found' });
       }
 
+      // Check if branchId is being changed and if new branchId already exists
+      if (branchId !== undefined && branchId !== branch.branchId) {
+        const existing = await storage.getTenantBranchByBranchId(businessId, branchId);
+        if (existing) {
+          return res.status(409).json({
+            error: 'Branch ID already exists',
+            message: `Branch with ID ${branchId} already exists for this business`,
+          });
+        }
+      }
+
       const updates: any = {};
+      if (branchId !== undefined) updates.branchId = branchId;
       if (branchName !== undefined) updates.branchName = branchName;
       if (isActive !== undefined) updates.isActive = isActive;
       if (isPrimary !== undefined) updates.isPrimary = isPrimary;

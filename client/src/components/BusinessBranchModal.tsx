@@ -90,12 +90,16 @@ export default function BusinessBranchModal({
     businessId: '',
     businessName: '',
   });
-  const [editBusinessName, setEditBusinessName] = useState('');
+  const [editBusinessData, setEditBusinessData] = useState({
+    businessId: '',
+    businessName: '',
+  });
   const [newBranch, setNewBranch] = useState({
     branchId: '',
     branchName: '',
   });
   const [editBranchData, setEditBranchData] = useState({
+    branchId: '',
     branchName: '',
     isPrimary: false,
     isActive: true,
@@ -142,17 +146,11 @@ export default function BusinessBranchModal({
 
   // Update business mutation
   const updateBusinessMutation = useMutation({
-    mutationFn: async ({
-      businessId,
-      businessName,
-    }: {
-      businessId: string;
-      businessName: string;
-    }) => {
+    mutationFn: async ({ businessId, data }: { businessId: string; data: { businessId: string; businessName: string } }) => {
       const response = await apiRequest(
         'PUT',
         `/api/platform/tenants/${tenantId}/businesses/${businessId}`,
-        { businessName },
+        data,
       );
       return await response.json();
     },
@@ -306,15 +304,15 @@ export default function BusinessBranchModal({
   };
 
   const handleUpdateBusiness = (businessId: string) => {
-    if (!editBusinessName.trim()) {
+    if (!editBusinessData.businessName.trim() || !editBusinessData.businessId.trim()) {
       toast({
-        title: 'Invalid name',
-        description: 'Business name cannot be empty',
+        title: 'Invalid fields',
+        description: 'Business name and ID cannot be empty',
         variant: 'destructive',
       });
       return;
     }
-    updateBusinessMutation.mutate({ businessId, businessName: editBusinessName });
+    updateBusinessMutation.mutate({ businessId, data: editBusinessData });
   };
 
   const handleCreateBranch = (businessId: string) => {
@@ -338,10 +336,10 @@ export default function BusinessBranchModal({
   };
 
   const handleUpdateBranch = (businessId: string, branchDbId: string) => {
-    if (!editBranchData.branchName.trim()) {
+    if (!editBranchData.branchName.trim() || !editBranchData.branchId.trim()) {
       toast({
-        title: 'Invalid name',
-        description: 'Branch name cannot be empty',
+        title: 'Invalid fields',
+        description: 'Branch name and ID cannot be empty',
         variant: 'destructive',
       });
       return;
@@ -525,27 +523,60 @@ export default function BusinessBranchModal({
                             )}
                           </Button>
                           {editingBusiness === business.id ? (
-                            <div className="flex items-center gap-2 flex-1">
-                              <Input
-                                value={editBusinessName}
-                                onChange={(e) => setEditBusinessName(e.target.value)}
-                                placeholder="Business name"
-                                className="flex-1"
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => handleUpdateBusiness(business.id)}
-                                disabled={updateBusinessMutation.isPending}
-                              >
-                                <Save className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingBusiness(null)}
-                              >
-                                <X className="w-3 h-3" />
-                              </Button>
+                            <div className="flex-1 space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label htmlFor="editBusinessName" className="text-xs">
+                                    Business Name
+                                  </Label>
+                                  <Input
+                                    id="editBusinessName"
+                                    value={editBusinessData.businessName}
+                                    onChange={(e) =>
+                                      setEditBusinessData({
+                                        ...editBusinessData,
+                                        businessName: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Business name"
+                                    className="h-8"
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="editBusinessId" className="text-xs">
+                                    Business ID
+                                  </Label>
+                                  <Input
+                                    id="editBusinessId"
+                                    value={editBusinessData.businessId}
+                                    onChange={(e) =>
+                                      setEditBusinessData({
+                                        ...editBusinessData,
+                                        businessId: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Business ID"
+                                    className="h-8"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleUpdateBusiness(business.id)}
+                                  disabled={updateBusinessMutation.isPending}
+                                >
+                                  <Save className="w-3 h-3 mr-1" />
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingBusiness(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
                             </div>
                           ) : (
                             <>
@@ -571,7 +602,10 @@ export default function BusinessBranchModal({
                                   size="icon"
                                   onClick={() => {
                                     setEditingBusiness(business.id);
-                                    setEditBusinessName(business.businessName);
+                                    setEditBusinessData({
+                                      businessId: business.businessId,
+                                      businessName: business.businessName,
+                                    });
                                   }}
                                 >
                                   <Edit className="w-4 h-4" />
@@ -686,17 +720,42 @@ export default function BusinessBranchModal({
                                   <CardContent className="p-3">
                                     {editingBranch === branch.id ? (
                                       <div className="space-y-2">
-                                        <Input
-                                          value={editBranchData.branchName}
-                                          onChange={(e) =>
-                                            setEditBranchData({
-                                              ...editBranchData,
-                                              branchName: e.target.value,
-                                            })
-                                          }
-                                          placeholder="Branch name"
-                                          className="h-8"
-                                        />
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <Label htmlFor="editBranchName" className="text-xs">
+                                              Branch Name
+                                            </Label>
+                                            <Input
+                                              id="editBranchName"
+                                              value={editBranchData.branchName}
+                                              onChange={(e) =>
+                                                setEditBranchData({
+                                                  ...editBranchData,
+                                                  branchName: e.target.value,
+                                                })
+                                              }
+                                              placeholder="Branch name"
+                                              className="h-8"
+                                            />
+                                          </div>
+                                          <div>
+                                            <Label htmlFor="editBranchId" className="text-xs">
+                                              Branch ID
+                                            </Label>
+                                            <Input
+                                              id="editBranchId"
+                                              value={editBranchData.branchId}
+                                              onChange={(e) =>
+                                                setEditBranchData({
+                                                  ...editBranchData,
+                                                  branchId: e.target.value,
+                                                })
+                                              }
+                                              placeholder="Branch ID"
+                                              className="h-8"
+                                            />
+                                          </div>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                           <Button
                                             size="sm"
@@ -770,6 +829,7 @@ export default function BusinessBranchModal({
                                             onClick={() => {
                                               setEditingBranch(branch.id);
                                               setEditBranchData({
+                                                branchId: branch.branchId,
                                                 branchName: branch.branchName,
                                                 isPrimary: branch.isPrimary,
                                                 isActive: branch.isActive,
