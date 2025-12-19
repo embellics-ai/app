@@ -67,7 +67,7 @@ async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
  *   phorestBookingId?: string
  *   phorestClientId?: string
  *   description?: string
- *   expiresInMinutes?: number (default: 5, max: 1440 = 24 hours)
+ *   expiresInMinutes?: number (default: 30, min: 30, max: 1440 = 24 hours)
  *   metadata?: object
  * }
  */
@@ -84,7 +84,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
       phorestBookingId,
       phorestClientId,
       description,
-      expiresInMinutes = 5,
+      expiresInMinutes = 30,
       metadata = {},
     } = req.body;
 
@@ -101,8 +101,8 @@ router.post('/create-link', async (req: Request, res: Response) => {
       });
     }
 
-    // Validate expiry time (min: 1 minute, max: 1440 minutes = 24 hours)
-    const expiryMinutes = Math.min(Math.max(expiresInMinutes, 1), 1440);
+    // Validate expiry time (min: 30 minutes per Stripe requirement, max: 1440 minutes = 24 hours)
+    const expiryMinutes = Math.min(Math.max(expiresInMinutes, 30), 1440);
     const expirySeconds = expiryMinutes * 60;
 
     // Get tenant's Stripe client
