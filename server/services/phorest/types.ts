@@ -15,7 +15,6 @@ import { z } from 'zod';
  * Request payload for creating a new client in Phorest
  */
 export interface CreateClientRequest {
-  tenantId: string;
   businessId: string;
   firstName: string;
   lastName: string;
@@ -78,7 +77,6 @@ export interface TenantBusiness {
  * Zod schema for validating create client request
  */
 export const createClientRequestSchema = z.object({
-  tenantId: z.string().min(1, 'Tenant ID is required'),
   businessId: z.string().min(1, 'Business ID is required'),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),

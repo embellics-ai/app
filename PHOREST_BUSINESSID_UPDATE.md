@@ -1,19 +1,45 @@
-# Phorest API Update - Required Changes
+# Phorest API Update - businessId Only
 
 ## Summary
 
-The Phorest client creation endpoint now requires `businessId` to be passed in the request payload instead of being automatically fetched from the database.
+The Phorest client creation endpoint has been updated to only require `businessId` in the request payload. The `tenantId` is automatically resolved from the `businessId` by looking it up in the `tenant_businesses` table.
 
-## Changes Needed
+## Key Changes
 
-### 1. Update `server/routes/phorest.routes.ts`
+### API Request Format
 
-**Schema Update:**
+**OLD (with tenantId):**
+
+```json
+{
+  "tenantId": "your-tenant-id",
+  "businessId": "your-business-id",
+  "firstName": "John",
+  "lastName": "Doe",
+  "mobile": "0871234567",
+  "email": "john@example.com"
+}
+```
+
+**NEW (businessId only):**
+
+```json
+{
+  "businessId": "your-business-id",
+  "firstName": "John",
+  "lastName": "Doe",
+  "mobile": "0871234567",
+  "email": "john@example.com"
+}
+```
+
+## Implementation Details
+
+### 1. Route Schema (`server/routes/phorest.routes.ts`)
 
 ```typescript
 const createClientSchema = z.object({
-  tenantId: z.string().min(1, 'Tenant ID is required'),
-  businessId: z.string().min(1, 'Business ID is required'), // ADD THIS LINE
+  businessId: z.string().min(1, 'Business ID is required'),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   mobile: z.string().min(1, 'Mobile number is required'),
@@ -21,90 +47,51 @@ const createClientSchema = z.object({
 });
 ```
 
-**Request Handling Update:**
+### 2. Type Definition (`server/services/phorest/types.ts`)
 
 ```typescript
-const { tenantId, businessId, firstName, lastName, mobile, email } = validationResult.data; // ADD businessId
+export interface CreateClientRequest {
+  businessId: string;
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  email: string;
+}
+```
 
-console.log('[Phorest API] Creating client:', {
-  tenantId,
-  businessId, // ADD THIS LINE
-  firstName,
-  lastName,
-  email,
+### 3. Service Implementation (`server/services/phorest/index.ts`)
+
+**New Method - Lookup Tenant from Business ID:**
+
+```typescript
+private async getTenantIdFromBusinessId(businessId: string): Promise<string> {
+  const businesses = await this.db
+    .select()
+    .from(tenantBusinesses)
+    .where(
+      and(
+        eq(tenantBusinesses.businessId, businessId),
+        eq(tenantBusinesses.serviceName, 'phorest_api'),
+      ),
+    );
+
+  if (!businesses || businesses.length === 0) {
+    throw new PhorestConfigError('Business ID not found in system', { businessId });
+  }
+
+  return businesses[0].tenantId;
+}
+```
+
+**Updated createClient Method:**
+tenantId: sanitizedRequest.tenantId,
+businessId: sanitizedRequest.businessId, // ADD THIS LINE
+firstName: sanitizedRequest.firstName,
+lastName: sanitizedRequest.lastName,
+email: sanitizedRequest.email,
 });
 
-const client = await phorestService.createClient({
-  tenantId,
-  businessId, // ADD THIS LINE
-  firstName,
-  lastName,
-  mobile,
-  email,
-});
-```
-
-### 2. Update `server/services/phorest/index.ts`
-
-**Method Signature Update:**
-
-```typescript
-// CHANGE THIS:
-async createClient(
-  request: Omit<CreateClientRequest, 'tenantId' | 'businessId'> & { tenantId: string },
-): Promise<CreateClientResponse>
-
-// TO THIS:
-async createClient(
-  request: CreateClientRequest,
-): Promise<CreateClientResponse>
-```
-
-**Remove Automatic BusinessId Fetching:**
-
-```typescript
-// DELETE THESE LINES (around line 139-151):
-const sanitizedRequest = {
-  tenantId: sanitizeInput(request.tenantId),
-  // DELETE: businessId fetch
-  firstName: sanitizeInput(request.firstName),
-  // ...
-};
-
-// Step 1: Get tenant's business ID (automatic population)
-const business = await this.getTenantBusiness(sanitizedRequest.tenantId);
-const businessId = business.businessId;
-
-logServiceActivity('info', 'Business ID retrieved', {
-  businessId,
-  businessName: business.businessName,
-});
-```
-
-**Add businessId to Sanitization:**
-
-```typescript
-const sanitizedRequest = {
-  tenantId: sanitizeInput(request.tenantId),
-  businessId: sanitizeInput(request.businessId), // ADD THIS LINE
-  firstName: sanitizeInput(request.firstName),
-  lastName: sanitizeInput(request.lastName),
-  mobile: sanitizeInput(request.mobile),
-  email: sanitizeInput(request.email),
-};
-```
-
-**Update Logging:**
-
-```typescript
-logServiceActivity('info', 'Creating Phorest client', {
-  tenantId: sanitizedRequest.tenantId,
-  businessId: sanitizedRequest.businessId, // ADD THIS LINE
-  firstName: sanitizedRequest.firstName,
-  lastName: sanitizedRequest.lastName,
-  email: sanitizedRequest.email,
-});
-```
+````
 
 **Update API URL Building:**
 
@@ -113,12 +100,20 @@ logServiceActivity('info', 'Creating Phorest client', {
 const apiUrl = buildPhorestApiUrl(config.baseUrl, sanitizedRequest.tenantId, businessId);
 
 // TO THIS:
-const apiUrl = buildPhorestApiUrl(
-  config.baseUrl,
-  sanitizedRequest.tenantId,
-  sanitizedRequest.businessId,
-);
-```
+```typescript
+async createClient(request: CreateClientRequest): Promise<CreateClientResponse> {
+  // Step 1: Lookup tenant ID from business ID
+  const tenantId = await this.getTenantIdFromBusinessId(sanitizedRequest.businessId);
+
+  // Step 2: Get Phorest API configuration using the resolved tenantId
+  const config = await this.getPhorestConfig(tenantId);
+
+  // Step 3: Build API URL (still needs tenantId for URL structure)
+  const apiUrl = buildPhorestApiUrl(config.baseUrl, tenantId, sanitizedRequest.businessId);
+
+  // Rest of implementation...
+}
+````
 
 ## Retell AI Configuration
 
@@ -128,10 +123,6 @@ const apiUrl = buildPhorestApiUrl(
 {
   "type": "object",
   "properties": {
-    "tenantId": {
-      "type": "string",
-      "description": "The tenant ID from get-tenant-details response"
-    },
     "businessId": {
       "type": "string",
       "description": "The Phorest business ID from tenant.businesses[0].businessId"
@@ -153,15 +144,14 @@ const apiUrl = buildPhorestApiUrl(
       "description": "Customer's email address"
     }
   },
-  "required": ["tenantId", "businessId", "firstName", "lastName", "mobile", "email"]
+  "required": ["businessId", "firstName", "lastName", "mobile", "email"]
 }
 ```
 
-### Example Values for SWC
+### Example Request
 
 ```json
 {
-  "tenantId": "your-tenant-id-here",
   "businessId": "your-phorest-business-id",
   "firstName": "John",
   "lastName": "Doe",
@@ -179,7 +169,6 @@ POST https://embellics-app.onrender.com/api/phorest/clients
 Content-Type: application/json
 
 {
-  "tenantId": "your-tenant-id-here",
   "businessId": "your-phorest-business-id",
   "firstName": "Test",
   "lastName": "User",
@@ -204,12 +193,10 @@ Expected Response:
 }
 ```
 
-## Documentation Updated
+## Files Updated
 
-✅ `/docs/API/PHOREST_API_DOCUMENTATION.md` - Updated to show businessId as required
-✅ `/docs/API/RETELL_TENANT_LOOKUP_INTEGRATION.md` - Updated JSON schema with businessId
-
-## Files to Manually Update
-
-⏳ `server/routes/phorest.routes.ts` - Add businessId to schema and request handling
-⏳ `server/services/phorest/index.ts` - Remove auto-fetch, accept businessId in request
+✅ `server/routes/phorest.routes.ts` - Removed tenantId from schema
+✅ `server/services/phorest/types.ts` - Removed tenantId from interface
+✅ `server/services/phorest/index.ts` - Added tenant lookup from businessId
+✅ `/docs/API/PHOREST_API_DOCUMENTATION.md` - Updated to show only businessId required
+✅ `/docs/API/RETELL_TENANT_LOOKUP_INTEGRATION.md` - Updated JSON schema without tenantId

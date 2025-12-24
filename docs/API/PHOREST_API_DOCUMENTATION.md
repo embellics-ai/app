@@ -20,7 +20,6 @@ Creates a new client in Phorest salon management system.
 
 ```json
 {
-  "tenantId": "string (required)",
   "businessId": "string (required)",
   "firstName": "string (required, max 100 chars)",
   "lastName": "string (required, max 100 chars)",
@@ -31,8 +30,7 @@ Creates a new client in Phorest salon management system.
 
 **Field Details:**
 
-- **`tenantId`**: Unique identifier for the tenant/salon
-- **`businessId`**: Phorest business ID for the salon
+- **`businessId`**: Phorest business ID for the salon (tenant ID is automatically resolved from this)
 - **`firstName`**: Client's first name (1-100 characters)
 - **`lastName`**: Client's last name (1-100 characters)
 - **`mobile`**: Phone number (will be formatted to Irish format: +353XXXXXXXXX)
@@ -111,7 +109,7 @@ Creates a new client in Phorest salon management system.
 ```javascript
 // In widget chat handler
 const contactData = {
-  tenantId: 'tenant-123',
+  businessId: 'your-phorest-business-id',
   firstName: 'John',
   lastName: 'Doe',
   mobile: '0871234567', // Will be formatted to +353871234567
@@ -149,7 +147,7 @@ try {
     "Content-Type": "application/json"
   },
   "body": {
-    "tenantId": "{{$json.tenantId}}",
+    "businessId": "{{$json.businessId}}",
     "firstName": "{{$json.first_name}}",
     "lastName": "{{$json.last_name}}",
     "mobile": "{{$json.phone}}",
@@ -166,7 +164,7 @@ const transcript = extractContactDetails(call.transcript);
 
 if (transcript.hasContactDetails) {
   const response = await axios.post('http://localhost:3000/api/phorest/clients', {
-    tenantId: call.tenantId,
+    businessId: call.businessId, // From tenant lookup response
     firstName: transcript.firstName,
     lastName: transcript.lastName,
     mobile: transcript.phone,
@@ -185,7 +183,7 @@ POST https://your-domain.com/api/phorest/clients
 
 Body:
 {
-  "tenantId": "{{ $json.tenantId }}",
+  "businessId": "{{ $json.businessId }}",
   "firstName": "{{ $json.contact.firstName }}",
   "lastName": "{{ $json.contact.lastName }}",
   "mobile": "{{ $json.contact.phone }}",

@@ -100,7 +100,7 @@ export default function PhorestConfigPage({ embedded = false }: PhorestConfigPag
                 <pre className="text-xs font-mono">
                   {JSON.stringify(
                     {
-                      tenantId: 'string (required)',
+                      businessId: 'string (required)',
                       firstName: 'string (required)',
                       lastName: 'string (required)',
                       mobile: 'string (required)',
@@ -122,7 +122,7 @@ export default function PhorestConfigPage({ embedded = false }: PhorestConfigPag
 
 ${JSON.stringify(
   {
-    tenantId: 'tenant_123',
+    businessId: 'your-phorest-business-id',
     firstName: 'John',
     lastName: 'Doe',
     mobile: '0871234567',
@@ -235,8 +235,9 @@ ${JSON.stringify(
             <div>
               <h4 className="font-semibold text-sm mb-1">Automatic Credential Fetching</h4>
               <p className="text-sm text-muted-foreground">
-                API credentials are automatically fetched from the database based on tenantId. You
-                never pass credentials in API requests.
+                API credentials are automatically fetched from the database based on businessId. The
+                tenant is automatically resolved from the business ID. You never pass credentials in
+                API requests.
               </p>
             </div>
             <div>
@@ -246,14 +247,14 @@ ${JSON.stringify(
                 - Encrypted API credentials
                 <br />•{' '}
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">tenant_businesses</code> -
-                Business ID and name
+                Business ID and name mapping
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-sm mb-1">Multi-Tenant Support</h4>
               <p className="text-sm text-muted-foreground">
-                Each tenant has isolated Phorest configuration. Use tenantId to specify which
-                account to use.
+                Each tenant has isolated Phorest configuration. Use businessId to specify which
+                account to use. The system automatically resolves the tenant from the business ID.
               </p>
             </div>
           </CardContent>

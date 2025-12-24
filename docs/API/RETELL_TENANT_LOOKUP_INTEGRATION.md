@@ -97,10 +97,6 @@ https://your-domain.com/api/phorest/clients
 {
   "type": "object",
   "properties": {
-    "tenantId": {
-      "type": "string",
-      "description": "The tenant ID obtained from get-tenant-details"
-    },
     "businessId": {
       "type": "string",
       "description": "The Phorest business ID from tenant.businesses[0].businessId"
@@ -122,7 +118,7 @@ https://your-domain.com/api/phorest/clients
       "description": "Customer's email address"
     }
   },
-  "required": ["tenantId", "businessId", "firstName", "lastName", "mobile", "email"]
+  "required": ["businessId", "firstName", "lastName", "mobile", "email"]
 }
 ```
 
@@ -140,18 +136,19 @@ WORKFLOW:
 2. Ask which salon/business they're calling about
 3. Use the get-tenant-details tool to look up the business
 4. If business not found, politely ask for clarification
-5. Once business is identified, collect their contact details:
+5. Once business is identified, extract the businessId from tenant.businesses[0].businessId
+6. Collect their contact details:
    - First name
    - Last name
    - Mobile phone number
    - Email address
-6. Use the create-phorest-client tool to register them
-7. Confirm registration was successful
+7. Use the create-phorest-client tool to register them (only needs businessId, not tenantId)
+8. Confirm registration was successful
 
 IMPORTANT:
 - Always use get-tenant-details first to identify the tenant
-- Store the tenantId from the lookup response
-- Pass the tenantId to create-phorest-client
+- Extract the businessId from the tenant.businesses array
+- Pass only the businessId to create-phorest-client (tenant is automatically resolved)
 - Be patient and friendly if customers need to spell their name or email
 
 Example conversation:
@@ -159,7 +156,7 @@ Customer: "I'd like to book with SWC"
 Agent: "Great! Let me look up SWC for you..." [calls get-tenant-details with name="SWC"]
 Agent: "Perfect, I found SWC. May I have your first name please?"
 ...
-Agent: "Thank you! Let me register you in our system..." [calls create-phorest-client with collected info]
+Agent: "Thank you! Let me register you in our system..." [calls create-phorest-client with businessId and collected info]
 ```
 
 ---
@@ -179,11 +176,14 @@ Agent: "Thank you! Let me register you in our system..." [calls create-phorest-c
        "tenantId": "clx123abc456",
        "tenantName": "SWC",
        "tenantEmail": "contact@swc.ie",
-       "businesses": [...]
+       "businesses": [{
+         "businessId": "your-phorest-business-id",
+         "serviceName": "phorest_api"
+       }]
      }
    }
 
-3. Agent extracts tenantId: "clx123abc456"
+3. Agent extracts businessId: "your-phorest-business-id" from tenant.businesses[0].businessId
 
 4. Agent collects:
    - firstName: "John"
@@ -194,7 +194,7 @@ Agent: "Thank you! Let me register you in our system..." [calls create-phorest-c
 5. Agent calls: POST /api/phorest/clients
    Body:
    {
-     "tenantId": "clx123abc456",
+     "businessId": "your-phorest-business-id",
      "firstName": "John",
      "lastName": "Doe",
      "mobile": "0871234567",
