@@ -80,7 +80,7 @@ export const createClientRequestSchema = z.object({
   businessId: z.string().min(1, 'Business ID is required'),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
-  mobile: z.string().regex(/^\+353\d{9}$/, 'Mobile must be in format +353XXXXXXXXX'),
+  mobile: z.string().min(1, 'Mobile number is required'),
   email: z.string().email('Invalid email format'),
 });
 
