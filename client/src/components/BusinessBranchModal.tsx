@@ -146,7 +146,13 @@ export default function BusinessBranchModal({
 
   // Update business mutation
   const updateBusinessMutation = useMutation({
-    mutationFn: async ({ businessId, data }: { businessId: string; data: { businessId: string; businessName: string } }) => {
+    mutationFn: async ({
+      businessId,
+      data,
+    }: {
+      businessId: string;
+      data: { businessId: string; businessName: string };
+    }) => {
       const response = await apiRequest(
         'PUT',
         `/api/platform/tenants/${tenantId}/businesses/${businessId}`,

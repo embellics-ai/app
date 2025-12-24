@@ -1,6 +1,7 @@
 # Phorest API Update - Required Changes
 
 ## Summary
+
 The Phorest client creation endpoint now requires `businessId` to be passed in the request payload instead of being automatically fetched from the database.
 
 ## Changes Needed
@@ -8,10 +9,11 @@ The Phorest client creation endpoint now requires `businessId` to be passed in t
 ### 1. Update `server/routes/phorest.routes.ts`
 
 **Schema Update:**
+
 ```typescript
 const createClientSchema = z.object({
   tenantId: z.string().min(1, 'Tenant ID is required'),
-  businessId: z.string().min(1, 'Business ID is required'),  // ADD THIS LINE
+  businessId: z.string().min(1, 'Business ID is required'), // ADD THIS LINE
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   mobile: z.string().min(1, 'Mobile number is required'),
@@ -20,12 +22,13 @@ const createClientSchema = z.object({
 ```
 
 **Request Handling Update:**
+
 ```typescript
-const { tenantId, businessId, firstName, lastName, mobile, email } = validationResult.data;  // ADD businessId
+const { tenantId, businessId, firstName, lastName, mobile, email } = validationResult.data; // ADD businessId
 
 console.log('[Phorest API] Creating client:', {
   tenantId,
-  businessId,  // ADD THIS LINE
+  businessId, // ADD THIS LINE
   firstName,
   lastName,
   email,
@@ -33,7 +36,7 @@ console.log('[Phorest API] Creating client:', {
 
 const client = await phorestService.createClient({
   tenantId,
-  businessId,  // ADD THIS LINE
+  businessId, // ADD THIS LINE
   firstName,
   lastName,
   mobile,
@@ -44,6 +47,7 @@ const client = await phorestService.createClient({
 ### 2. Update `server/services/phorest/index.ts`
 
 **Method Signature Update:**
+
 ```typescript
 // CHANGE THIS:
 async createClient(
@@ -57,6 +61,7 @@ async createClient(
 ```
 
 **Remove Automatic BusinessId Fetching:**
+
 ```typescript
 // DELETE THESE LINES (around line 139-151):
 const sanitizedRequest = {
@@ -77,10 +82,11 @@ logServiceActivity('info', 'Business ID retrieved', {
 ```
 
 **Add businessId to Sanitization:**
+
 ```typescript
 const sanitizedRequest = {
   tenantId: sanitizeInput(request.tenantId),
-  businessId: sanitizeInput(request.businessId),  // ADD THIS LINE
+  businessId: sanitizeInput(request.businessId), // ADD THIS LINE
   firstName: sanitizeInput(request.firstName),
   lastName: sanitizeInput(request.lastName),
   mobile: sanitizeInput(request.mobile),
@@ -89,10 +95,11 @@ const sanitizedRequest = {
 ```
 
 **Update Logging:**
+
 ```typescript
 logServiceActivity('info', 'Creating Phorest client', {
   tenantId: sanitizedRequest.tenantId,
-  businessId: sanitizedRequest.businessId,  // ADD THIS LINE
+  businessId: sanitizedRequest.businessId, // ADD THIS LINE
   firstName: sanitizedRequest.firstName,
   lastName: sanitizedRequest.lastName,
   email: sanitizedRequest.email,
@@ -100,12 +107,17 @@ logServiceActivity('info', 'Creating Phorest client', {
 ```
 
 **Update API URL Building:**
+
 ```typescript
 // CHANGE THIS:
 const apiUrl = buildPhorestApiUrl(config.baseUrl, sanitizedRequest.tenantId, businessId);
 
 // TO THIS:
-const apiUrl = buildPhorestApiUrl(config.baseUrl, sanitizedRequest.tenantId, sanitizedRequest.businessId);
+const apiUrl = buildPhorestApiUrl(
+  config.baseUrl,
+  sanitizedRequest.tenantId,
+  sanitizedRequest.businessId,
+);
 ```
 
 ## Retell AI Configuration
@@ -177,6 +189,7 @@ Content-Type: application/json
 ```
 
 Expected Response:
+
 ```json
 {
   "success": true,
@@ -192,9 +205,11 @@ Expected Response:
 ```
 
 ## Documentation Updated
+
 ✅ `/docs/API/PHOREST_API_DOCUMENTATION.md` - Updated to show businessId as required
 ✅ `/docs/API/RETELL_TENANT_LOOKUP_INTEGRATION.md` - Updated JSON schema with businessId
 
 ## Files to Manually Update
+
 ⏳ `server/routes/phorest.routes.ts` - Add businessId to schema and request handling
 ⏳ `server/services/phorest/index.ts` - Remove auto-fetch, accept businessId in request
