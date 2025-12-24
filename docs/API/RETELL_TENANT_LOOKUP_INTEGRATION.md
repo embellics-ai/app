@@ -101,6 +101,10 @@ https://your-domain.com/api/phorest/clients
       "type": "string",
       "description": "The tenant ID obtained from get-tenant-details"
     },
+    "businessId": {
+      "type": "string",
+      "description": "The Phorest business ID from tenant.businesses[0].businessId"
+    },
     "firstName": {
       "type": "string",
       "description": "Customer's first name"
@@ -118,7 +122,7 @@ https://your-domain.com/api/phorest/clients
       "description": "Customer's email address"
     }
   },
-  "required": ["tenantId", "firstName", "lastName", "mobile", "email"]
+  "required": ["tenantId", "businessId", "firstName", "lastName", "mobile", "email"]
 }
 ```
 
