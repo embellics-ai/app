@@ -23,6 +23,9 @@
 
 import type { Express } from 'express';
 
+// Public routes (no auth) - MUST be registered first
+import lookupRoutes from './lookup.routes';
+
 // Phase 1 routes
 import authRoutes from './auth.routes';
 import analyticsRoutes from './analytics.routes';
@@ -43,8 +46,14 @@ import widgetTestRoutes from './widget-test.routes';
 import widgetConfigRoutes from './widget-config.routes';
 import paymentRoutes from './payment.routes';
 import stripeWebhookRoutes from './stripe-webhook.routes';
+import phorestRoutes from './phorest.routes';
 
 export async function registerModularRoutes(app: Express): Promise<void> {
+  // ===== Public Routes (No Auth) - Register FIRST =====
+
+  // Public tenant lookup for external integrations (Retell AI, voice agents, etc.)
+  app.use('/api/lookup', lookupRoutes);
+
   // ===== Phase 1: Extracted Modular Routes =====
 
   // Authentication routes
@@ -102,11 +111,17 @@ export async function registerModularRoutes(app: Express): Promise<void> {
   // Stripe webhook routes (MUST come before JSON body parser in main app)
   app.use('/api/webhooks', stripeWebhookRoutes);
 
+  // Phorest API routes (universal client creation endpoint)
+  app.use('/api/phorest', phorestRoutes);
+
+  console.log(
+    '[Router] ✅ Registered public routes: lookup (tenant lookup for external integrations)',
+  );
   console.log(
     '[Router] ✅ Registered Phase 1 routes: auth, analytics, proxy, tenant, user, integration',
   );
   console.log(
-    '[Router] ✅ Registered Phase 2 routes: function, webhook, n8n, conversation, handoff, widget, widget-test, widget-config, payment, stripe-webhook',
+    '[Router] ✅ Registered Phase 2 routes: function, webhook, n8n, conversation, handoff, widget, widget-test, widget-config, payment, stripe-webhook, phorest',
   );
   console.log('[Router] ✅ All modular routes registered successfully');
 }

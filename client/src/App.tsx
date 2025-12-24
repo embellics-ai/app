@@ -18,6 +18,7 @@ import AnalyticsVoice from '@/pages/analytics-voice';
 import UnifiedAnalytics from '@/pages/unified-analytics';
 import PlatformAnalytics from '@/pages/platform-analytics';
 import WidgetConfigPage from '@/pages/widget-config';
+import IntegrationsPage from '@/pages/integrations';
 import ApiKeysPage from '@/pages/api-keys';
 import AgentDashboard from '@/pages/agent-dashboard';
 import AgentQueue from '@/pages/agent-queue';
@@ -76,6 +77,20 @@ function Router() {
       <Route path="/widget-config">
         <ProtectedRoute path="/widget-config">
           <WidgetConfigPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/phorest-config">
+        <ProtectedRoute path="/phorest-config">
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <IntegrationsPage />
+          </RoleProtectedRoute>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/integrations">
+        <ProtectedRoute path="/integrations">
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <IntegrationsPage />
+          </RoleProtectedRoute>
         </ProtectedRoute>
       </Route>
       <Route path="/api-keys">

@@ -38,6 +38,9 @@
   let inactivityTimer = null;
   const INACTIVITY_TIMEOUT = 300000;
 
+  // Store phone number temporarily for new client creation
+  let pendingPhoneNumber = null;
+
   // LocalStorage keys for persistence (only store IDs, not messages)
   const STORAGE_KEYS = {
     CHAT_ID: 'embellics_chat_id',
@@ -761,9 +764,9 @@
         // Timer will be started by toggleWidget when widget opens
       }
 
-      // Display assistant messages
+      // Display assistant messages (or show forms if triggered)
       if (data.messages && data.messages.length > 0) {
-        await displayMessagesSequentially(data.messages);
+        await processMessages(data.messages);
       }
     } catch (error) {
       console.error('[Embellics Widget] Error auto-starting conversation:', error);
@@ -851,11 +854,18 @@
           if (msg.role === 'user') {
             addMessageToUI('user', msg.content, null, true); // true = isHistorical
           } else if (msg.role === 'assistant' || msg.role === 'agent') {
-            // Skip special trigger messages like SHOW_CONTACT_FORM (they should trigger forms, not display)
+            // Skip special trigger messages like SHOW_CONTACT_FORM and SHOW_PHONE_FORM (they should trigger forms, not display)
             if (msg.content.trim() === 'SHOW_CONTACT_FORM') {
               // When loading from history, don't show the form again (already completed)
               // Just display a message indicating the form was shown
               addMessageToUI('system', 'Contact form was requested', null, true);
+              return; // Don't display the trigger text or show form
+            }
+
+            if (msg.content.trim() === 'SHOW_PHONE_FORM') {
+              // When loading from history, don't show the form again (already completed)
+              // Just display a message indicating the form was shown
+              addMessageToUI('system', 'Phone form was requested', null, true);
               return; // Don't display the trigger text or show form
             }
 
@@ -1094,55 +1104,7 @@
 
         // Check if first message is a trigger for contact form
         if (data.messages && data.messages.length > 0) {
-          const firstMessage = data.messages[0];
-
-          if (firstMessage.trim() === 'SHOW_CONTACT_FORM') {
-            // Show contact form and handle submission
-            showContactForm(async (contactData) => {
-              // Send contact data back to agent as JSON
-              const contactDetails = {
-                first_name: contactData.firstName,
-                last_name: contactData.lastName,
-                email: contactData.email,
-                phone: contactData.phone,
-              };
-              const contactMessage = JSON.stringify(contactDetails);
-
-              try {
-                const followupResponse = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    apiKey: API_KEY,
-                    chatId: chatId,
-                    message: contactMessage,
-                    referrer: window.location.host,
-                  }),
-                });
-
-                if (followupResponse.ok) {
-                  const followupData = await followupResponse.json();
-                  if (followupData.messages && followupData.messages.length > 0) {
-                    // Display messages sequentially with delays
-                    await displayMessagesSequentially(followupData.messages);
-                  }
-                }
-              } catch (error) {
-                console.error('[Embellics Widget] Failed to send contact data:', error);
-                showError('Failed to submit contact details. Please try again.');
-              }
-            });
-
-            if (data.chatId) {
-              chatId = data.chatId;
-              saveSessionState();
-            }
-
-            return; // Don't show the trigger text
-          }
-
-          // Display all messages sequentially with delays
-          await displayMessagesSequentially(data.messages);
+          await processMessages(data.messages);
         }
 
         if (data.chatId) {
@@ -1232,6 +1194,120 @@
     setTimeout(() => errorDiv.classList.remove('show'), 5000);
   }
 
+  // Show phone number form only
+  function showPhoneForm(callback, isHistorical = false) {
+    const messagesContainer = document.getElementById('embellics-widget-messages');
+
+    const formContainer = document.createElement('div');
+    formContainer.className = 'embellics-contact-form';
+
+    formContainer.innerHTML = `
+      <div class="embellics-contact-form-title">Please provide your phone number:</div>
+      <div class="embellics-contact-form-phone-group">
+        <input type="text" value="353" class="embellics-contact-form-phone-prefix" disabled readonly>
+        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-phone-input" placeholder="812345678 (9 digits) *" required autocomplete="tel" maxlength="9" ${isHistorical ? 'disabled' : ''}>
+      </div>
+      <div class="embellics-contact-form-error" id="embellics-form-error"></div>
+      <button type="button" id="embellics-form-submit" ${isHistorical ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>Submit Phone</button>
+    `;
+
+    messagesContainer.appendChild(formContainer);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Don't focus or handle submission if historical
+    if (isHistorical) {
+      return;
+    }
+
+    // Focus phone input
+    const phoneInput = document.getElementById('embellics-form-phone');
+    setTimeout(() => phoneInput.focus(), 100);
+
+    // Handle form submission
+    const submitBtn = document.getElementById('embellics-form-submit');
+    const errorDiv = document.getElementById('embellics-form-error');
+
+    // Add phone input helper - only allow digits and limit to 9
+    phoneInput.addEventListener('input', (e) => {
+      let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+
+      // Limit to 9 digits max
+      if (value.length > 9) {
+        value = value.slice(0, 9);
+      }
+
+      // Update input value
+      e.target.value = value;
+    });
+
+    const handleSubmit = () => {
+      const phone = phoneInput.value.trim();
+
+      // Validation
+      errorDiv.classList.remove('show');
+      let isValid = true;
+
+      // Phone validation (Irish format: 9 digits after 353 prefix)
+      const phoneDigits = phone.replace(/\D/g, '');
+
+      if (!phone || phoneDigits.length !== 9) {
+        phoneInput.classList.add('error');
+        isValid = false;
+        if (phoneDigits.length === 0) {
+          errorDiv.textContent = 'Phone number is required';
+        } else if (phoneDigits.length < 9) {
+          errorDiv.textContent = `Phone number must be exactly 9 digits. You entered ${phoneDigits.length} digit${phoneDigits.length === 1 ? '' : 's'}.`;
+        } else {
+          errorDiv.textContent = 'Phone number must be exactly 9 digits';
+        }
+      } else {
+        phoneInput.classList.remove('error');
+      }
+
+      if (!isValid) {
+        errorDiv.classList.add('show');
+        return;
+      }
+
+      // Clear any previous errors
+      errorDiv.textContent = '';
+      errorDiv.classList.remove('show');
+
+      // Disable form
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      // Return formatted data with full Irish phone number (353 prefix + 9 digits)
+      const fullPhone = '353' + phone;
+      const phoneData = {
+        phone: fullPhone,
+      };
+
+      // Remove form and show confirmation
+      formContainer.remove();
+
+      // Add confirmation message
+      const confirmText = `✓ Phone number saved: +${fullPhone}`;
+      addMessageToUI('system', confirmText);
+
+      // Call callback with data
+      if (callback) {
+        callback(phoneData);
+      }
+    };
+
+    // Submit on button click
+    submitBtn.addEventListener('click', handleSubmit);
+
+    // Submit on Enter key
+    phoneInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      }
+    });
+  }
+
   // Show contact details form
   function showContactForm(callback, isHistorical = false) {
     const messagesContainer = document.getElementById('embellics-widget-messages');
@@ -1247,10 +1323,6 @@
       </div>
       <div class="embellics-contact-form-row">
         <input type="email" id="embellics-form-email" class="embellics-contact-form-full" placeholder="Email *" required autocomplete="email" maxlength="100" ${isHistorical ? 'disabled' : ''}>
-      </div>
-      <div class="embellics-contact-form-phone-group">
-        <input type="text" value="353" class="embellics-contact-form-phone-prefix" disabled readonly>
-        <input type="tel" id="embellics-form-phone" class="embellics-contact-form-phone-input" placeholder="812345678 (9 digits) *" required autocomplete="tel" maxlength="9" ${isHistorical ? 'disabled' : ''}>
       </div>
       <div class="embellics-contact-form-error" id="embellics-form-error"></div>
       <button type="button" id="embellics-form-submit" ${isHistorical ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>Submit Details</button>
@@ -1272,25 +1344,10 @@
     const submitBtn = document.getElementById('embellics-form-submit');
     const errorDiv = document.getElementById('embellics-form-error');
 
-    // Add phone input helper - only allow digits and limit to 9
-    const phoneInput = document.getElementById('embellics-form-phone');
-    phoneInput.addEventListener('input', (e) => {
-      let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-
-      // Limit to 9 digits max
-      if (value.length > 9) {
-        value = value.slice(0, 9);
-      }
-
-      // Update input value
-      e.target.value = value;
-    });
-
     const handleSubmit = () => {
       const firstName = document.getElementById('embellics-form-firstname').value.trim();
       const lastName = document.getElementById('embellics-form-lastname').value.trim();
       const email = document.getElementById('embellics-form-email').value.trim();
-      const phone = document.getElementById('embellics-form-phone').value.trim();
 
       // Validation
       errorDiv.classList.remove('show');
@@ -1319,27 +1376,8 @@
         document.getElementById('embellics-form-email').classList.remove('error');
       }
 
-      // Phone validation (Irish format: 9 digits after 353 prefix)
-      const phoneDigits = phone.replace(/\D/g, '');
-
-      if (!phone || phoneDigits.length !== 9) {
-        document.getElementById('embellics-form-phone').classList.add('error');
-        isValid = false;
-        if (phoneDigits.length === 0) {
-          errorDiv.textContent = 'Phone number is required';
-        } else if (phoneDigits.length < 9) {
-          errorDiv.textContent = `Phone number must be exactly 9 digits. You entered ${phoneDigits.length} digit${phoneDigits.length === 1 ? '' : 's'}.`;
-        } else {
-          errorDiv.textContent = 'Phone number must be exactly 9 digits';
-        }
-      } else {
-        document.getElementById('embellics-form-phone').classList.remove('error');
-      }
-
       if (!isValid) {
-        if (!errorDiv.textContent) {
-          errorDiv.textContent = 'Please fill in all fields correctly';
-        }
+        errorDiv.textContent = 'Please fill in all fields correctly';
         errorDiv.classList.add('show');
         return;
       }
@@ -1352,20 +1390,18 @@
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
 
-      // Return formatted data with full Irish phone number (353 prefix + 9 digits)
-      const fullPhone = '353' + phone;
+      // Return formatted data (no phone number)
       const contactData = {
         firstName,
         lastName,
         email,
-        phone: fullPhone,
       };
 
       // Remove form and show confirmation
       formContainer.remove();
 
       // Add confirmation message
-      const confirmText = `✓ Contact details saved:\nName: ${firstName} ${lastName}\nEmail: ${email}\nPhone: +${fullPhone}`;
+      const confirmText = `✓ Contact details saved:\nName: ${firstName} ${lastName}\nEmail: ${email}`;
       addMessageToUI('system', confirmText);
 
       // Call callback with data
@@ -1388,15 +1424,134 @@
     });
   }
 
+  // Process messages and handle form triggers
+  async function processMessages(messages) {
+    if (!messages || messages.length === 0) {
+      return;
+    }
+
+    const firstMessage = messages[0];
+    console.log('[Embellics Widget] Processing messages, first message:', firstMessage);
+
+    // Check if first message is a trigger for contact form
+    if (firstMessage.trim() === 'SHOW_CONTACT_FORM') {
+      console.log('[Embellics Widget] Showing contact form');
+      showContactForm(async (contactData) => {
+        // Send contact data back to agent as structured JSON that Retell can parse
+        // If we have a pending phone number (from new client flow), include it
+        const contactDetails = {
+          first_name: contactData.firstName,
+          last_name: contactData.lastName,
+          email: contactData.email,
+        };
+
+        // Include phone number if available from previous phone form submission
+        if (pendingPhoneNumber) {
+          contactDetails.phone = pendingPhoneNumber;
+          console.log(
+            '[Embellics Widget] Including pending phone number in contact details:',
+            pendingPhoneNumber,
+          );
+          // Clear the pending phone number after using it
+          pendingPhoneNumber = null;
+        }
+
+        const contactMessage = JSON.stringify(contactDetails);
+        console.log('[Embellics Widget] Sending contact details:', contactMessage);
+
+        try {
+          const followupResponse = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              apiKey: API_KEY,
+              chatId: chatId,
+              message: contactMessage,
+              referrer: window.location.host,
+            }),
+          });
+
+          if (followupResponse.ok) {
+            const followupData = await followupResponse.json();
+            console.log('[Embellics Widget] Contact form followup response:', followupData);
+            if (followupData.messages && followupData.messages.length > 0) {
+              // Recursively process follow-up messages
+              await processMessages(followupData.messages);
+            }
+          }
+        } catch (error) {
+          console.error('[Embellics Widget] Failed to send contact data:', error);
+          showError('Failed to submit contact details. Please try again.');
+        }
+      });
+      return; // Don't process other messages
+    }
+
+    // Check if first message is a trigger for phone form
+    if (firstMessage.trim() === 'SHOW_PHONE_FORM') {
+      console.log('[Embellics Widget] Showing phone form');
+      showPhoneForm(async (phoneData) => {
+        // Store phone number for potential use in contact form submission
+        pendingPhoneNumber = phoneData.phone;
+        console.log('[Embellics Widget] Stored pending phone number:', pendingPhoneNumber);
+
+        // Send phone data back to agent as structured JSON that Retell can parse
+        const phoneDetails = {
+          phone: phoneData.phone,
+        };
+        const phoneMessage = JSON.stringify(phoneDetails);
+
+        try {
+          const followupResponse = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              apiKey: API_KEY,
+              chatId: chatId,
+              message: phoneMessage,
+              referrer: window.location.host,
+            }),
+          });
+
+          if (followupResponse.ok) {
+            const followupData = await followupResponse.json();
+            console.log('[Embellics Widget] Phone form followup response:', followupData);
+            if (followupData.messages && followupData.messages.length > 0) {
+              // Recursively process follow-up messages
+              await processMessages(followupData.messages);
+            }
+          }
+        } catch (error) {
+          console.error('[Embellics Widget] Failed to send phone data:', error);
+          showError('Failed to submit phone number. Please try again.');
+        }
+      });
+      return; // Don't process other messages
+    }
+
+    // No form trigger, display messages normally
+    await displayMessagesSequentially(messages);
+  }
+
   // Display multiple messages sequentially with delays
   async function displayMessagesSequentially(messages) {
     for (let i = 0; i < messages.length; i++) {
+      const currentMessage = messages[i];
+
+      // Skip trigger messages - they should not be displayed
+      if (
+        currentMessage.trim() === 'SHOW_CONTACT_FORM' ||
+        currentMessage.trim() === 'SHOW_PHONE_FORM'
+      ) {
+        continue; // Skip this message entirely
+      }
+
       // Parse for structured options
-      let responseText = messages[i];
+      let responseText = currentMessage;
       let responseOptions = null;
 
       try {
-        const parsed = JSON.parse(messages[i]);
+        const parsed = JSON.parse(currentMessage);
         if (parsed.message && parsed.options) {
           responseText = parsed.message;
           responseOptions = parsed.options;
@@ -1513,50 +1668,7 @@
         showTyping(false);
 
         if (data.messages && data.messages.length > 0) {
-          const firstMessage = data.messages[0];
-
-          // Check if first message is a trigger for contact form
-          if (firstMessage.trim() === 'SHOW_CONTACT_FORM') {
-            // Show contact form and handle submission
-            showContactForm(async (contactData) => {
-              // Send contact data back to agent as JSON
-              const contactDetails = {
-                first_name: contactData.firstName,
-                last_name: contactData.lastName,
-                email: contactData.email,
-                phone: contactData.phone,
-              };
-              const contactMessage = JSON.stringify(contactDetails);
-
-              try {
-                const followupResponse = await fetch(`${WIDGET_API_BASE}/api/widget/chat`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    apiKey: API_KEY,
-                    chatId: chatId,
-                    message: contactMessage,
-                    referrer: window.location.host,
-                  }),
-                });
-
-                if (followupResponse.ok) {
-                  const followupData = await followupResponse.json();
-                  if (followupData.messages && followupData.messages.length > 0) {
-                    // Display messages sequentially with delays
-                    await displayMessagesSequentially(followupData.messages);
-                  }
-                }
-              } catch (error) {
-                console.error('[Embellics Widget] Failed to send contact data:', error);
-                showError('Failed to submit contact details. Please try again.');
-              }
-            });
-            return; // Don't show the trigger text
-          }
-
-          // Display all messages sequentially with delays
-          await displayMessagesSequentially(data.messages);
+          await processMessages(data.messages);
         }
       }
     } catch (error) {
