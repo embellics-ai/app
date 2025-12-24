@@ -210,7 +210,7 @@ export class PhorestService {
       });
 
       // Step 6: Build API URL
-      const apiUrl = buildPhorestApiUrl(config.baseUrl, tenantId, sanitizedRequest.businessId);
+      const apiUrl = buildPhorestApiUrl(config.baseUrl, sanitizedRequest.businessId);
 
       logServiceActivity('info', 'Calling Phorest API', { url: apiUrl });
 

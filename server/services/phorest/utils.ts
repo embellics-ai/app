@@ -49,46 +49,22 @@ export function decryptPhorestCredentials(encryptedCredentials: string): Phorest
 
 /**
  * Format phone number to Phorest API expected format (+353XXXXXXXXX)
+ * Assumes the input is already in format 353XXXXXXXXX
  *
- * @param phone - Phone number in various formats
- * @returns Formatted phone number
- * @throws PhorestValidationError if phone number is invalid
+ * @param phone - Phone number in format 353XXXXXXXXX
+ * @returns Formatted phone number with + prefix
  */
 export function formatPhoneNumber(phone: string): string {
-  // Remove all whitespace, dashes, parentheses, and dots
-  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
+  // Remove all whitespace
+  const cleaned = phone.trim();
 
-  // If already in correct format, return as is
-  if (/^\+353\d{9}$/.test(cleaned)) {
+  // If already has +, return as is
+  if (cleaned.startsWith('+')) {
     return cleaned;
   }
 
-  // If starts with +353 but wrong length
-  if (cleaned.startsWith('+353')) {
-    throw new PhorestValidationError(
-      `Invalid Irish phone number: ${phone}. Expected format: +353XXXXXXXXX (9 digits after +353)`,
-    );
-  }
-
-  // If starts with 353 (no +), add it
-  if (/^353\d{9}$/.test(cleaned)) {
-    return `+${cleaned}`;
-  }
-
-  // If starts with 0 (Irish local format), convert to international
-  if (/^0\d{9}$/.test(cleaned)) {
-    return `+353${cleaned.substring(1)}`;
-  }
-
-  // If just 9 digits, add +353
-  if (/^\d{9}$/.test(cleaned)) {
-    return `+353${cleaned}`;
-  }
-
-  // Invalid format
-  throw new PhorestValidationError(
-    `Invalid phone number format: ${phone}. Expected Irish format: +353XXXXXXXXX, 0XXXXXXXXX, or XXXXXXXXX (9 digits)`,
-  );
+  // Add + prefix (assumes format is 353XXXXXXXXX)
+  return `+${cleaned}`;
 }
 
 /**
@@ -146,19 +122,19 @@ export function sanitizeInput(input: string): string {
 }
 
 /**
- * Build Phorest API URL
+ * Build Phorest API URL for client creation
  *
  * @param baseUrl - Base URL from config
- * @param tenantId - Tenant ID
- * @param businessId - Business ID
+ * @param businessId - Phorest business ID
  * @returns Full API endpoint URL
  */
-export function buildPhorestApiUrl(baseUrl: string, tenantId: string, businessId: string): string {
+export function buildPhorestApiUrl(baseUrl: string, businessId: string): string {
   // Remove trailing slash from baseUrl if present
   const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
   // Build the URL according to Phorest API format
-  return `${cleanBaseUrl}/${tenantId}/http/phorest_api/api/business/${businessId}/client`;
+  // Format: {baseUrl}/api/business/{businessId}/client
+  return `${cleanBaseUrl}/api/business/${businessId}/client`;
 }
 
 /**
