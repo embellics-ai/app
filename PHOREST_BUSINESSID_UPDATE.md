@@ -161,8 +161,8 @@ const apiUrl = buildPhorestApiUrl(
 
 ```json
 {
-  "tenantId": "eb40f9f0-e696-4f46-bf00-4c7cf96338cc",
-  "businessId": "Xuq9HTXKLidtKJVE6p8ACA",
+  "tenantId": "your-tenant-id-here",
+  "businessId": "your-phorest-business-id",
   "firstName": "John",
   "lastName": "Doe",
   "mobile": "0851234567",
@@ -179,8 +179,8 @@ POST https://embellics-app.onrender.com/api/phorest/clients
 Content-Type: application/json
 
 {
-  "tenantId": "eb40f9f0-e696-4f46-bf00-4c7cf96338cc",
-  "businessId": "Xuq9HTXKLidtKJVE6p8ACA",
+  "tenantId": "your-tenant-id-here",
+  "businessId": "your-phorest-business-id",
   "firstName": "Test",
   "lastName": "User",
   "mobile": "0851234567",
