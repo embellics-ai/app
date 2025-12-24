@@ -305,8 +305,73 @@ router.post('/api/widget/chat', async (req, res) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
+    // ========================================
+    // CHECK FOR CONTACT FORM DATA & CREATE PHOREST CLIENT
+    // ========================================
+    let phorestClientId: string | null = null;
+    let messageToSend = message;
+
+    try {
+      // Try to parse message as JSON (contact form data)
+      const parsedMessage = JSON.parse(message);
+
+      // Check if this is contact form data with required fields
+      if (
+        parsedMessage.first_name &&
+        parsedMessage.last_name &&
+        parsedMessage.email &&
+        parsedMessage.phone
+      ) {
+        console.log('[Widget Chat] Contact form data detected, creating Phorest client');
+
+        try {
+          // Call the universal Phorest API endpoint
+          const axios = (await import('axios')).default;
+          const phorestResponse = await axios.post(
+            `http://localhost:${process.env.PORT || 3000}/api/phorest/clients`,
+            {
+              tenantId: tenantId,
+              firstName: parsedMessage.first_name,
+              lastName: parsedMessage.last_name,
+              mobile: parsedMessage.phone,
+              email: parsedMessage.email,
+            },
+          );
+
+          phorestClientId = phorestResponse.data.client.clientId;
+
+          console.log('[Widget Chat] Phorest client created successfully:', {
+            clientId: phorestClientId,
+            email: parsedMessage.email,
+          });
+
+          // Update message to include the clientId for Retell agent
+          messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, phorestClientId=${phorestClientId}`;
+        } catch (phorestError: any) {
+          // Handle Phorest API errors
+          const errorResponse = phorestError?.response?.data;
+
+          if (phorestError?.response?.status === 409) {
+            console.log('[Widget Chat] Client already exists in Phorest:', parsedMessage.email);
+            // Still send to Retell but with a note about existing client
+            messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, note=client_already_exists`;
+          } else if (errorResponse?.error) {
+            console.error('[Widget Chat] Phorest service error:', errorResponse);
+            // Send error info to Retell so agent can handle gracefully
+            messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, error=phorest_creation_failed`;
+          } else {
+            console.error('[Widget Chat] Unexpected Phorest error:', phorestError);
+            messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, error=unknown`;
+          }
+        }
+      }
+    } catch (parseError) {
+      // Not JSON or not contact form data - proceed normally
+      // This is expected for regular chat messages
+    }
+
     // Send message to Retell and get response with retry logic for new sessions
-    console.log('[Widget Chat] Sending message:', message);
+    console.log('[Widget Chat] Sending message:', messageToSend);
     let completion;
     let retries = isNewSession ? 3 : 1;
     let lastError;
@@ -315,7 +380,7 @@ router.post('/api/widget/chat', async (req, res) => {
       try {
         completion = await tenantRetellClient.chat.createChatCompletion({
           chat_id: retellChatId,
-          content: message,
+          content: messageToSend,
         });
         break; // Success, exit retry loop
       } catch (error: any) {
@@ -335,6 +400,8 @@ router.post('/api/widget/chat', async (req, res) => {
       throw lastError || new Error('Failed to get completion from Retell');
     }
 
+    console.log('[Widget Chat] Retell completion response:', JSON.stringify(completion, null, 2));
+
     // Extract ALL agent responses from this interaction
     const messages = completion.messages || [];
     const assistantMessages = messages.filter(
@@ -348,9 +415,15 @@ router.post('/api/widget/chat', async (req, res) => {
     let responseMessages = ["I'm processing your request..."];
     if (assistantMessages.length > 0) {
       responseMessages = assistantMessages.map((msg: any) => msg.content);
+    } else {
+      console.warn(
+        '[Widget Chat] No assistant messages found in completion. Full response:',
+        completion,
+      );
     }
 
     console.log('[Widget Chat] Total assistant messages:', assistantMessages.length);
+    console.log('[Widget Chat] Response messages:', responseMessages);
 
     // Save messages to database for history persistence
     try {

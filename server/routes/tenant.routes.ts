@@ -277,6 +277,100 @@ router.delete(
 );
 
 /**
+ * GET /api/tenants/lookup
+ * Look up tenant details by business name or email
+ *
+ * This is a public endpoint (no auth required) for external integrations like
+ * Retell AI agents, voice systems, and future integrations to resolve tenant
+ * information dynamically.
+ *
+ * IMPORTANT: This route MUST be defined BEFORE /:tenantId route to avoid
+ * being caught by the parameterized route matcher.
+ *
+ * Query params:
+ * - name: Business/tenant name (case-insensitive)
+ * - email: Tenant email
+ *
+ * Example: GET /api/tenants/lookup?name=SWC
+ */
+router.get('/lookup', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const tenantName = req.query.name as string | undefined;
+    const tenantEmail = req.query.email as string | undefined;
+
+    if (!tenantName && !tenantEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter',
+        message: 'Provide either ?name=TenantName or ?email=tenant@example.com',
+      });
+    }
+
+    console.log('[Tenant Lookup] Request:', { tenantName, tenantEmail });
+
+    let tenant;
+
+    if (tenantEmail) {
+      tenant = await storage.getTenantByEmail(tenantEmail);
+    } else if (tenantName) {
+      // Search by name (case-insensitive)
+      const allTenants = await storage.getAllTenants();
+      tenant = allTenants.find((t) => t.name.toLowerCase() === tenantName.toLowerCase());
+    }
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: tenantName
+          ? `No tenant found with name: ${tenantName}`
+          : `No tenant found with email: ${tenantEmail}`,
+      });
+    }
+
+    console.log('[Tenant Lookup] Tenant found:', tenant.id, tenant.name);
+
+    // Fetch businesses and branches for this tenant
+    const businesses = await storage.getTenantBusinessesByTenant(tenant.id);
+
+    // Fetch branches for each business
+    const businessesWithBranches = await Promise.all(
+      businesses.map(async (business) => {
+        const branches = await storage.getTenantBranchesByBusiness(business.id);
+        return {
+          serviceName: business.serviceName,
+          businessId: business.businessId,
+          businessName: business.businessName,
+          branches: branches.map((branch) => ({
+            branchId: branch.branchId,
+            branchName: branch.branchName,
+            isPrimary: branch.isPrimary,
+            isActive: branch.isActive,
+          })),
+        };
+      }),
+    );
+
+    res.json({
+      success: true,
+      tenant: {
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        tenantEmail: tenant.email,
+        businesses: businessesWithBranches,
+      },
+    });
+  } catch (error) {
+    console.error('[Tenant Lookup] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to lookup tenant',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * Get single tenant by ID
  *
  * GET /api/tenants/:tenantId
