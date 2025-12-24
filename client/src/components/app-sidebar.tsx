@@ -53,7 +53,7 @@ export function AppSidebar() {
           icon: Shield,
         },
         {
-          title: 'Integrations',
+          title: 'Integration Documentation',
           url: '/integrations',
           icon: Plug,
         },

@@ -12,7 +12,7 @@ const router = Router();
  * Validates incoming requests for client creation
  */
 const createClientSchema = z.object({
-  tenantId: z.string().min(1, 'Tenant ID is required'),
+  businessId: z.string().min(1, 'Business ID is required'),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   mobile: z.string().min(1, 'Mobile number is required'),
@@ -44,10 +44,10 @@ router.post('/clients', async (req: Request, res: Response) => {
       });
     }
 
-    const { tenantId, firstName, lastName, mobile, email } = validationResult.data;
+    const { businessId, firstName, lastName, mobile, email } = validationResult.data;
 
     console.log('[Phorest API] Creating client:', {
-      tenantId,
+      businessId,
       firstName,
       lastName,
       email,
@@ -55,7 +55,7 @@ router.post('/clients', async (req: Request, res: Response) => {
 
     // Call Phorest service to create client
     const client = await phorestService.createClient({
-      tenantId,
+      businessId,
       firstName,
       lastName,
       mobile,

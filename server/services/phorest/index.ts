@@ -98,6 +98,33 @@ export class PhorestService {
   }
 
   /**
+   * Get tenant ID from business ID
+   *
+   * @param businessId - Business ID
+   * @returns Tenant ID
+   * @throws PhorestConfigError if business not found
+   */
+  private async getTenantIdFromBusinessId(businessId: string): Promise<string> {
+    logServiceActivity('info', 'Looking up tenant ID from business ID', { businessId });
+
+    const businesses = await this.db
+      .select()
+      .from(tenantBusinesses)
+      .where(
+        and(
+          eq(tenantBusinesses.businessId, businessId),
+          eq(tenantBusinesses.serviceName, 'phorest_api'),
+        ),
+      );
+
+    if (!businesses || businesses.length === 0) {
+      throw new PhorestConfigError('Business ID not found in system', { businessId });
+    }
+
+    return businesses[0].tenantId;
+  }
+
+  /**
    * Get tenant's business ID for Phorest
    *
    * @param tenantId - Tenant ID
@@ -127,17 +154,15 @@ export class PhorestService {
   /**
    * Create a new client in Phorest
    *
-   * @param request - Create client request (only needs firstName, lastName, mobile, email)
+   * @param request - Create client request with businessId and client details
    * @returns Created client with clientId from Phorest
    * @throws Various PhorestError types based on failure reason
    */
-  async createClient(
-    request: Omit<CreateClientRequest, 'tenantId' | 'businessId'> & { tenantId: string },
-  ): Promise<CreateClientResponse> {
+  async createClient(request: CreateClientRequest): Promise<CreateClientResponse> {
     try {
       // Sanitize inputs
       const sanitizedRequest = {
-        tenantId: sanitizeInput(request.tenantId),
+        businessId: sanitizeInput(request.businessId),
         firstName: sanitizeInput(request.firstName),
         lastName: sanitizeInput(request.lastName),
         mobile: sanitizeInput(request.mobile),
@@ -145,23 +170,22 @@ export class PhorestService {
       };
 
       logServiceActivity('info', 'Creating Phorest client', {
-        tenantId: sanitizedRequest.tenantId,
+        businessId: sanitizedRequest.businessId,
         firstName: sanitizedRequest.firstName,
         lastName: sanitizedRequest.lastName,
         email: sanitizedRequest.email,
       });
 
-      // Step 1: Get tenant's business ID (automatic population)
-      const business = await this.getTenantBusiness(sanitizedRequest.tenantId);
-      const businessId = business.businessId;
+      // Step 1: Lookup tenant ID from business ID
+      const tenantId = await this.getTenantIdFromBusinessId(sanitizedRequest.businessId);
 
-      logServiceActivity('info', 'Business ID retrieved', {
-        businessId,
-        businessName: business.businessName,
+      logServiceActivity('info', 'Tenant ID resolved', {
+        tenantId,
+        businessId: sanitizedRequest.businessId,
       });
 
       // Step 2: Get Phorest API configuration
-      const config = await this.getPhorestConfig(sanitizedRequest.tenantId);
+      const config = await this.getPhorestConfig(tenantId);
 
       // Step 3: Decrypt credentials
       const credentials: PhorestCredentials = decryptPhorestCredentials(
@@ -178,8 +202,7 @@ export class PhorestService {
 
       // Step 5: Validate complete request with schema
       const validatedRequest = createClientRequestSchema.parse({
-        tenantId: sanitizedRequest.tenantId,
-        businessId: businessId,
+        businessId: sanitizedRequest.businessId,
         firstName: sanitizedRequest.firstName,
         lastName: sanitizedRequest.lastName,
         mobile: formattedPhone,
@@ -187,11 +210,11 @@ export class PhorestService {
       });
 
       // Step 6: Build API URL
-      const apiUrl = buildPhorestApiUrl(config.baseUrl, sanitizedRequest.tenantId, businessId);
+      const apiUrl = buildPhorestApiUrl(config.baseUrl, tenantId, sanitizedRequest.businessId);
 
       logServiceActivity('info', 'Calling Phorest API', { url: apiUrl });
 
-      // Step 7: Prepare request payload
+      // Step 6: Prepare request payload
       const payload = {
         firstName: validatedRequest.firstName,
         lastName: validatedRequest.lastName,
