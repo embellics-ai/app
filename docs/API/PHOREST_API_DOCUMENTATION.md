@@ -21,7 +21,7 @@ Creates a new client in Phorest salon management system.
 ```json
 {
   "tenantId": "string (required)",
-  "businessId": "string (optional)",
+  "businessId": "string (required)",
   "firstName": "string (required, max 100 chars)",
   "lastName": "string (required, max 100 chars)",
   "mobile": "string (required, will be formatted to +353XXXXXXXXX)",
@@ -32,7 +32,7 @@ Creates a new client in Phorest salon management system.
 **Field Details:**
 
 - **`tenantId`**: Unique identifier for the tenant/salon
-- **`businessId`**: Business/branch ID (optional - will be auto-fetched from database if not provided)
+- **`businessId`**: Phorest business ID for the salon
 - **`firstName`**: Client's first name (1-100 characters)
 - **`lastName`**: Client's last name (1-100 characters)
 - **`mobile`**: Phone number (will be formatted to Irish format: +353XXXXXXXXX)
