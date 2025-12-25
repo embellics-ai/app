@@ -124,12 +124,15 @@ router.post('/clients', async (req: Request, res: Response) => {
  * - businessId: The Phorest business ID (required)
  * - phone: The client's phone number (required)
  */
-router.get('/clients', async (req: Request, res: Response) => {
+const retrieveClientHandler = async (req: Request, res: Response) => {
   try {
-    // Retell may send function arguments in req.query.args
-    const requestData = (req.query.args as any) || req.query;
+    // Support both GET (query params) and POST (body) for Retell compatibility
+    const requestData =
+      req.method === 'GET' ? (req.query.args as any) || req.query : req.body.args || req.body;
 
-    // Validate query parameters
+    console.log('[Phorest API] Retrieve request:', { method: req.method, data: requestData });
+
+    // Validate parameters
     const validationResult = retrieveClientSchema.safeParse(requestData);
     if (!validationResult.success) {
       return res.status(400).json({
@@ -194,7 +197,10 @@ router.get('/clients', async (req: Request, res: Response) => {
       message: error instanceof Error ? error.message : 'Unknown error occurred',
     });
   }
-});
+};
+
+// GET endpoint for retrieve client
+router.get('/clients', retrieveClientHandler);
 
 /**
  * GET /api/phorest/health
