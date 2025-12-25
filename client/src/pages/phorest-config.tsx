@@ -90,6 +90,9 @@ export default function PhorestConfigPage({ embedded = false }: PhorestConfigPag
                 Creates a new client in the Phorest salon management system. Phone numbers are
                 automatically formatted to Irish format (+353XXXXXXXXX).
               </p>
+              <p className="text-sm text-red-600 font-medium mt-2">
+                🔐 Authentication Required: X-API-Key header must be included
+              </p>
             </div>
 
             <Separator />
@@ -204,6 +207,9 @@ ${JSON.stringify(
               <p className="text-sm text-muted-foreground">
                 Retrieves an existing client from the Phorest salon management system using their
                 phone number. Returns 404 if no client found.
+              </p>
+              <p className="text-sm text-red-600 font-medium mt-2">
+                🔐 Authentication Required: X-API-Key header must be included
               </p>
             </div>
 

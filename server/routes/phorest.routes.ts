@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { phorestService } from '../services/phorest';
 import { PhorestServiceError, PhorestClientExistsError } from '../services/phorest/errors';
 import { requireAuth, requirePlatformAdmin, type AuthenticatedRequest } from '../auth';
+import { requireRetellApiKey } from '../middleware/retell-auth.middleware';
 
 const router = Router();
 
@@ -35,9 +36,11 @@ const retrieveClientSchema = z.object({
  * Creates a new client in the Phorest salon management system.
  * This endpoint can be called from any channel (Widget, Voice, WhatsApp, n8n workflows).
  *
+ * AUTHENTICATION REQUIRED: X-API-Key header must be provided
+ *
  * Phone numbers are automatically formatted to Irish format (+353XXXXXXXXX)
  */
-router.post('/clients', async (req: Request, res: Response) => {
+router.post('/clients', requireRetellApiKey, async (req: Request, res: Response) => {
   try {
     // Retell sends function arguments in req.body.args, not req.body directly
     const requestData = req.body.args || req.body;
@@ -120,6 +123,8 @@ router.post('/clients', async (req: Request, res: Response) => {
  * Retrieves an existing client from the Phorest salon management system using their phone number.
  * This endpoint can be called from any channel (Widget, Voice, WhatsApp, n8n workflows).
  *
+ * AUTHENTICATION REQUIRED: X-API-Key header must be provided
+ *
  * Query Parameters:
  * - businessId: The Phorest business ID (required)
  * - phone: The client's phone number (required)
@@ -199,8 +204,8 @@ const retrieveClientHandler = async (req: Request, res: Response) => {
   }
 };
 
-// GET endpoint for retrieve client
-router.get('/clients', retrieveClientHandler);
+// GET endpoint for retrieve client (requires API key)
+router.get('/clients', requireRetellApiKey, retrieveClientHandler);
 
 /**
  * GET /api/phorest/health
