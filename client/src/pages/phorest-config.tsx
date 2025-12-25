@@ -306,6 +306,139 @@ ${JSON.stringify(
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Badge className="bg-purple-600 hover:bg-purple-700">GET</Badge>
+              <code className="text-sm">/api/phorest/service-categories</code>
+              <CopyButton text="endpoint URL" url="/api/phorest/service-categories" />
+            </CardTitle>
+            <CardDescription>Retrieve service categories for a business and branch</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h4 className="font-semibold mb-2">Description</h4>
+              <p className="text-sm text-muted-foreground">
+                Retrieves the list of service categories available for a specific business and
+                branch in the Phorest salon management system. Use this to display available service
+                categories to clients.
+              </p>
+              <p className="text-sm text-red-600 font-medium mt-2">
+                🔐 Authentication Required: X-API-Key header must be included
+              </p>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-semibold mb-2">Query Parameters</h4>
+              <div className="bg-muted p-4 rounded-md overflow-x-auto">
+                <pre className="text-xs font-mono">
+                  {JSON.stringify(
+                    {
+                      businessId: 'string (required)',
+                      branchId: 'string (required)',
+                    },
+                    null,
+                    2,
+                  )}
+                </pre>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-semibold mb-2">Example</h4>
+              <div className="bg-muted p-4 rounded-md overflow-x-auto">
+                <pre className="text-xs font-mono">{`GET /api/phorest/service-categories?businessId=your-business-id&branchId=your-branch-id`}</pre>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-semibold mb-2">Responses</h4>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className="bg-green-600 hover:bg-green-700">200</Badge>
+                    <span className="text-sm">Success - Service Categories Retrieved</span>
+                  </div>
+                  <div className="bg-muted p-3 rounded-md overflow-x-auto">
+                    <pre className="text-xs font-mono">
+                      {JSON.stringify(
+                        {
+                          success: true,
+                          data: {
+                            businessId: 'your-business-id',
+                            branchId: 'your-branch-id',
+                            categories: [
+                              {
+                                categoryId: 'cat-123',
+                                categoryName: 'Hair Services',
+                                description: 'All hair-related services',
+                                sortOrder: 1,
+                              },
+                              {
+                                categoryId: 'cat-456',
+                                categoryName: 'Nail Services',
+                                description: 'Manicure and pedicure services',
+                                sortOrder: 2,
+                              },
+                            ],
+                          },
+                        },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="destructive">400</Badge>
+                    <span className="text-sm">Validation Error - Missing required parameters</span>
+                  </div>
+                  <div className="bg-muted p-3 rounded-md overflow-x-auto">
+                    <pre className="text-xs font-mono">
+                      {JSON.stringify(
+                        {
+                          success: false,
+                          error: 'Validation failed',
+                          details: [
+                            {
+                              field: 'businessId',
+                              message: 'Business ID is required',
+                            },
+                          ],
+                        },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="destructive">404</Badge>
+                    <span className="text-sm">Business not configured</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="destructive">401/403</Badge>
+                    <span className="text-sm">Authentication failed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Badge className="bg-purple-600 hover:bg-purple-700">GET</Badge>
               <code className="text-sm">/api/phorest/health</code>
               <CopyButton text="endpoint URL" url="/api/phorest/health" />
             </CardTitle>
