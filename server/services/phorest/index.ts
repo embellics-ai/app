@@ -16,11 +16,14 @@ import {
   CreateClientResponse,
   RetrieveClientRequest,
   RetrieveClientResponse,
+  RetrieveServiceCategoriesRequest,
+  RetrieveServiceCategoriesResponse,
   PhorestCredentials,
   ExternalApiConfig,
   TenantBusiness,
   createClientRequestSchema,
   retrieveClientRequestSchema,
+  retrieveServiceCategoriesRequestSchema,
 } from './types';
 import {
   PhorestServiceError,
@@ -361,6 +364,104 @@ export class PhorestService {
       throw new PhorestServiceError('Unexpected error retrieving client from Phorest', 500, {
         originalError: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  /**
+   * Retrieve service categories from Phorest for a business and branch
+   *
+   * @param request - Retrieve service categories request with businessId and branchId
+   * @returns Service categories data
+   * @throws Various PhorestError types based on failure reason
+   */
+  async retrieveServiceCategories(
+    request: RetrieveServiceCategoriesRequest,
+  ): Promise<RetrieveServiceCategoriesResponse> {
+    try {
+      const { businessId, branchId } = request;
+
+      logServiceActivity('info', 'Retrieving Phorest service categories', {
+        businessId,
+        branchId,
+      });
+
+      // Validate request
+      const validatedRequest = retrieveServiceCategoriesRequestSchema.parse(request);
+
+      // Get tenant ID and config
+      const tenantId = await this.getTenantIdFromBusinessId(validatedRequest.businessId);
+      const config = await this.getPhorestConfig(tenantId);
+      const credentials: PhorestCredentials = decryptPhorestCredentials(
+        config.encryptedCredentials,
+      );
+
+      // Build API URL for service categories
+      // Format: {baseUrl}/api/business/{businessId}/branch/{branchId}/service-category
+      // Remove trailing slash from baseUrl if present
+      const cleanBaseUrl = config.baseUrl.replace(/\/$/, '');
+      const apiUrl = `${cleanBaseUrl}/api/business/${validatedRequest.businessId}/branch/${validatedRequest.branchId}/service-category`;
+
+      logServiceActivity('info', 'Calling Phorest API for service categories', { url: apiUrl });
+
+      // Make API request
+      const response = await this.httpClient.get(apiUrl, {
+        auth: {
+          username: credentials.username,
+          password: credentials.password,
+        },
+      });
+
+      logServiceActivity('info', 'Phorest service categories response received', {
+        status: response.status,
+        categoriesCount: response.data?._embedded?.serviceCategories?.length || 0,
+      });
+
+      // Parse response - Phorest returns data in _embedded.serviceCategories array
+      const serviceCategoriesData = response.data?._embedded?.serviceCategories || [];
+
+      // Map to our response format - only using fields that actually exist in Phorest response
+      const categories = serviceCategoriesData.map((category: any) => ({
+        categoryId: category.categoryId,
+        categoryName: category.name,
+      }));
+
+      const result: RetrieveServiceCategoriesResponse = {
+        businessId: validatedRequest.businessId,
+        branchId: validatedRequest.branchId,
+        categories,
+      };
+
+      logServiceActivity('info', 'Service categories retrieved successfully', {
+        businessId: validatedRequest.businessId,
+        branchId: validatedRequest.branchId,
+        categoriesCount: categories.length,
+      });
+
+      return result;
+    } catch (error) {
+      // Handle specific error types
+      if (error instanceof PhorestServiceError) {
+        logServiceActivity('error', `Phorest service error: ${error.message}`, error.details);
+        throw error;
+      }
+
+      // Handle Axios errors
+      if (axios.isAxiosError(error)) {
+        return this.handleAxiosError(error);
+      }
+
+      // Handle unexpected errors
+      logServiceActivity('error', 'Unexpected error retrieving service categories', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      throw new PhorestServiceError(
+        'Unexpected error retrieving service categories from Phorest',
+        500,
+        {
+          originalError: error instanceof Error ? error.message : String(error),
+        },
+      );
     }
   }
 

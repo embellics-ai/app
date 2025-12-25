@@ -30,6 +30,15 @@ const retrieveClientSchema = z.object({
 });
 
 /**
+ * Retrieve Service Categories Request Schema
+ * Validates incoming requests for service categories retrieval
+ */
+const retrieveServiceCategoriesSchema = z.object({
+  businessId: z.string().min(1, 'Business ID is required'),
+  branchId: z.string().min(1, 'Branch ID is required'),
+});
+
+/**
  * POST /api/phorest/clients
  * Create a new client in Phorest
  *
@@ -206,6 +215,97 @@ const retrieveClientHandler = async (req: Request, res: Response) => {
 
 // GET endpoint for retrieve client (requires API key)
 router.get('/clients', requireRetellApiKey, retrieveClientHandler);
+
+/**
+ * GET /api/phorest/service-categories
+ * Retrieve service categories from Phorest for a business and branch
+ *
+ * Retrieves the list of service categories available for a specific business and branch
+ * in the Phorest salon management system. This endpoint can be called from any channel
+ * (Widget, Voice, WhatsApp, n8n workflows).
+ *
+ * AUTHENTICATION REQUIRED: X-API-Key header must be provided
+ *
+ * Query Parameters:
+ * - businessId: The Phorest business ID (required)
+ * - branchId: The Phorest branch ID (required)
+ */
+const retrieveServiceCategoriesHandler = async (req: Request, res: Response) => {
+  try {
+    // Support both GET (query params) and POST (body) for Retell compatibility
+    const requestData =
+      req.method === 'GET' ? (req.query.args as any) || req.query : req.body.args || req.body;
+
+    console.log('[Phorest API] Retrieve service categories request:', {
+      method: req.method,
+      data: requestData,
+      query: req.query,
+      body: req.body,
+    });
+
+    // Validate parameters
+    const validationResult = retrieveServiceCategoriesSchema.safeParse(requestData);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationResult.error.errors.map((err) => ({
+          field: err.path.join('.'),
+          message: err.message,
+        })),
+      });
+    }
+
+    const { businessId, branchId } = validationResult.data;
+
+    console.log('[Phorest API] Retrieving service categories:', {
+      businessId,
+      branchId,
+    });
+
+    // Call Phorest service to retrieve service categories
+    const result = await phorestService.retrieveServiceCategories({
+      businessId,
+      branchId,
+    });
+
+    console.log('[Phorest API] Service categories retrieved successfully:', {
+      businessId: result.businessId,
+      branchId: result.branchId,
+      categoriesCount: result.categories.length,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[Phorest API] Error retrieving service categories:', error);
+
+    // Handle Phorest-specific errors
+    if (error instanceof PhorestServiceError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: error.name,
+        message: error.message,
+        details: error.details,
+      });
+    }
+
+    // Handle unexpected errors
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+    });
+  }
+};
+
+// GET endpoint for retrieve service categories (requires API key)
+router.get('/service-categories', requireRetellApiKey, retrieveServiceCategoriesHandler);
+
+// POST endpoint for retrieve service categories (for Retell compatibility)
+router.post('/service-categories', requireRetellApiKey, retrieveServiceCategoriesHandler);
 
 /**
  * GET /api/phorest/health

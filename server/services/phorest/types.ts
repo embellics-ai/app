@@ -55,6 +55,31 @@ export interface RetrieveClientResponse {
 }
 
 /**
+ * Request payload for retrieving service categories from Phorest
+ */
+export interface RetrieveServiceCategoriesRequest {
+  businessId: string;
+  branchId: string;
+}
+
+/**
+ * Service category item from Phorest API
+ */
+export interface ServiceCategory {
+  categoryId: string;
+  categoryName: string;
+}
+
+/**
+ * Response from Phorest API after retrieving service categories
+ */
+export interface RetrieveServiceCategoriesResponse {
+  businessId: string;
+  branchId: string;
+  categories: ServiceCategory[];
+}
+
+/**
  * Phorest API credentials structure (decrypted)
  */
 export interface PhorestCredentials {
@@ -121,6 +146,21 @@ export const retrieveClientRequestSchema = z.object({
  * Type inference from validation schema
  */
 export type ValidatedRetrieveClientRequest = z.infer<typeof retrieveClientRequestSchema>;
+
+/**
+ * Zod schema for validating retrieve service categories request
+ */
+export const retrieveServiceCategoriesRequestSchema = z.object({
+  businessId: z.string().min(1, 'Business ID is required'),
+  branchId: z.string().min(1, 'Branch ID is required'),
+});
+
+/**
+ * Type inference from validation schema
+ */
+export type ValidatedRetrieveServiceCategoriesRequest = z.infer<
+  typeof retrieveServiceCategoriesRequestSchema
+>;
 
 // ============================================
 // Error Response Types
