@@ -30,10 +30,11 @@ const createClientSchema = z.object({
  */
 router.post('/clients', async (req: Request, res: Response) => {
   try {
-    // Validate request body
-    const validationResult = createClientSchema.safeParse(req.body);
+    // Retell sends function arguments in req.body.args, not req.body directly
+    const requestData = req.body.args || req.body;
 
-    if (!validationResult.success) {
+    // Validate request body
+    const validationResult = createClientSchema.safeParse(requestData);    if (!validationResult.success) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',

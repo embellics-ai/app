@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { storage } from '../storage';
 import { verifyPassword } from '../middleware/auth.middleware';
 import Retell from 'retell-sdk';
+import { phorestService } from '../services/phorest';
+import { PhorestClientExistsError } from '../services/phorest/errors';
 
 const router = Router();
 
@@ -320,25 +322,27 @@ router.post('/api/widget/chat', async (req, res) => {
         parsedMessage.first_name &&
         parsedMessage.last_name &&
         parsedMessage.email &&
-        parsedMessage.phone
+        parsedMessage.phone &&
+        parsedMessage.businessId
       ) {
         console.log('[Widget Chat] Contact form data detected, creating Phorest client');
+        console.log(
+          '[Widget Chat] Parsed message from Retell:',
+          JSON.stringify(parsedMessage, null, 2),
+        );
 
         try {
-          // Call the universal Phorest API endpoint
-          const axios = (await import('axios')).default;
-          const phorestResponse = await axios.post(
-            `http://localhost:${process.env.PORT || 3000}/api/phorest/clients`,
-            {
-              tenantId: tenantId,
-              firstName: parsedMessage.first_name,
-              lastName: parsedMessage.last_name,
-              mobile: parsedMessage.phone,
-              email: parsedMessage.email,
-            },
-          );
+          // Call Phorest service directly (no HTTP call needed - we're already on the server!)
+          const requestPayload = {
+            businessId: parsedMessage.businessId,
+            firstName: parsedMessage.first_name,
+            lastName: parsedMessage.last_name,
+            mobile: parsedMessage.phone,
+            email: parsedMessage.email,
+          };
 
-          phorestClientId = phorestResponse.data.client.clientId;
+          const client = await phorestService.createClient(requestPayload);
+          phorestClientId = client.clientId;
 
           console.log('[Widget Chat] Phorest client created successfully:', {
             clientId: phorestClientId,
@@ -348,20 +352,21 @@ router.post('/api/widget/chat', async (req, res) => {
           // Update message to include the clientId for Retell agent
           messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, phorestClientId=${phorestClientId}`;
         } catch (phorestError: any) {
-          // Handle Phorest API errors
-          const errorResponse = phorestError?.response?.data;
+          // Handle Phorest service errors
+          console.error('[Widget Chat] Phorest service error:', {
+            name: phorestError?.name,
+            message: phorestError?.message,
+            stack: phorestError?.stack,
+          });
 
-          if (phorestError?.response?.status === 409) {
+          if (phorestError instanceof PhorestClientExistsError) {
             console.log('[Widget Chat] Client already exists in Phorest:', parsedMessage.email);
             // Still send to Retell but with a note about existing client
             messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, note=client_already_exists`;
-          } else if (errorResponse?.error) {
-            console.error('[Widget Chat] Phorest service error:', errorResponse);
+          } else {
+            console.error('[Widget Chat] Phorest creation failed:', phorestError.message);
             // Send error info to Retell so agent can handle gracefully
             messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, error=phorest_creation_failed`;
-          } else {
-            console.error('[Widget Chat] Unexpected Phorest error:', phorestError);
-            messageToSend = `Contact details: firstName=${parsedMessage.first_name}, lastName=${parsedMessage.last_name}, email=${parsedMessage.email}, phone=${parsedMessage.phone}, error=unknown`;
           }
         }
       }
@@ -387,8 +392,35 @@ router.post('/api/widget/chat', async (req, res) => {
         lastError = error;
         console.error(`[Widget Chat] Attempt ${attempt}/${retries} failed:`, error.message);
 
-        if (attempt < retries) {
-          // Exponential backoff: 300ms, 600ms
+        // If chat already ended, create a new session and retry
+        if (error.message?.includes('Chat already ended') || error.message?.includes('400')) {
+          console.log('[Widget Chat] Chat session ended, creating new session...');
+          const newChatSession = await tenantRetellClient.chat.create({
+            agent_id: widgetConfig.retellAgentId,
+            metadata: {
+              tenantId: tenantId,
+              source: 'widget',
+            },
+          });
+          retellChatId = newChatSession.chat_id;
+          console.log('[Widget Chat] Created new session:', retellChatId);
+
+          // Give new session time to initialize
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Retry with new session
+          try {
+            completion = await tenantRetellClient.chat.createChatCompletion({
+              chat_id: retellChatId,
+              content: messageToSend,
+            });
+            break; // Success with new session
+          } catch (retryError: any) {
+            console.error('[Widget Chat] Retry with new session failed:', retryError.message);
+            lastError = retryError;
+          }
+        } else if (attempt < retries) {
+          // Exponential backoff for other errors: 300ms, 600ms
           const delay = 300 * attempt;
           console.log(`[Widget Chat] Retrying in ${delay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
