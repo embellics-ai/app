@@ -1030,7 +1030,7 @@ router.post('/api/widget/end-chat', async (req, res) => {
       .object({
         apiKey: z.string(),
         chatId: z.string(),
-        handoffId: z.string().optional(),
+        handoffId: z.string().nullable().optional(),
         referrer: z.string().optional(),
       })
       .parse(req.body);
