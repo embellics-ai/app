@@ -20,6 +20,15 @@ const createClientSchema = z.object({
 });
 
 /**
+ * Retrieve Client Request Schema
+ * Validates incoming requests for client retrieval
+ */
+const retrieveClientSchema = z.object({
+  businessId: z.string().min(1, 'Business ID is required'),
+  phone: z.string().min(1, 'Phone number is required'),
+});
+
+/**
  * POST /api/phorest/clients
  * Create a new client in Phorest
  *
@@ -34,7 +43,8 @@ router.post('/clients', async (req: Request, res: Response) => {
     const requestData = req.body.args || req.body;
 
     // Validate request body
-    const validationResult = createClientSchema.safeParse(requestData);    if (!validationResult.success) {
+    const validationResult = createClientSchema.safeParse(requestData);
+    if (!validationResult.success) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
@@ -85,6 +95,89 @@ router.post('/clients', async (req: Request, res: Response) => {
       });
     }
 
+    if (error instanceof PhorestServiceError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: error.name,
+        message: error.message,
+        details: error.details,
+      });
+    }
+
+    // Handle unexpected errors
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+    });
+  }
+});
+
+/**
+ * GET /api/phorest/clients
+ * Retrieve a client from Phorest by phone number
+ *
+ * Retrieves an existing client from the Phorest salon management system using their phone number.
+ * This endpoint can be called from any channel (Widget, Voice, WhatsApp, n8n workflows).
+ *
+ * Query Parameters:
+ * - businessId: The Phorest business ID (required)
+ * - phone: The client's phone number (required)
+ */
+router.get('/clients', async (req: Request, res: Response) => {
+  try {
+    // Retell may send function arguments in req.query.args
+    const requestData = (req.query.args as any) || req.query;
+
+    // Validate query parameters
+    const validationResult = retrieveClientSchema.safeParse(requestData);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: validationResult.error.errors.map((err) => ({
+          field: err.path.join('.'),
+          message: err.message,
+        })),
+      });
+    }
+
+    const { businessId, phone } = validationResult.data;
+
+    console.log('[Phorest API] Retrieving client:', {
+      businessId,
+      phone,
+    });
+
+    // Call Phorest service to retrieve client
+    const client = await phorestService.retrieveClient({
+      businessId,
+      phone,
+    });
+
+    // If no client found, return 404
+    if (!client) {
+      console.log('[Phorest API] Client not found:', { phone });
+      return res.status(404).json({
+        success: false,
+        error: 'Client not found',
+        message: 'No client found with the provided phone number',
+      });
+    }
+
+    console.log('[Phorest API] Client retrieved successfully:', {
+      clientId: client.clientId,
+      email: client.email,
+    });
+
+    return res.status(200).json({
+      success: true,
+      client,
+    });
+  } catch (error) {
+    console.error('[Phorest API] Error retrieving client:', error);
+
+    // Handle Phorest-specific errors
     if (error instanceof PhorestServiceError) {
       return res.status(error.statusCode).json({
         success: false,

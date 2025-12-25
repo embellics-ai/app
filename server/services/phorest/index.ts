@@ -14,10 +14,13 @@ import { externalApiConfigs, tenantBusinesses } from '../../../shared/schema';
 import {
   CreateClientRequest,
   CreateClientResponse,
+  RetrieveClientRequest,
+  RetrieveClientResponse,
   PhorestCredentials,
   ExternalApiConfig,
   TenantBusiness,
   createClientRequestSchema,
+  retrieveClientRequestSchema,
 } from './types';
 import {
   PhorestServiceError,
@@ -278,6 +281,84 @@ export class PhorestService {
       });
 
       throw new PhorestServiceError('Unexpected error creating client in Phorest', 500, {
+        originalError: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Retrieve a client from Phorest by phone number
+   *
+   * @param request - Retrieve client request with businessId and phone
+   * @returns Client data if found, null if not found
+   * @throws Various PhorestError types based on failure reason
+   */
+  async retrieveClient(request: RetrieveClientRequest): Promise<RetrieveClientResponse | null> {
+    try {
+      const { businessId, phone } = request;
+
+      logServiceActivity('info', 'Retrieving Phorest client', { businessId, phone });
+
+      // Get tenant ID and config
+      const tenantId = await this.getTenantIdFromBusinessId(businessId);
+      const config = await this.getPhorestConfig(tenantId);
+      const credentials: PhorestCredentials = decryptPhorestCredentials(
+        config.encryptedCredentials,
+      );
+
+      // Build API URL with query parameter
+      const baseApiUrl = buildPhorestApiUrl(config.baseUrl, businessId);
+      const apiUrl = `${baseApiUrl}?phone=${encodeURIComponent(phone)}`;
+
+      logServiceActivity('info', 'Calling Phorest API', { url: apiUrl });
+
+      // Make API request
+      const response = await this.httpClient.get(apiUrl, {
+        auth: {
+          username: credentials.username,
+          password: credentials.password,
+        },
+      });
+
+      // Phorest returns clients in _embedded.clients array
+      const clients = response.data?._embedded?.clients;
+
+      if (clients && Array.isArray(clients) && clients.length > 0) {
+        const client = clients[0]; // Get first match
+
+        logServiceActivity('info', 'Client retrieved successfully', {
+          clientId: client.clientId,
+        });
+
+        return {
+          clientId: client.clientId,
+          firstName: client.firstName || '',
+          lastName: client.lastName || '',
+          mobile: client.mobile || phone,
+          email: client.email || '',
+          createdAt: client.clientSince || '',
+        };
+      }
+
+      logServiceActivity('info', 'No client found', { phone });
+      return null;
+    } catch (error) {
+      // If 404, return null
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        logServiceActivity('info', 'Client not found (404)', { phone: request.phone });
+        return null;
+      }
+
+      // Handle other errors
+      if (error instanceof PhorestServiceError) {
+        throw error;
+      }
+
+      if (axios.isAxiosError(error)) {
+        return this.handleAxiosError(error);
+      }
+
+      throw new PhorestServiceError('Unexpected error retrieving client from Phorest', 500, {
         originalError: error instanceof Error ? error.message : String(error),
       });
     }

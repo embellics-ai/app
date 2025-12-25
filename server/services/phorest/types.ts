@@ -35,6 +35,26 @@ export interface CreateClientResponse {
 }
 
 /**
+ * Request payload for retrieving a client from Phorest
+ */
+export interface RetrieveClientRequest {
+  businessId: string;
+  phone: string;
+}
+
+/**
+ * Response from Phorest API after retrieving a client
+ */
+export interface RetrieveClientResponse {
+  clientId: string;
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  email: string;
+  createdAt?: string;
+}
+
+/**
  * Phorest API credentials structure (decrypted)
  */
 export interface PhorestCredentials {
@@ -88,6 +108,19 @@ export const createClientRequestSchema = z.object({
  * Type inference from validation schema
  */
 export type ValidatedCreateClientRequest = z.infer<typeof createClientRequestSchema>;
+
+/**
+ * Zod schema for validating retrieve client request
+ */
+export const retrieveClientRequestSchema = z.object({
+  businessId: z.string().min(1, 'Business ID is required'),
+  phone: z.string().min(1, 'Phone number is required'),
+});
+
+/**
+ * Type inference from validation schema
+ */
+export type ValidatedRetrieveClientRequest = z.infer<typeof retrieveClientRequestSchema>;
 
 // ============================================
 // Error Response Types

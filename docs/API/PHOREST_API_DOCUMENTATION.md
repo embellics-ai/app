@@ -102,6 +102,94 @@ Creates a new client in Phorest salon management system.
 }
 ```
 
+---
+
+### GET `/api/phorest/clients`
+
+Retrieves an existing client from Phorest salon management system by phone number.
+
+**Base URL:** `https://your-domain.com/api/phorest/clients`
+
+**Method:** `GET`
+
+### Query Parameters
+
+| Parameter  | Type   | Required | Description                                           |
+| ---------- | ------ | -------- | ----------------------------------------------------- |
+| businessId | string | Yes      | Phorest business ID for the salon                     |
+| phone      | string | Yes      | Client's phone number (353871234567 or +353871234567) |
+
+**Example URL:**
+
+```
+GET /api/phorest/clients?businessId=YOUR_BUSINESS_ID&phone=353871234567
+```
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "client": {
+    "clientId": "12345",
+    "firstName": "John",
+    "lastName": "Doe",
+    "mobile": "+353871234567",
+    "email": "john.doe@example.com",
+    "createdAt": "2024-12-24T10:30:00Z"
+  }
+}
+```
+
+### Error Responses
+
+#### 404 - Client Not Found
+
+```json
+{
+  "success": false,
+  "error": "Client not found",
+  "message": "No client found with the provided phone number"
+}
+```
+
+#### 400 - Validation Error
+
+```json
+{
+  "success": false,
+  "error": "Validation failed",
+  "details": [
+    {
+      "field": "phone",
+      "message": "Phone number is required"
+    }
+  ]
+}
+```
+
+#### 404 - Configuration Not Found
+
+```json
+{
+  "success": false,
+  "error": "PhorestConfigError",
+  "message": "Business ID not found in system"
+}
+```
+
+#### 500 - Server Error
+
+```json
+{
+  "success": false,
+  "error": "Internal server error",
+  "message": "Error details here"
+}
+```
+
+---
+
 ## Usage Examples
 
 ### From Widget (JavaScript)
