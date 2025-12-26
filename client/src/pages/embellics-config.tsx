@@ -92,14 +92,17 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
               <code className="text-sm">/api/platform/webhook/clients</code>
               <CopyButton text="endpoint URL" url="/api/platform/webhook/clients" />
             </CardTitle>
-            <CardDescription>Create or update customer from external systems (Retell AI, N8N)</CardDescription>
+            <CardDescription>
+              Create or update customer from external systems (Retell AI, N8N)
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <h4 className="font-semibold mb-2">Description</h4>
               <p className="text-sm text-muted-foreground">
-                Creates a new customer record or updates an existing one. Phone number is used as the
-                unique identifier per tenant. Designed for external systems like Retell AI, N8N, and webhooks.
+                Creates a new customer record or updates an existing one. Phone number is used as
+                the unique identifier per tenant. Designed for external systems like Retell AI, N8N,
+                and webhooks.
               </p>
               <p className="text-sm text-red-600 font-medium mt-2">
                 🔐 Authentication Required: X-API-Key header (not Bearer token)
@@ -112,7 +115,8 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
               <h4 className="font-semibold mb-2">Headers</h4>
               <div className="bg-muted p-4 rounded-md">
                 <code className="text-xs font-mono">
-                  X-API-Key: Your API key from environment variables<br/>
+                  X-API-Key: Your API key from environment variables
+                  <br />
                   Content-Type: application/json
                 </code>
               </div>
@@ -447,6 +451,22 @@ ${JSON.stringify(
                 paid yet. This creates/updates a client record and optionally creates a lead for
                 follow-up. Does NOT create booking in Phorest.
               </p>
+              <p className="text-sm text-red-600 font-medium mt-2">
+                🔐 Authentication Required: X-API-Key header (not Bearer token)
+              </p>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-semibold mb-2">Headers</h4>
+              <div className="bg-muted p-4 rounded-md">
+                <code className="text-xs font-mono">
+                  X-API-Key: Your API key from environment variables
+                  <br />
+                  Content-Type: application/json
+                </code>
+              </div>
             </div>
 
             <Separator />
@@ -551,6 +571,22 @@ ${JSON.stringify(
                 creates a booking record, integrates with Phorest to create the appointment, and
                 updates the client status.
               </p>
+              <p className="text-sm text-red-600 font-medium mt-2">
+                🔐 Authentication Required: X-API-Key header (not Bearer token)
+              </p>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-semibold mb-2">Headers</h4>
+              <div className="bg-muted p-4 rounded-md">
+                <code className="text-xs font-mono">
+                  X-API-Key: Your API key from environment variables
+                  <br />
+                  Content-Type: application/json
+                </code>
+              </div>
             </div>
 
             <Separator />
