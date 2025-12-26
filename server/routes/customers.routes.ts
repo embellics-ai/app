@@ -595,7 +595,14 @@ router.post('/bookings/complete', async (req, res: Response) => {
       await storage.confirmBooking(booking.id, depositAmount);
     }
 
-    // Update client status to active if this is their first booking
+    // Update client's firstBookingDate if this is their first booking
+    if (!client.firstBookingDate) {
+      await storage.updateClient(clientId, {
+        firstBookingDate: booking.bookingDateTime,
+      });
+    }
+
+    // Update client status to active and set lastBookingDate
     if (client.status === 'lead') {
       await storage.updateClient(clientId, {
         status: 'active',

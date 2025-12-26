@@ -131,14 +131,20 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
                       phone: 'string (required) - E.164 format recommended',
                       email: 'string (optional)',
                       firstInteractionSource: 'voice | web | whatsapp (required)',
-                      firstInteractionDate: 'ISO 8601 datetime (required)',
-                      firstBookingDate: 'ISO 8601 datetime (optional)',
                       status: 'active | inactive | blocked (default: active)',
                     },
                     null,
                     2,
                   )}
                 </pre>
+              </div>
+              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  ℹ️ <strong>Auto-populated fields:</strong> <code>firstInteractionDate</code> is
+                  automatically set to the current timestamp when the client is created.{' '}
+                  <code>firstBookingDate</code> is automatically set when the client makes their
+                  first booking.
+                </p>
               </div>
             </div>
 
@@ -158,8 +164,6 @@ ${JSON.stringify(
     phone: '+353871234567',
     email: 'emma.johnson@example.com',
     firstInteractionSource: 'voice',
-    firstInteractionDate: '2025-12-26T10:30:00Z',
-    firstBookingDate: '2025-12-26T10:30:00Z',
     status: 'active',
   },
   null,
@@ -189,9 +193,9 @@ ${JSON.stringify(
                           phone: '+353871234567',
                           email: 'emma.johnson@example.com',
                           firstInteractionSource: 'voice',
-                          firstInteractionDate: '2025-12-26T10:30:00Z',
-                          firstBookingDate: '2025-12-26T10:30:00Z',
-                          lastBookingDate: '2025-12-26T10:30:00Z',
+                          firstInteractionDate: '2025-12-26T10:30:00Z', // Auto-set
+                          firstBookingDate: null, // Set when first booking created
+                          lastBookingDate: null,
                           status: 'active',
                           createdAt: '2025-12-26T10:30:00Z',
                         },
