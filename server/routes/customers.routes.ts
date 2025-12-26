@@ -5,9 +5,10 @@
  * Client admins can only access their own tenant's customer data
  */
 
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import { storage } from '../storage';
 import { type AuthenticatedRequest, requireAuth } from '../middleware/auth.middleware';
+import { requireRetellApiKey } from '../middleware/retell-auth.middleware';
 
 const router = Router();
 
@@ -116,42 +117,6 @@ router.get(
 );
 
 /**
- * POST /api/platform/tenants/:tenantId/clients
- * Create a new client
- * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
- */
-router.post('/:tenantId/clients', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { tenantId } = req.params;
-
-    // Authorization check
-    if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-      return res.status(403).json({ error: 'Access denied to this tenant' });
-    }
-
-    const clientData = {
-      ...req.body,
-      tenantId, // Ensure tenantId from URL is used
-    };
-
-    // Check if client with this phone already exists
-    const existingClient = await storage.getClientByPhone(tenantId, clientData.phone);
-    if (existingClient) {
-      return res.status(409).json({
-        error: 'Client with this phone number already exists',
-        existingClient,
-      });
-    }
-
-    const client = await storage.createClient(clientData);
-    res.status(201).json(client);
-  } catch (error) {
-    console.error('Error creating client:', error);
-    res.status(500).json({ error: 'Failed to create client' });
-  }
-});
-
-/**
  * PATCH /api/platform/tenants/:tenantId/clients/:clientId
  * Update client information
  * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
@@ -182,6 +147,85 @@ router.patch(
     }
   },
 );
+
+// ============================================
+// WEBHOOK/EXTERNAL API ENDPOINTS (Retell AI)
+// ============================================
+
+/**
+ * POST /api/platform/webhook/clients
+ * Create or update a client from external system (Retell AI, N8N, etc.)
+ * Accessible by: External systems with valid API key (X-API-Key header)
+ */
+router.post('/webhook/clients', requireRetellApiKey, async (req: Request, res: Response) => {
+  try {
+    const {
+      tenantId,
+      firstName,
+      lastName,
+      phone,
+      email,
+      firstInteractionSource,
+      status = 'active',
+    } = req.body;
+
+    // Validate required fields
+    if (!tenantId || !firstName || !lastName || !phone || !firstInteractionSource) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['tenantId', 'firstName', 'lastName', 'phone', 'firstInteractionSource'],
+      });
+    }
+
+    // Check if client with this phone already exists
+    const existingClient = await storage.getClientByPhone(tenantId, phone);
+    if (existingClient) {
+      // Update existing client with new information if provided
+      const updates: any = {};
+      if (email && !existingClient.email) updates.email = email;
+      if (firstName && !existingClient.firstName) updates.firstName = firstName;
+      if (lastName && !existingClient.lastName) updates.lastName = lastName;
+
+      if (Object.keys(updates).length > 0) {
+        const updatedClient = await storage.updateClient(existingClient.id, updates);
+        return res.status(200).json({
+          success: true,
+          client: updatedClient,
+          message: 'Client updated successfully',
+          existed: true,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        client: existingClient,
+        message: 'Client already exists',
+        existed: true,
+      });
+    }
+
+    // Create new client
+    const client = await storage.createClient({
+      tenantId,
+      firstName,
+      lastName,
+      phone,
+      email,
+      firstInteractionSource,
+      status,
+    });
+
+    res.status(201).json({
+      success: true,
+      client,
+      message: 'Client created successfully',
+      existed: false,
+    });
+  } catch (error) {
+    console.error('Error creating/updating client via webhook:', error);
+    res.status(500).json({ error: 'Failed to process client request' });
+  }
+});
 
 // ============================================
 // BOOKING API ENDPOINTS
@@ -218,51 +262,6 @@ router.get('/:tenantId/bookings', requireAuth, async (req: AuthenticatedRequest,
     res.status(500).json({ error: 'Failed to fetch bookings' });
   }
 });
-
-/**
- * POST /api/platform/tenants/:tenantId/bookings
- * Create a new booking
- * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
- */
-router.post(
-  '/:tenantId/bookings',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { tenantId } = req.params;
-
-      // Authorization check
-      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-        return res.status(403).json({ error: 'Access denied to this tenant' });
-      }
-
-      const bookingData = {
-        ...req.body,
-        tenantId, // Ensure tenantId from URL is used
-      };
-
-      // Verify client exists and belongs to tenant
-      const client = await storage.getClient(bookingData.clientId);
-      if (!client || client.tenantId !== tenantId) {
-        return res
-          .status(404)
-          .json({ error: 'Client not found or does not belong to this tenant' });
-      }
-
-      const booking = await storage.createBooking(bookingData);
-
-      // Update client's last booking date
-      await storage.updateClient(bookingData.clientId, {
-        lastBookingDate: booking.bookingDateTime,
-      });
-
-      res.status(201).json(booking);
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      res.status(500).json({ error: 'Failed to create booking' });
-    }
-  },
-);
 
 // ============================================
 // LEAD API ENDPOINTS
@@ -429,8 +428,9 @@ router.patch(
  * Track customer interaction (reservation/inquiry) - NO Phorest call
  * Creates/updates client record and optional lead record
  * Used for: Initial contact, reservation inquiry, pre-payment tracking
+ * Authentication: API Key (X-API-Key header)
  */
-router.post('/interactions/track', async (req, res: Response) => {
+router.post('/interactions/track', requireRetellApiKey, async (req, res: Response) => {
   try {
     const {
       tenantId,
@@ -527,8 +527,9 @@ router.post('/interactions/track', async (req, res: Response) => {
  * POST /api/platform/bookings/complete
  * Complete booking flow: Create booking + Phorest integration + mapping
  * Used when: Customer pays deposit, booking is confirmed
+ * Authentication: API Key (X-API-Key header)
  */
-router.post('/bookings/complete', async (req, res: Response) => {
+router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response) => {
   try {
     const {
       tenantId,
