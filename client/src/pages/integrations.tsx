@@ -10,14 +10,15 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Store, Package } from 'lucide-react';
+import { Store, Package, Sparkles } from 'lucide-react';
+import EmbellicsConfigPage from '@/pages/embellics-config';
 import PhorestConfigPage from '@/pages/phorest-config';
 import { useAuth } from '@/contexts/auth-context';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
 export default function IntegrationsPage() {
-  const [activeTab, setActiveTab] = useState('phorest');
+  const [activeTab, setActiveTab] = useState('embellics');
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -57,6 +58,10 @@ export default function IntegrationsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
+          <TabsTrigger value="embellics" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Embellics
+          </TabsTrigger>
           <TabsTrigger value="phorest" className="flex items-center gap-2">
             <Store className="h-4 w-4" />
             Phorest
@@ -67,6 +72,10 @@ export default function IntegrationsPage() {
             <span className="text-xs text-muted-foreground ml-1">(Coming Soon)</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="embellics" className="space-y-4">
+          <EmbellicsConfigPage embedded={true} />
+        </TabsContent>
 
         <TabsContent value="phorest" className="space-y-4">
           <PhorestConfigPage embedded={true} />

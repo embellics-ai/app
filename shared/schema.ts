@@ -1088,7 +1088,10 @@ export const bookings = pgTable('bookings', {
   // Financial
   amount: real('amount').notNull(),
   currency: text('currency').notNull().default('EUR'),
-  paymentStatus: text('payment_status').notNull().default('pending'), // pending, paid, refunded
+  paymentStatus: text('payment_status').notNull().default('awaiting_deposit'),
+  // awaiting_deposit, deposit_paid, paid, refunded, no_payment
+  depositAmount: real('deposit_amount'), // Amount of deposit paid
+  depositPaidAt: timestamp('deposit_paid_at'), // When deposit was paid
 
   // Scheduling
   bookingDateTime: timestamp('booking_date_time').notNull(),
@@ -1098,8 +1101,19 @@ export const bookings = pgTable('bookings', {
   staffMemberId: text('staff_member_id'), // External service provider staff ID
 
   // Status
-  status: text('status').notNull().default('confirmed'),
-  // confirmed, completed, cancelled, no-show, rescheduled
+  status: text('status').notNull().default('pending'),
+  // pending (reserved), confirmed (deposit paid), completed, cancelled, no_show
+
+  // Lifecycle Timestamps
+  confirmedAt: timestamp('confirmed_at'), // When booking was confirmed (deposit paid)
+  completedAt: timestamp('completed_at'), // When service was completed
+  cancelledAt: timestamp('cancelled_at'), // When booking was cancelled
+
+  // Cancellation Details
+  cancellationReason: text('cancellation_reason'), // Why booking was cancelled
+  refundAmount: real('refund_amount'), // Amount refunded on cancellation
+  refundedAt: timestamp('refunded_at'), // When refund was processed
+  cancellationNotes: text('cancellation_notes'), // Additional notes
 
   // Service Provider Mapping
   serviceProvider: text('service_provider').notNull(), // 'phorest_api', 'fresha_api', etc.
