@@ -27,6 +27,7 @@ import {
   TestTube2,
   Boxes,
   Plug,
+  UserCog,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +47,11 @@ export function AppSidebar() {
           title: 'Analytics',
           url: '/analytics',
           icon: BarChart3,
+        },
+        {
+          title: 'Customers',
+          url: '/customers',
+          icon: UserCog,
         },
         {
           title: 'Platform Admin',
@@ -72,6 +78,11 @@ export function AppSidebar() {
           title: 'Analytics',
           url: '/analytics',
           icon: BarChart3,
+        },
+        {
+          title: 'Customers',
+          url: '/customers',
+          icon: UserCog,
         },
         {
           title: 'Agent Dashboard',
