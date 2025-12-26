@@ -616,7 +616,7 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       const branch = await storage.getBranchByExternalId(
         internalBusinessId,
         externalServiceName,
-        externalBranchId,
+        externalBranchId, // This is the branch_id which already contains the external ID
       );
       if (!branch) {
         return res.status(404).json({
@@ -626,7 +626,7 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       internalBranchId = branch.id;
       branchData = {
         id: branch.id,
-        externalBranchId: branch.externalBranchId,
+        branchId: branch.branchId, // The external branch ID
         branchName: branch.branchName,
       };
     }

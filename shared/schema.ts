@@ -869,7 +869,7 @@ export const tenantBranches = pgTable(
       .notNull()
       .references(() => tenantBusinesses.id, { onDelete: 'cascade' }),
     branchId: text('branch_id').notNull(),
-    // The branch ID from the external service
+    // The branch ID from the external service (e.g., Phorest branch ID)
     branchName: text('branch_name').notNull(),
     // Human-readable branch name
     isPrimary: boolean('is_primary').default(false).notNull(),
@@ -879,7 +879,6 @@ export const tenantBranches = pgTable(
 
     // External Service Mapping (for API calls using external provider IDs)
     externalServiceName: text('external_service_name'), // 'phorest_api', 'fresha_api', etc.
-    externalBranchId: text('external_branch_id'), // External provider's branch ID
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

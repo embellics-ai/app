@@ -2784,12 +2784,12 @@ export class DbStorage implements IStorage {
   }
 
   /**
-   * Get branch by external service branch ID
+   * Get branch by external service branch ID (using branch_id which contains the external ID)
    */
   async getBranchByExternalId(
     businessId: string,
     serviceName: string,
-    externalBranchId: string,
+    branchId: string,
   ): Promise<TenantBranch | undefined> {
     const [branch] = await this.db
       .select()
@@ -2798,7 +2798,7 @@ export class DbStorage implements IStorage {
         and(
           eq(tenantBranches.businessId, businessId),
           eq(tenantBranches.externalServiceName, serviceName),
-          eq(tenantBranches.externalBranchId, externalBranchId),
+          eq(tenantBranches.branchId, branchId),
         ),
       )
       .limit(1);
