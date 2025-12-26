@@ -927,6 +927,10 @@ export const clients = pgTable(
     // Status
     status: text('status').notNull().default('active'), // active, inactive, blocked
 
+    // External Service Mapping (e.g., Phorest, Fresha)
+    externalServiceName: text('external_service_name'), // 'phorest_api', 'fresha_api', etc.
+    externalServiceClientId: text('external_service_client_id'), // External provider's client ID
+
     // Timestamps
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

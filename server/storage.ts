@@ -395,6 +395,11 @@ export interface IStorage {
   // Client methods
   getClient(id: string): Promise<Client | undefined>;
   getClientByPhone(tenantId: string, phone: string): Promise<Client | undefined>;
+  getClientByExternalId(
+    tenantId: string,
+    serviceName: string,
+    externalClientId: string,
+  ): Promise<Client | undefined>;
   getClientsByTenant(
     tenantId: string,
     filters?: {
@@ -2718,6 +2723,28 @@ export class DbStorage implements IStorage {
       .select()
       .from(clients)
       .where(and(eq(clients.tenantId, tenantId), eq(clients.phone, phone)))
+      .limit(1);
+    return client;
+  }
+
+  /**
+   * Get client by external service client ID
+   */
+  async getClientByExternalId(
+    tenantId: string,
+    serviceName: string,
+    externalClientId: string,
+  ): Promise<Client | undefined> {
+    const [client] = await this.db
+      .select()
+      .from(clients)
+      .where(
+        and(
+          eq(clients.tenantId, tenantId),
+          eq(clients.externalServiceName, serviceName),
+          eq(clients.externalServiceClientId, externalClientId),
+        ),
+      )
       .limit(1);
     return client;
   }

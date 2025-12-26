@@ -169,6 +169,8 @@ router.post('/webhook/clients', requireRetellApiKey, async (req: Request, res: R
       email,
       firstInteractionSource,
       status = 'active',
+      externalServiceName, // e.g., 'phorest_api'
+      externalServiceClientId, // External provider's client ID (e.g., Phorest client ID)
     } = requestData;
 
     // Validate required fields
@@ -187,6 +189,12 @@ router.post('/webhook/clients', requireRetellApiKey, async (req: Request, res: R
       if (email && !existingClient.email) updates.email = email;
       if (firstName && !existingClient.firstName) updates.firstName = firstName;
       if (lastName && !existingClient.lastName) updates.lastName = lastName;
+      if (externalServiceName && !existingClient.externalServiceName) {
+        updates.externalServiceName = externalServiceName;
+      }
+      if (externalServiceClientId && !existingClient.externalServiceClientId) {
+        updates.externalServiceClientId = externalServiceClientId;
+      }
 
       if (Object.keys(updates).length > 0) {
         const updatedClient = await storage.updateClient(existingClient.id, updates);
@@ -215,6 +223,8 @@ router.post('/webhook/clients', requireRetellApiKey, async (req: Request, res: R
       email,
       firstInteractionSource,
       status,
+      externalServiceName,
+      externalServiceClientId,
     });
 
     res.status(201).json({
@@ -535,7 +545,8 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
   try {
     const {
       tenantId,
-      clientId,
+      externalServiceName = 'phorest_api', // Default to phorest_api
+      externalServiceClientId, // Phorest client ID (required)
       businessId,
       branchId,
       serviceName,
@@ -546,21 +557,34 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       staffMemberId,
       bookingSource,
       bookingSourceDetails,
-      phorestClientId, // Optional: if client already exists in Phorest
     } = req.body;
 
     // Validate required fields
-    if (!tenantId || !clientId || !serviceName || !amount || !bookingDateTime || !bookingSource) {
+    if (
+      !tenantId ||
+      !externalServiceClientId ||
+      !serviceName ||
+      !amount ||
+      !bookingDateTime ||
+      !bookingSource
+    ) {
       return res.status(400).json({
         error:
-          'Missing required fields: tenantId, clientId, serviceName, amount, bookingDateTime, bookingSource',
+          'Missing required fields: tenantId, externalServiceClientId, serviceName, amount, bookingDateTime, bookingSource',
       });
     }
 
-    // Get client information
-    const client = await storage.getClient(clientId);
-    if (!client || client.tenantId !== tenantId) {
-      return res.status(404).json({ error: 'Client not found' });
+    // Lookup internal client ID using external service client ID
+    const client = await storage.getClientByExternalId(
+      tenantId,
+      externalServiceName,
+      externalServiceClientId,
+    );
+
+    if (!client) {
+      return res.status(404).json({
+        error: 'Client not found. Please create the client first using POST /webhook/clients',
+      });
     }
 
     // Create booking in our system with confirmed status if deposit paid
@@ -569,7 +593,7 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
 
     const booking = await storage.createBooking({
       tenantId,
-      clientId,
+      clientId: client.id, // Use the internal client ID
       businessId,
       branchId,
       serviceName,
@@ -580,7 +604,7 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       bookingDateTime: new Date(bookingDateTime),
       staffMemberId,
       status: bookingStatus,
-      serviceProvider: 'phorest_api',
+      serviceProvider: externalServiceName,
       bookingSource,
       bookingSourceDetails,
     });
@@ -592,73 +616,30 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
 
     // Update client's firstBookingDate if this is their first booking
     if (!client.firstBookingDate) {
-      await storage.updateClient(clientId, {
+      await storage.updateClient(client.id, {
         firstBookingDate: booking.bookingDateTime,
       });
     }
 
     // Update client status to active and set lastBookingDate
     if (client.status === 'lead') {
-      await storage.updateClient(clientId, {
+      await storage.updateClient(client.id, {
         status: 'active',
         lastBookingDate: booking.bookingDateTime,
       });
     } else {
-      await storage.updateClient(clientId, {
+      await storage.updateClient(client.id, {
         lastBookingDate: booking.bookingDateTime,
       });
     }
 
-    // TODO: Integrate with Phorest API
-    // if (createInPhorest) {
-    //   const phorestService = new PhorestService();
-    //   let phorestClientIdToUse = phorestClientId;
-    //
-    //   if (!phorestClientIdToUse) {
-    //     // Check if client mapping exists
-    //     const mapping = await storage.getClientServiceMappings(clientId);
-    //     const phorestMapping = mapping.find(m => m.serviceProvider === 'phorest_api');
-    //
-    //     if (phorestMapping) {
-    //       phorestClientIdToUse = phorestMapping.externalClientId;
-    //     } else {
-    //       // Create client in Phorest
-    //       const phorestClient = await phorestService.createClient(tenantId, {
-    //         firstName: client.firstName,
-    //         lastName: client.lastName,
-    //         mobile: client.phone,
-    //         email: client.email,
-    //       });
-    //       phorestClientIdToUse = phorestClient.clientId;
-    //
-    //       // Create mapping
-    //       await storage.createClientServiceMapping({
-    //         clientId,
-    //         serviceProvider: 'phorest_api',
-    //         externalClientId: phorestClientIdToUse,
-    //       });
-    //     }
-    //   }
-    //
-    //   // Create booking in Phorest
-    //   const phorestBooking = await phorestService.createBooking(tenantId, {
-    //     clientId: phorestClientIdToUse,
-    //     branchId: branchId,
-    //     startTime: bookingDateTime,
-    //     serviceName: serviceName,
-    //     staffId: staffMemberId,
-    //   });
-    //
-    //   // Update our booking with Phorest ID
-    //   await storage.updateBooking(booking.id, {
-    //     serviceProviderBookingId: phorestBooking.appointmentId,
-    //     serviceProviderData: phorestBooking,
-    //   });
-    // }
-
     res.status(201).json({
       success: true,
       booking,
+      client: {
+        id: client.id,
+        externalServiceClientId: client.externalServiceClientId,
+      },
       message: 'Booking completed successfully',
     });
   } catch (error) {
