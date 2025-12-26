@@ -539,18 +539,13 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       businessId,
       branchId,
       serviceName,
-      serviceCategory,
       amount,
       currency,
       depositAmount,
       bookingDateTime,
-      duration,
-      staffMemberName,
       staffMemberId,
       bookingSource,
       bookingSourceDetails,
-      // Phorest integration data
-      createInPhorest = true,
       phorestClientId, // Optional: if client already exists in Phorest
     } = req.body;
 
@@ -578,14 +573,11 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       businessId,
       branchId,
       serviceName,
-      serviceCategory,
       amount,
       currency: currency || 'EUR',
       paymentStatus,
       depositAmount,
       bookingDateTime: new Date(bookingDateTime),
-      duration,
-      staffMemberName,
       staffMemberId,
       status: bookingStatus,
       serviceProvider: 'phorest_api',

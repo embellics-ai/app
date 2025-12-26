@@ -45,13 +45,10 @@ interface ServiceMapping {
 interface Booking {
   id: string;
   serviceName: string;
-  serviceCategory: string | null;
   amount: number;
   currency: string;
   bookingDateTime: string;
-  duration: number | null;
   status: string;
-  staffMemberName: string | null;
   bookingSource: string;
   paymentStatus: string;
 }
@@ -391,13 +388,8 @@ export default function CustomerDetailPage() {
                       <Badge className={getBookingStatusColor(booking.status)}>
                         {formatStatusText(booking.status)}
                       </Badge>
-                      {booking.serviceCategory && (
-                        <Badge variant="outline" className="capitalize">
-                          {booking.serviceCategory}
-                        </Badge>
-                      )}
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-muted-foreground">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {new Date(booking.bookingDateTime).toLocaleDateString()}
@@ -409,18 +401,6 @@ export default function CustomerDetailPage() {
                           minute: '2-digit',
                         })}
                       </div>
-                      {booking.duration && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {booking.duration} min
-                        </div>
-                      )}
-                      {booking.staffMemberName && (
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {booking.staffMemberName}
-                        </div>
-                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-2">
                       <Badge variant="outline" className="capitalize text-xs">
