@@ -419,6 +419,18 @@ export interface IStorage {
   updateClient(id: string, updates: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<void>;
 
+  // Business/Branch lookup methods
+  getBusinessByExternalId(
+    tenantId: string,
+    serviceName: string,
+    externalBusinessId: string,
+  ): Promise<TenantBusiness | undefined>;
+  getBranchByExternalId(
+    businessId: string,
+    serviceName: string,
+    externalBranchId: string,
+  ): Promise<TenantBranch | undefined>;
+
   // Client Service Mapping methods
   getClientServiceMapping(id: string): Promise<ClientServiceMapping | undefined>;
   getClientServiceMappings(clientId: string): Promise<ClientServiceMapping[]>;
@@ -2747,6 +2759,50 @@ export class DbStorage implements IStorage {
       )
       .limit(1);
     return client;
+  }
+
+  /**
+   * Get business by external service business ID
+   */
+  async getBusinessByExternalId(
+    tenantId: string,
+    serviceName: string,
+    externalBusinessId: string,
+  ): Promise<TenantBusiness | undefined> {
+    const [business] = await this.db
+      .select()
+      .from(tenantBusinesses)
+      .where(
+        and(
+          eq(tenantBusinesses.tenantId, tenantId),
+          eq(tenantBusinesses.externalServiceName, serviceName),
+          eq(tenantBusinesses.externalBusinessId, externalBusinessId),
+        ),
+      )
+      .limit(1);
+    return business;
+  }
+
+  /**
+   * Get branch by external service branch ID
+   */
+  async getBranchByExternalId(
+    businessId: string,
+    serviceName: string,
+    externalBranchId: string,
+  ): Promise<TenantBranch | undefined> {
+    const [branch] = await this.db
+      .select()
+      .from(tenantBranches)
+      .where(
+        and(
+          eq(tenantBranches.businessId, businessId),
+          eq(tenantBranches.externalServiceName, serviceName),
+          eq(tenantBranches.externalBranchId, externalBranchId),
+        ),
+      )
+      .limit(1);
+    return branch;
   }
 
   /**
