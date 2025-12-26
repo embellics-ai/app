@@ -202,7 +202,8 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
                           email: '{{email}}',
                           firstInteractionSource: 'voice | web | whatsapp (required)',
                           status: 'active | inactive | blocked (default: active)',
-                          externalServiceName: 'phorest_api | fresha | other (optional)',
+                          externalServiceName:
+                            'external_service_api (e.g., phorest_api, fresha, etc.) (optional)',
                           externalServiceClientId: 'external_provider_client_id (optional)',
                         },
                         null,
@@ -222,9 +223,9 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
                     <p className="text-xs text-amber-700 dark:text-amber-300">
                       🔗 <strong>External Service Mapping:</strong> Use{' '}
                       <code>externalServiceName</code> and <code>externalServiceClientId</code> to
-                      map this client to external booking systems like Phorest. This allows you to
-                      pass the external provider's client ID when creating bookings instead of
-                      Embellics' internal ID.
+                      map this client to external booking systems. This allows you to pass the
+                      external provider's client ID when creating bookings instead of Embellics'
+                      internal ID.
                     </p>
                   </div>
                 </div>
@@ -247,8 +248,8 @@ ${JSON.stringify(
     email: '{{email}}',
     firstInteractionSource: 'voice',
     status: 'active',
-    externalServiceName: 'phorest_api',
-    externalServiceClientId: 'phorest_client_123',
+    externalServiceName: 'external_service_api',
+    externalServiceClientId: 'ext_client_123',
   },
   null,
   2,
@@ -281,8 +282,8 @@ ${JSON.stringify(
                                 firstInteractionDate: '2025-12-26T10:30:00Z', // Auto-set
                                 firstBookingDate: null, // Set when first booking created
                                 status: 'active',
-                                externalServiceName: 'phorest_api',
-                                externalServiceClientId: 'phorest_client_123',
+                                externalServiceName: 'external_service_api',
+                                externalServiceClientId: 'ext_client_123',
                               },
                               message: 'Client created successfully',
                               existed: false,
@@ -372,7 +373,8 @@ ${JSON.stringify(
                   )}
                 </div>
                 <CardDescription className="text-left mt-2">
-                  Track customer interaction (inquiry/reservation) without creating Phorest booking
+                  Track customer interaction (inquiry/reservation) without creating external service
+                  booking
                 </CardDescription>
               </CollapsibleTrigger>
             </CardHeader>
@@ -383,7 +385,7 @@ ${JSON.stringify(
                   <p className="text-sm text-muted-foreground">
                     Use this endpoint when a customer makes an inquiry or reserves a booking but
                     hasn't paid yet. This creates/updates a client record and optionally creates a
-                    lead for follow-up. Does NOT create booking in Phorest.
+                    lead for follow-up. Does NOT create booking in external service.
                   </p>
                   <p className="text-sm text-red-600 font-medium mt-2">
                     🔐 Authentication Required: X-API-Key header (not Bearer token)
@@ -513,7 +515,7 @@ ${JSON.stringify(
                   )}
                 </div>
                 <CardDescription className="text-left mt-2">
-                  Create confirmed booking with Phorest integration
+                  Create confirmed booking with external service integration
                 </CardDescription>
               </CollapsibleTrigger>
             </CardHeader>
@@ -523,8 +525,8 @@ ${JSON.stringify(
                   <h4 className="font-semibold mb-2">When to use</h4>
                   <p className="text-sm text-muted-foreground">
                     Use this endpoint when a customer pays a deposit or confirms their booking. This
-                    creates a booking record, integrates with Phorest to create the appointment, and
-                    updates the client status.
+                    creates a booking record, integrates with external service to create the
+                    appointment, and updates the client status.
                   </p>
                   <p className="text-sm text-red-600 font-medium mt-2">
                     🔐 Authentication Required: X-API-Key header (not Bearer token)
@@ -551,10 +553,10 @@ ${JSON.stringify(
                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
                     {`{
   "tenantId": "{TENANT_ID}",
-  "externalServiceName": "phorest_api (default)",
-  "externalServiceClientId": "phorest_client_123",
-  "businessId": "{BUSINESS_UUID}",
-  "branchId": "{BRANCH_UUID}",
+  "externalServiceName": "external_service_api (default: phorest_api)",
+  "externalServiceClientId": "ext_client_123",
+  "externalBusinessId": "ext_business_456 (optional)",
+  "externalBranchId": "ext_branch_789 (optional)",
   "serviceName": "Premium Facial Treatment",
   "amount": 89.00,
   "currency": "EUR",
@@ -571,10 +573,10 @@ ${JSON.stringify(
                   <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 rounded-md border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-700 dark:text-amber-300">
                       ⚠️ <strong>Changed from clientId to externalServiceClientId:</strong> Pass the
-                      external provider's client ID (e.g., Phorest client ID) instead of Embellics'
-                      internal client ID. The system will automatically lookup and use the correct
-                      internal ID. Make sure the client was created first with the external service
-                      mapping using POST /webhook/clients.
+                      external provider's client ID (e.g., external service client ID) instead of
+                      Embellics' internal client ID. The system will automatically lookup and use
+                      the correct internal ID. Make sure the client was created first with the
+                      external service mapping using POST /webhook/clients.
                     </p>
                   </div>
                 </div>
@@ -588,11 +590,19 @@ ${JSON.stringify(
                     </li>
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">externalServiceClientId</code>{' '}
-                      - External provider's client ID (e.g., Phorest client ID)
+                      - External provider's client ID (e.g., external service client ID)
                     </li>
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">externalServiceName</code> -
-                      Service name (optional, defaults to 'phorest_api')
+                      Service name (optional, defaults to 'external_service_api')
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">externalBusinessId</code> -
+                      External provider's business ID (optional, e.g., external service business ID)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">externalBranchId</code> -
+                      External provider's branch ID (optional, e.g., external service branch ID)
                     </li>
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">serviceName</code> - Name of
@@ -622,6 +632,8 @@ ${JSON.stringify(
     "id": "{BOOKING_UUID}",
     "tenantId": "{TENANT_ID}",
     "clientId": "{INTERNAL_CLIENT_ID}",
+    "businessId": "{INTERNAL_BUSINESS_ID}",
+    "branchId": "{INTERNAL_BRANCH_ID}",
     "serviceName": "Premium Facial Treatment",
     "amount": 89.00,
     "depositAmount": 20.00,
@@ -629,12 +641,22 @@ ${JSON.stringify(
     "paymentStatus": "deposit_paid",
     "bookingDateTime": "2025-01-20T14:30:00Z",
     "confirmedAt": "2025-01-15T10:35:00Z",
-    "serviceProviderBookingId": "phorest_appt_456",
+    "serviceProviderBookingId": "ext_appt_456",
     "createdAt": "2025-01-15T10:35:00Z"
   },
   "client": {
     "id": "{INTERNAL_CLIENT_ID}",
-    "externalServiceClientId": "phorest_client_123"
+    "externalServiceClientId": "ext_client_123"
+  },
+  "business": {
+    "id": "{INTERNAL_BUSINESS_ID}",
+    "externalBusinessId": "ext_business_456",
+    "businessName": "SWC"
+  },
+  "branch": {
+    "id": "{INTERNAL_BRANCH_ID}",
+    "externalBranchId": "ext_branch_789",
+    "branchName": "Dublin City Center"
   },
   "message": "Booking completed successfully"
 }`}

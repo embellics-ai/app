@@ -547,8 +547,8 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       tenantId,
       externalServiceName = 'phorest_api', // Default to phorest_api
       externalServiceClientId, // Phorest client ID (required)
-      businessId,
-      branchId,
+      externalBusinessId, // Phorest business ID (optional, will lookup internal ID)
+      externalBranchId, // Phorest branch ID (optional, will lookup internal ID)
       serviceName,
       amount,
       currency,
@@ -587,6 +587,50 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       });
     }
 
+    // Lookup internal business ID if external business ID provided
+    let internalBusinessId: string | undefined;
+    let businessData: any = null;
+    if (externalBusinessId) {
+      const business = await storage.getBusinessByExternalId(
+        tenantId,
+        externalServiceName,
+        externalBusinessId,
+      );
+      if (!business) {
+        return res.status(404).json({
+          error: `Business not found with external ID: ${externalBusinessId}`,
+        });
+      }
+      internalBusinessId = business.id;
+      businessData = {
+        id: business.id,
+        externalBusinessId: business.externalBusinessId,
+        businessName: business.businessName,
+      };
+    }
+
+    // Lookup internal branch ID if external branch ID provided
+    let internalBranchId: string | undefined;
+    let branchData: any = null;
+    if (externalBranchId && internalBusinessId) {
+      const branch = await storage.getBranchByExternalId(
+        internalBusinessId,
+        externalServiceName,
+        externalBranchId,
+      );
+      if (!branch) {
+        return res.status(404).json({
+          error: `Branch not found with external ID: ${externalBranchId}`,
+        });
+      }
+      internalBranchId = branch.id;
+      branchData = {
+        id: branch.id,
+        externalBranchId: branch.externalBranchId,
+        branchName: branch.branchName,
+      };
+    }
+
     // Create booking in our system with confirmed status if deposit paid
     const bookingStatus = depositAmount ? 'confirmed' : 'pending';
     const paymentStatus = depositAmount ? 'deposit_paid' : 'awaiting_deposit';
@@ -594,8 +638,8 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
     const booking = await storage.createBooking({
       tenantId,
       clientId: client.id, // Use the internal client ID
-      businessId,
-      branchId,
+      businessId: internalBusinessId, // Use the internal business ID (looked up from external ID)
+      branchId: internalBranchId, // Use the internal branch ID (looked up from external ID)
       serviceName,
       amount,
       currency: currency || 'EUR',
@@ -640,6 +684,8 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
         id: client.id,
         externalServiceClientId: client.externalServiceClientId,
       },
+      business: businessData,
+      branch: branchData,
       message: 'Booking completed successfully',
     });
   } catch (error) {

@@ -828,6 +828,11 @@ export const tenantBusinesses = pgTable(
     // The business ID from the external service
     businessName: text('business_name').notNull(),
     // Human-readable business name
+
+    // External Service Mapping (for API calls using external provider IDs)
+    externalServiceName: text('external_service_name'), // 'phorest_api', 'fresha_api', etc.
+    externalBusinessId: text('external_business_id'), // External provider's business ID
+
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -871,6 +876,11 @@ export const tenantBranches = pgTable(
     // Whether this is the primary/default branch
     isActive: boolean('is_active').default(true).notNull(),
     // Whether this branch is currently active
+
+    // External Service Mapping (for API calls using external provider IDs)
+    externalServiceName: text('external_service_name'), // 'phorest_api', 'fresha_api', etc.
+    externalBranchId: text('external_branch_id'), // External provider's branch ID
+
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
