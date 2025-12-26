@@ -5,9 +5,10 @@
  * Client admins can only access their own tenant's customer data
  */
 
-import { Router, Response } from 'express';
+import { Router, Response, Request } from 'express';
 import { storage } from '../storage';
 import { type AuthenticatedRequest, requireAuth } from '../middleware/auth.middleware';
+import { requireRetellApiKey } from '../middleware/retell-auth.middleware';
 
 const router = Router();
 
@@ -182,6 +183,85 @@ router.patch(
     }
   },
 );
+
+// ============================================
+// WEBHOOK/EXTERNAL API ENDPOINTS (Retell AI)
+// ============================================
+
+/**
+ * POST /api/platform/webhook/clients
+ * Create or update a client from external system (Retell AI, N8N, etc.)
+ * Accessible by: External systems with valid API key (X-API-Key header)
+ */
+router.post('/webhook/clients', requireRetellApiKey, async (req: Request, res: Response) => {
+  try {
+    const {
+      tenantId,
+      firstName,
+      lastName,
+      phone,
+      email,
+      firstInteractionSource,
+      status = 'active',
+    } = req.body;
+
+    // Validate required fields
+    if (!tenantId || !firstName || !lastName || !phone || !firstInteractionSource) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['tenantId', 'firstName', 'lastName', 'phone', 'firstInteractionSource'],
+      });
+    }
+
+    // Check if client with this phone already exists
+    const existingClient = await storage.getClientByPhone(tenantId, phone);
+    if (existingClient) {
+      // Update existing client with new information if provided
+      const updates: any = {};
+      if (email && !existingClient.email) updates.email = email;
+      if (firstName && !existingClient.firstName) updates.firstName = firstName;
+      if (lastName && !existingClient.lastName) updates.lastName = lastName;
+
+      if (Object.keys(updates).length > 0) {
+        const updatedClient = await storage.updateClient(existingClient.id, updates);
+        return res.status(200).json({
+          success: true,
+          client: updatedClient,
+          message: 'Client updated successfully',
+          existed: true,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        client: existingClient,
+        message: 'Client already exists',
+        existed: true,
+      });
+    }
+
+    // Create new client
+    const client = await storage.createClient({
+      tenantId,
+      firstName,
+      lastName,
+      phone,
+      email,
+      firstInteractionSource,
+      status,
+    });
+
+    res.status(201).json({
+      success: true,
+      client,
+      message: 'Client created successfully',
+      existed: false,
+    });
+  } catch (error) {
+    console.error('Error creating/updating client via webhook:', error);
+    res.status(500).json({ error: 'Failed to process client request' });
+  }
+});
 
 // ============================================
 // BOOKING API ENDPOINTS
