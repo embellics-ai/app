@@ -130,11 +130,11 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
                 <pre className="text-xs font-mono">
                   {JSON.stringify(
                     {
-                      tenantId: 'string (required) - Your tenant ID',
-                      firstName: 'string (required)',
-                      lastName: 'string (required)',
-                      phone: 'string (required) - E.164 format recommended',
-                      email: 'string (optional)',
+                      tenantId: '{{tenantId}}',
+                      firstName: '{{first_name}}',
+                      lastName: '{{last_name}}',
+                      phone: '{{phone}}',
+                      email: '{{email}}',
                       firstInteractionSource: 'voice | web | whatsapp (required)',
                       status: 'active | inactive | blocked (default: active)',
                     },
@@ -164,11 +164,11 @@ Content-Type: application/json
 
 ${JSON.stringify(
   {
-    tenantId: 'ab40f9f0-e696-4f46-bf00-4c7cf96338cc',
-    firstName: 'Emma',
-    lastName: 'Johnson',
-    phone: '+353871234567',
-    email: 'emma.johnson@example.com',
+    tenantId: '{{tenantId}}',
+    firstName: '{{first_name}}',
+    lastName: '{{last_name}}',
+    phone: '{{phone}}',
+    email: '{{email}}',
     firstInteractionSource: 'voice',
     status: 'active',
   },
