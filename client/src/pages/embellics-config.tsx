@@ -655,7 +655,7 @@ ${JSON.stringify(
   },
   "branch": {
     "id": "{INTERNAL_BRANCH_ID}",
-    "externalBranchId": "ext_branch_789",
+    "branchId": "ext_branch_789",
     "branchName": "Dublin City Center"
   },
   "message": "Booking completed successfully"
