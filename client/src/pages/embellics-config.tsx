@@ -55,7 +55,6 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
   const [allExpanded, setAllExpanded] = useState(false);
   const [expandedEndpoints, setExpandedEndpoints] = useState<Record<string, boolean>>({
     'webhook-clients': false,
-    'create-booking': false,
     'track-interaction': false,
     'complete-booking': false,
     'update-booking': false,
@@ -66,7 +65,6 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
     setAllExpanded(newState);
     setExpandedEndpoints({
       'webhook-clients': newState,
-      'create-booking': newState,
       'track-interaction': newState,
       'complete-booking': newState,
       'update-booking': newState,
@@ -299,191 +297,6 @@ ${JSON.stringify(
                       <div className="flex items-center gap-2 mb-2">
                         <Badge variant="destructive">400</Badge>
                         <span className="text-sm">Bad Request - Missing required fields</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-
-        {/* Removed old POST /bookings endpoint - Use /bookings/complete instead */}
-
-        {/* Booking Lifecycle Section */}
-        <Card>
-          <Collapsible
-            open={expandedEndpoints['create-booking']}
-            onOpenChange={() => toggleEndpoint('create-booking')}
-          >
-            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CollapsibleTrigger className="w-full">
-                <div className="flex items-center justify-between w-full">
-                  <CardTitle className="flex items-center gap-2">
-                    <Badge variant="default">POST</Badge>
-                    <code className="text-sm">/api/platform/tenants/:tenantId/bookings</code>
-                    <CopyButton
-                      text="endpoint URL"
-                      url="/api/platform/tenants/:tenantId/bookings"
-                    />
-                  </CardTitle>
-                  {expandedEndpoints['create-booking'] ? (
-                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </div>
-                <CardDescription className="text-left mt-2">
-                  Record a new booking for a customer
-                </CardDescription>
-              </CollapsibleTrigger>
-            </CardHeader>
-            <CollapsibleContent>
-              <CardContent className="space-y-4">
-                <div>
-                  <h4 className="font-semibold mb-2">Description</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Creates a booking record linked to a customer. The customer must already exist
-                    in the system. This endpoint tracks all appointment details including service,
-                    staff, pricing, and booking source.
-                  </p>
-                  <p className="text-sm text-red-600 font-medium mt-2">
-                    🔐 Authentication Required: Bearer token with Platform Admin or Client Admin
-                    access
-                  </p>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="font-semibold mb-2">URL Parameters</h4>
-                  <div className="bg-muted p-4 rounded-md">
-                    <code className="text-xs font-mono">
-                      tenantId: The unique identifier for the tenant/business
-                    </code>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="font-semibold mb-2">Request Body</h4>
-                  <div className="bg-muted p-4 rounded-md overflow-x-auto">
-                    <pre className="text-xs font-mono">
-                      {JSON.stringify(
-                        {
-                          clientId: 'string (required) - Customer UUID',
-                          bookingDate: 'ISO 8601 datetime (required)',
-                          serviceName: 'string (required)',
-                          serviceCategory: 'string (optional)',
-                          duration: 'number (optional) - minutes',
-                          staffMember: 'string (optional)',
-                          amount: 'number (required) - decimal',
-                          currency: 'string (default: EUR)',
-                          status:
-                            'pending | confirmed | completed | cancelled (default: confirmed)',
-                          paymentStatus: 'pending | paid | refunded (default: pending)',
-                          source: 'voice | web | whatsapp (required)',
-                          externalBookingId: 'string (optional) - Phorest/Fresha booking ID',
-                          notes: 'string (optional)',
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="font-semibold mb-2">Example Request</h4>
-                  <div className="bg-muted p-4 rounded-md overflow-x-auto">
-                    <pre className="text-xs font-mono">{`POST /api/platform/tenants/{TENANT_ID}/bookings
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-${JSON.stringify(
-  {
-    clientId: '{CLIENT_UUID}',
-    bookingDate: '2025-12-27T14:00:00Z',
-    serviceName: 'Deep Tissue Massage',
-    serviceCategory: 'massage',
-    duration: 60,
-    staffMember: 'Emma Thompson',
-    amount: 75.0,
-    currency: 'EUR',
-    status: 'confirmed',
-    paymentStatus: 'pending',
-    source: 'voice',
-    externalBookingId: 'PHOREST-12345',
-    notes: 'Customer requested firm pressure',
-  },
-  null,
-  2,
-)}`}</pre>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="font-semibold mb-2">Responses</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge className="bg-green-600 hover:bg-green-700">201</Badge>
-                        <span className="text-sm">Created - Booking recorded</span>
-                      </div>
-                      <div className="bg-muted p-3 rounded-md overflow-x-auto">
-                        <pre className="text-xs font-mono">
-                          {JSON.stringify(
-                            {
-                              id: '{BOOKING_UUID}',
-                              tenantId: '{TENANT_ID}',
-                              clientId: '{CLIENT_UUID}',
-                              bookingDate: '2025-12-27T14:00:00Z',
-                              serviceName: 'Deep Tissue Massage',
-                              serviceCategory: 'massage',
-                              duration: 60,
-                              staffMember: 'Emma Thompson',
-                              amount: 75.0,
-                              currency: 'EUR',
-                              status: 'confirmed',
-                              paymentStatus: 'pending',
-                              source: 'voice',
-                              externalBookingId: 'PHOREST-12345',
-                              createdAt: '2025-12-26T10:30:00Z',
-                            },
-                            null,
-                            2,
-                          )}
-                        </pre>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="destructive">404</Badge>
-                        <span className="text-sm">Not Found - Customer doesn't exist</span>
-                      </div>
-                      <div className="bg-muted p-3 rounded-md overflow-x-auto">
-                        <pre className="text-xs font-mono">
-                          {JSON.stringify(
-                            {
-                              error: 'Client not found or does not belong to this tenant',
-                            },
-                            null,
-                            2,
-                          )}
-                        </pre>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="destructive">403</Badge>
-                        <span className="text-sm">Forbidden - Access denied</span>
                       </div>
                     </div>
                   </div>

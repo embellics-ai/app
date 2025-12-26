@@ -57,7 +57,7 @@ export default function PhorestConfigPage({ embedded = false }: PhorestConfigPag
     'create-client': false,
     'get-client': false,
     'service-categories': false,
-    'health': false,
+    health: false,
     'config-check': false,
   });
 
@@ -68,7 +68,7 @@ export default function PhorestConfigPage({ embedded = false }: PhorestConfigPag
       'create-client': newState,
       'get-client': newState,
       'service-categories': newState,
-      'health': newState,
+      health: newState,
       'config-check': newState,
     });
   };
@@ -292,8 +292,8 @@ ${JSON.stringify(
                 <div>
                   <h4 className="font-semibold mb-2">Description</h4>
                   <p className="text-sm text-muted-foreground">
-                    Retrieves an existing client from the Phorest salon management system using their
-                    phone number. Returns 404 if no client found.
+                    Retrieves an existing client from the Phorest salon management system using
+                    their phone number. Returns 404 if no client found.
                   </p>
                   <p className="text-sm text-red-600 font-medium mt-2">
                     🔐 Authentication Required: X-API-Key header must be included
@@ -422,8 +422,8 @@ ${JSON.stringify(
                   <h4 className="font-semibold mb-2">Description</h4>
                   <p className="text-sm text-muted-foreground">
                     Retrieves the list of service categories available for a specific business and
-                    branch in the Phorest salon management system. Use this to display available service
-                    categories to clients.
+                    branch in the Phorest salon management system. Use this to display available
+                    service categories to clients.
                   </p>
                   <p className="text-sm text-red-600 font-medium mt-2">
                     🔐 Authentication Required: X-API-Key header must be included
@@ -501,7 +501,9 @@ ${JSON.stringify(
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <Badge variant="destructive">400</Badge>
-                        <span className="text-sm">Validation Error - Missing required parameters</span>
+                        <span className="text-sm">
+                          Validation Error - Missing required parameters
+                        </span>
                       </div>
                     </div>
 
