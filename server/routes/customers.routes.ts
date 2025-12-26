@@ -159,6 +159,8 @@ router.patch(
  */
 router.post('/webhook/clients', requireRetellApiKey, async (req: Request, res: Response) => {
   try {
+    const requestData = req.body.args || req.body;
+
     const {
       tenantId,
       firstName,
@@ -167,7 +169,7 @@ router.post('/webhook/clients', requireRetellApiKey, async (req: Request, res: R
       email,
       firstInteractionSource,
       status = 'active',
-    } = req.body;
+    } = requestData;
 
     // Validate required fields
     if (!tenantId || !firstName || !lastName || !phone || !firstInteractionSource) {
