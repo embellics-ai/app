@@ -220,9 +220,11 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
                   </div>
                   <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 rounded-md border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                      🔗 <strong>External Service Mapping:</strong> Use <code>externalServiceName</code> and{' '}
-                      <code>externalServiceClientId</code> to map this client to external booking systems like Phorest.
-                      This allows you to pass the external provider's client ID when creating bookings instead of Embellics' internal ID.
+                      🔗 <strong>External Service Mapping:</strong> Use{' '}
+                      <code>externalServiceName</code> and <code>externalServiceClientId</code> to
+                      map this client to external booking systems like Phorest. This allows you to
+                      pass the external provider's client ID when creating bookings instead of
+                      Embellics' internal ID.
                     </p>
                   </div>
                 </div>
@@ -568,10 +570,11 @@ ${JSON.stringify(
                   </pre>
                   <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 rounded-md border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                      ⚠️ <strong>Changed from clientId to externalServiceClientId:</strong> Pass the external provider's
-                      client ID (e.g., Phorest client ID) instead of Embellics' internal client ID. The system will
-                      automatically lookup and use the correct internal ID. Make sure the client was created first
-                      with the external service mapping using POST /webhook/clients.
+                      ⚠️ <strong>Changed from clientId to externalServiceClientId:</strong> Pass the
+                      external provider's client ID (e.g., Phorest client ID) instead of Embellics'
+                      internal client ID. The system will automatically lookup and use the correct
+                      internal ID. Make sure the client was created first with the external service
+                      mapping using POST /webhook/clients.
                     </p>
                   </div>
                 </div>
@@ -584,12 +587,12 @@ ${JSON.stringify(
                       ID
                     </li>
                     <li>
-                      <code className="bg-muted px-1 py-0.5 rounded">externalServiceClientId</code> - External provider's
-                      client ID (e.g., Phorest client ID)
+                      <code className="bg-muted px-1 py-0.5 rounded">externalServiceClientId</code>{' '}
+                      - External provider's client ID (e.g., Phorest client ID)
                     </li>
                     <li>
-                      <code className="bg-muted px-1 py-0.5 rounded">externalServiceName</code> - Service name
-                      (optional, defaults to 'phorest_api')
+                      <code className="bg-muted px-1 py-0.5 rounded">externalServiceName</code> -
+                      Service name (optional, defaults to 'phorest_api')
                     </li>
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">serviceName</code> - Name of
