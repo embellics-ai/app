@@ -116,7 +116,11 @@ export async function registerModularRoutes(app: Express): Promise<void> {
   app.use('/api/phorest', phorestRoutes);
 
   // Customer management routes (clients, leads, bookings)
+  // Mounted at /tenants for dashboard routes with :tenantId
   app.use('/api/platform/tenants', customersRoutes);
+
+  // Also mount at /platform for webhook routes without :tenantId
+  app.use('/api/platform', customersRoutes);
 
   console.log(
     '[Router] ✅ Registered public routes: lookup (tenant lookup for external integrations)',
