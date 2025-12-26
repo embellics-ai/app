@@ -84,36 +84,36 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
           </CardContent>
         </Card>
 
-        {/* Create Client Endpoint */}
+        {/* Create Client Endpoint - Webhook */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Badge variant="default">POST</Badge>
-              <code className="text-sm">/api/platform/tenants/:tenantId/clients</code>
-              <CopyButton text="endpoint URL" url="/api/platform/tenants/:tenantId/clients" />
+              <code className="text-sm">/api/platform/webhook/clients</code>
+              <CopyButton text="endpoint URL" url="/api/platform/webhook/clients" />
             </CardTitle>
-            <CardDescription>Create a new customer or return existing one</CardDescription>
+            <CardDescription>Create or update customer from external systems (Retell AI, N8N)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <h4 className="font-semibold mb-2">Description</h4>
               <p className="text-sm text-muted-foreground">
-                Creates a new customer record in the Embellics platform. Phone number is used as the
-                unique identifier per tenant. If a customer with this phone already exists, the
-                endpoint returns a 409 conflict with the existing customer data.
+                Creates a new customer record or updates an existing one. Phone number is used as the
+                unique identifier per tenant. Designed for external systems like Retell AI, N8N, and webhooks.
               </p>
               <p className="text-sm text-red-600 font-medium mt-2">
-                🔐 Authentication Required: Bearer token with Platform Admin or Client Admin access
+                🔐 Authentication Required: X-API-Key header (not Bearer token)
               </p>
             </div>
 
             <Separator />
 
             <div>
-              <h4 className="font-semibold mb-2">URL Parameters</h4>
+              <h4 className="font-semibold mb-2">Headers</h4>
               <div className="bg-muted p-4 rounded-md">
                 <code className="text-xs font-mono">
-                  tenantId: The unique identifier for the tenant/business
+                  X-API-Key: Your API key from environment variables<br/>
+                  Content-Type: application/json
                 </code>
               </div>
             </div>
@@ -126,6 +126,7 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
                 <pre className="text-xs font-mono">
                   {JSON.stringify(
                     {
+                      tenantId: 'string (required) - Your tenant ID',
                       firstName: 'string (required)',
                       lastName: 'string (required)',
                       phone: 'string (required) - E.164 format recommended',
@@ -153,12 +154,13 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
             <div>
               <h4 className="font-semibold mb-2">Example Request</h4>
               <div className="bg-muted p-4 rounded-md overflow-x-auto">
-                <pre className="text-xs font-mono">{`POST /api/platform/tenants/{TENANT_ID}/clients
-Authorization: Bearer YOUR_TOKEN
+                <pre className="text-xs font-mono">{`POST /api/platform/webhook/clients
+X-API-Key: YOUR_API_KEY
 Content-Type: application/json
 
 ${JSON.stringify(
   {
+    tenantId: 'ab40f9f0-e696-4f46-bf00-4c7cf96338cc',
     firstName: 'Emma',
     lastName: 'Johnson',
     phone: '+353871234567',
@@ -186,40 +188,20 @@ ${JSON.stringify(
                     <pre className="text-xs font-mono">
                       {JSON.stringify(
                         {
-                          id: '{CLIENT_UUID}',
-                          tenantId: '{TENANT_ID}',
-                          firstName: 'Emma',
-                          lastName: 'Johnson',
-                          phone: '+353871234567',
-                          email: 'emma.johnson@example.com',
-                          firstInteractionSource: 'voice',
-                          firstInteractionDate: '2025-12-26T10:30:00Z', // Auto-set
-                          firstBookingDate: null, // Set when first booking created
-                          lastBookingDate: null,
-                          status: 'active',
-                          createdAt: '2025-12-26T10:30:00Z',
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="destructive">409</Badge>
-                    <span className="text-sm">Conflict - Customer already exists</span>
-                  </div>
-                  <div className="bg-muted p-3 rounded-md overflow-x-auto">
-                    <pre className="text-xs font-mono">
-                      {JSON.stringify(
-                        {
-                          error: 'Client with this phone number already exists',
-                          existingClient: {
+                          success: true,
+                          client: {
                             id: '{CLIENT_UUID}',
+                            tenantId: '{TENANT_ID}',
+                            firstName: 'Emma',
+                            lastName: 'Johnson',
                             phone: '+353871234567',
+                            firstInteractionSource: 'voice',
+                            firstInteractionDate: '2025-12-26T10:30:00Z', // Auto-set
+                            firstBookingDate: null, // Set when first booking created
+                            status: 'active',
                           },
+                          message: 'Client created successfully',
+                          existed: false,
                         },
                         null,
                         2,
@@ -230,8 +212,22 @@ ${JSON.stringify(
 
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="destructive">403</Badge>
-                    <span className="text-sm">Forbidden - Access denied</span>
+                    <Badge className="bg-blue-600 hover:bg-blue-700">200</Badge>
+                    <span className="text-sm">OK - Customer already exists</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="destructive">401</Badge>
+                    <span className="text-sm">Unauthorized - Invalid X-API-Key</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="destructive">400</Badge>
+                    <span className="text-sm">Bad Request - Missing required fields</span>
                   </div>
                 </div>
               </div>
@@ -239,7 +235,9 @@ ${JSON.stringify(
           </CardContent>
         </Card>
 
-        {/* Create Booking Endpoint */}
+        {/* Removed old POST /bookings endpoint - Use /bookings/complete instead */}
+
+        {/* Booking Lifecycle Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
