@@ -259,7 +259,7 @@ ${JSON.stringify(
                             {
                               success: true,
                               client: {
-                                id: '{CLIENT_UUID}',
+                                id: '{CLIENT_ID}',
                                 tenantId: '{TENANT_ID}',
                                 firstName: 'Emma',
                                 lastName: 'Johnson',
@@ -450,7 +450,7 @@ ${JSON.stringify(
                     {`{
   "success": true,
   "client": {
-    "id": "{CLIENT_UUID}",
+    "id": "{CLIENT_ID}",
     "tenantId": "{TENANT_ID}",
     "phone": "+353871234567",
     "email": "customer@example.com",
@@ -536,24 +536,20 @@ ${JSON.stringify(
                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
                     {`{
   "tenantId": "{TENANT_ID}",
-  "clientId": "{CLIENT_UUID}",
+  "clientId": "{CLIENT_ID}",
   "businessId": "{BUSINESS_UUID}",
   "branchId": "{BRANCH_UUID}",
   "serviceName": "Premium Facial Treatment",
-  "serviceCategory": "facial",
   "amount": 89.00,
   "currency": "EUR",
   "depositAmount": 20.00,
   "bookingDateTime": "2025-01-20T14:30:00Z",
-  "duration": 60,
-  "staffMemberName": "Emma Smith",
   "staffMemberId": "staff_123",
   "bookingSource": "voice",
   "bookingSourceDetails": {
     "callId": "call_abc123",
     "agentId": "agent_xyz"
-  },
-  "createInPhorest": true
+  }
 }`}
                   </pre>
                 </div>
@@ -596,7 +592,7 @@ ${JSON.stringify(
   "booking": {
     "id": "{BOOKING_UUID}",
     "tenantId": "{TENANT_ID}",
-    "clientId": "{CLIENT_UUID}",
+    "clientId": "{CLIENT_ID}",
     "serviceName": "Premium Facial Treatment",
     "amount": 89.00,
     "depositAmount": 20.00,
@@ -710,9 +706,8 @@ ${JSON.stringify(
                   </p>
                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
                     {`{
-  "staffMemberName": "New Staff Name",
-  "duration": 90,
-  "amount": 120.00
+  "amount": 120.00,
+  "bookingDateTime": "2025-01-21T15:00:00Z"
 }`}
                   </pre>
                 </div>

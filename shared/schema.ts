@@ -1083,7 +1083,6 @@ export const bookings = pgTable('bookings', {
 
   // Service Details
   serviceName: text('service_name').notNull(),
-  serviceCategory: text('service_category'), // 'facial', 'massage', 'nails', 'hair', etc.
 
   // Financial
   amount: real('amount').notNull(),
@@ -1095,9 +1094,7 @@ export const bookings = pgTable('bookings', {
 
   // Scheduling
   bookingDateTime: timestamp('booking_date_time').notNull(),
-  duration: integer('duration'), // minutes
 
-  staffMemberName: text('staff_member_name'),
   staffMemberId: text('staff_member_id'), // External service provider staff ID
 
   // Status

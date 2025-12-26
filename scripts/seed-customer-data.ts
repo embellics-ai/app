@@ -207,12 +207,9 @@ async function seedCustomerData() {
           businessId: business.id,
           branchId: null,
           serviceName: service.name,
-          serviceCategory: service.category,
           amount: service.price + (Math.random() * 10 - 5), // Add some variation
           currency: 'EUR',
           bookingDateTime: bookingDate,
-          duration: service.duration,
-          staffMemberName: staffMember,
           staffMemberId: `staff_${Math.random().toString(36).substr(2, 9)}`,
           status,
           serviceProvider: 'phorest_api',
