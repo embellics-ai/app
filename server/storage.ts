@@ -470,6 +470,15 @@ export interface IStorage {
   }>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBooking(id: string, updates: Partial<InsertBooking>): Promise<Booking | undefined>;
+  confirmBooking(bookingId: string, depositAmount?: number): Promise<Booking | undefined>;
+  completeBooking(bookingId: string): Promise<Booking | undefined>;
+  cancelBooking(
+    bookingId: string,
+    reason: string,
+    refundAmount?: number,
+    notes?: string,
+  ): Promise<Booking | undefined>;
+  markBookingNoShow(bookingId: string): Promise<Booking | undefined>;
   deleteBooking(id: string): Promise<void>;
 }
 
@@ -3124,6 +3133,100 @@ export class DbStorage implements IStorage {
       .update(bookings)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(bookings.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Confirm booking - mark as confirmed with deposit paid
+   */
+  async confirmBooking(bookingId: string, depositAmount?: number): Promise<Booking | undefined> {
+    const now = new Date();
+    const updates: any = {
+      status: 'confirmed',
+      paymentStatus: depositAmount ? 'deposit_paid' : 'no_payment',
+      confirmedAt: now,
+      updatedAt: now,
+    };
+
+    if (depositAmount) {
+      updates.depositAmount = depositAmount;
+      updates.depositPaidAt = now;
+    }
+
+    const [updated] = await this.db
+      .update(bookings)
+      .set(updates)
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Complete booking - mark service as completed
+   */
+  async completeBooking(bookingId: string): Promise<Booking | undefined> {
+    const now = new Date();
+    const [updated] = await this.db
+      .update(bookings)
+      .set({
+        status: 'completed',
+        paymentStatus: 'paid',
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Cancel booking with optional refund
+   */
+  async cancelBooking(
+    bookingId: string,
+    reason: string,
+    refundAmount?: number,
+    notes?: string,
+  ): Promise<Booking | undefined> {
+    const now = new Date();
+    const updates: any = {
+      status: 'cancelled',
+      cancelledAt: now,
+      cancellationReason: reason,
+      updatedAt: now,
+    };
+
+    if (refundAmount !== undefined) {
+      updates.refundAmount = refundAmount;
+      updates.refundedAt = now;
+      updates.paymentStatus = 'refunded';
+    }
+
+    if (notes) {
+      updates.cancellationNotes = notes;
+    }
+
+    const [updated] = await this.db
+      .update(bookings)
+      .set(updates)
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Mark booking as no-show
+   */
+  async markBookingNoShow(bookingId: string): Promise<Booking | undefined> {
+    const now = new Date();
+    const [updated] = await this.db
+      .update(bookings)
+      .set({
+        status: 'no_show',
+        updatedAt: now,
+      })
+      .where(eq(bookings.id, bookingId))
       .returning();
     return updated;
   }

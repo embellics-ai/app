@@ -135,16 +135,40 @@ export default function CustomerDetailPage() {
   const getBookingStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'completed':
-        return 'bg-green-500/10 text-green-500';
+        return 'bg-green-500/10 text-green-500 border-green-500/20';
       case 'confirmed':
-        return 'bg-blue-500/10 text-blue-500';
+        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'pending':
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
       case 'cancelled':
-        return 'bg-red-500/10 text-red-500';
+        return 'bg-red-500/10 text-red-500 border-red-500/20';
+      case 'no_show':
       case 'no-show':
-        return 'bg-orange-500/10 text-orange-500';
+        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
       default:
-        return 'bg-gray-500/10 text-gray-500';
+        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
     }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'paid':
+        return 'bg-green-500/10 text-green-500 border-green-500/20';
+      case 'deposit_paid':
+        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'awaiting_deposit':
+        return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+      case 'refunded':
+        return 'bg-red-500/10 text-red-500 border-red-500/20';
+      case 'no_payment':
+        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+    }
+  };
+
+  const formatStatusText = (status: string) => {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   return (
@@ -365,7 +389,7 @@ export default function CustomerDetailPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <h4 className="font-semibold">{booking.serviceName}</h4>
                       <Badge className={getBookingStatusColor(booking.status)}>
-                        {booking.status}
+                        {formatStatusText(booking.status)}
                       </Badge>
                       {booking.serviceCategory && (
                         <Badge variant="outline" className="capitalize">
@@ -402,8 +426,8 @@ export default function CustomerDetailPage() {
                       <Badge variant="outline" className="capitalize text-xs">
                         via {booking.bookingSource}
                       </Badge>
-                      <Badge variant="outline" className="capitalize text-xs">
-                        {booking.paymentStatus}
+                      <Badge className={`text-xs ${getPaymentStatusColor(booking.paymentStatus)}`}>
+                        {formatStatusText(booking.paymentStatus)}
                       </Badge>
                     </div>
                   </div>
