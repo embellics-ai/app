@@ -47,6 +47,7 @@ import widgetConfigRoutes from './widget-config.routes';
 import paymentRoutes from './payment.routes';
 import stripeWebhookRoutes from './stripe-webhook.routes';
 import phorestRoutes from './phorest.routes';
+import customersRoutes from './customers.routes';
 
 export async function registerModularRoutes(app: Express): Promise<void> {
   // ===== Public Routes (No Auth) - Register FIRST =====
@@ -114,6 +115,9 @@ export async function registerModularRoutes(app: Express): Promise<void> {
   // Phorest API routes (universal client creation endpoint)
   app.use('/api/phorest', phorestRoutes);
 
+  // Customer management routes (clients, leads, bookings)
+  app.use('/api/platform/tenants', customersRoutes);
+
   console.log(
     '[Router] ✅ Registered public routes: lookup (tenant lookup for external integrations)',
   );
@@ -121,7 +125,7 @@ export async function registerModularRoutes(app: Express): Promise<void> {
     '[Router] ✅ Registered Phase 1 routes: auth, analytics, proxy, tenant, user, integration',
   );
   console.log(
-    '[Router] ✅ Registered Phase 2 routes: function, webhook, n8n, conversation, handoff, widget, widget-test, widget-config, payment, stripe-webhook, phorest',
+    '[Router] ✅ Registered Phase 2 routes: function, webhook, n8n, conversation, handoff, widget, widget-test, widget-config, payment, stripe-webhook, phorest, customers',
   );
   console.log('[Router] ✅ All modular routes registered successfully');
 }

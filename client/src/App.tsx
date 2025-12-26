@@ -33,6 +33,8 @@ import ForgotPassword from '@/pages/forgot-password';
 import ResetPassword from '@/pages/reset-password';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentCancelled from '@/pages/PaymentCancelled';
+import CustomersPage from '@/pages/customers';
+import CustomerDetailPage from '@/pages/customer-detail';
 import NotFound from '@/pages/not-found';
 import { useEffect } from 'react';
 
@@ -131,6 +133,20 @@ function Router() {
         <ProtectedRoute path="/team-management">
           <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
             <TeamManagementPage />
+          </RoleProtectedRoute>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customers">
+        <ProtectedRoute path="/customers">
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <CustomersPage />
+          </RoleProtectedRoute>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customers/:id">
+        <ProtectedRoute path="/customers/:id">
+          <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
+            <CustomerDetailPage />
           </RoleProtectedRoute>
         </ProtectedRoute>
       </Route>

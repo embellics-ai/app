@@ -36,6 +36,14 @@ import {
   type InsertTenantBusiness,
   type TenantBranch,
   type InsertTenantBranch,
+  type Client,
+  type InsertClient,
+  type ClientServiceMapping,
+  type InsertClientServiceMapping,
+  type Lead,
+  type InsertLead,
+  type Booking,
+  type InsertBooking,
   tenants,
   clientUsers,
   apiKeys,
@@ -54,6 +62,10 @@ import {
   externalApiConfigs,
   tenantBusinesses,
   tenantBranches,
+  clients,
+  clientServiceMappings,
+  leads,
+  bookings,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -379,6 +391,86 @@ export interface IStorage {
   ): Promise<TenantBranch | undefined>;
   setPrimaryBranch(businessId: string, branchId: string): Promise<void>;
   deleteTenantBranch(id: string): Promise<void>;
+
+  // Client methods
+  getClient(id: string): Promise<Client | undefined>;
+  getClientByPhone(tenantId: string, phone: string): Promise<Client | undefined>;
+  getClientsByTenant(
+    tenantId: string,
+    filters?: {
+      status?: string;
+      source?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<Client[]>;
+  getClientStats(tenantId: string): Promise<{
+    totalClients: number;
+    activeClients: number;
+    newThisMonth: number;
+    bySource: Record<string, number>;
+  }>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: string, updates: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: string): Promise<void>;
+
+  // Client Service Mapping methods
+  getClientServiceMapping(id: string): Promise<ClientServiceMapping | undefined>;
+  getClientServiceMappings(clientId: string): Promise<ClientServiceMapping[]>;
+  getClientByServiceProviderId(
+    tenantId: string,
+    serviceName: string,
+    serviceProviderClientId: string,
+  ): Promise<Client | undefined>;
+  createClientServiceMapping(mapping: InsertClientServiceMapping): Promise<ClientServiceMapping>;
+  updateClientServiceMapping(
+    id: string,
+    updates: Partial<InsertClientServiceMapping>,
+  ): Promise<ClientServiceMapping | undefined>;
+  deleteClientServiceMapping(id: string): Promise<void>;
+
+  // Lead methods
+  getLead(id: string): Promise<Lead | undefined>;
+  getLeadByPhone(tenantId: string, phone: string): Promise<Lead | undefined>;
+  getLeadsByTenant(
+    tenantId: string,
+    filters?: {
+      status?: string;
+      assignedAgentId?: string;
+      needsFollowUp?: boolean;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<Lead[]>;
+  createLead(lead: InsertLead): Promise<Lead>;
+  updateLead(id: string, updates: Partial<InsertLead>): Promise<Lead | undefined>;
+  convertLeadToClient(leadId: string, clientId: string): Promise<void>;
+  deleteLead(id: string): Promise<void>;
+
+  // Booking methods
+  getBooking(id: string): Promise<Booking | undefined>;
+  getBookingsByClient(clientId: string): Promise<Booking[]>;
+  getBookingsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      status?: string;
+      clientId?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<Booking[]>;
+  getClientBookingStats(clientId: string): Promise<{
+    totalBookings: number;
+    totalSpent: number;
+    averageSpent: number;
+    lastBookingDate: Date | null;
+    favoriteServices: { serviceName: string; count: number }[];
+  }>;
+  createBooking(booking: InsertBooking): Promise<Booking>;
+  updateBooking(id: string, updates: Partial<InsertBooking>): Promise<Booking | undefined>;
+  deleteBooking(id: string): Promise<void>;
 }
 
 // Database storage implementation using PostgreSQL
@@ -2595,6 +2687,452 @@ export class DbStorage implements IStorage {
    */
   async deleteTenantBranch(id: string): Promise<void> {
     await this.db.delete(tenantBranches).where(eq(tenantBranches.id, id));
+  }
+
+  // ============================================
+  // CLIENT METHODS
+  // ============================================
+
+  /**
+   * Get client by ID
+   */
+  async getClient(id: string): Promise<Client | undefined> {
+    const [client] = await this.db.select().from(clients).where(eq(clients.id, id)).limit(1);
+    return client;
+  }
+
+  /**
+   * Get client by phone number (within tenant)
+   */
+  async getClientByPhone(tenantId: string, phone: string): Promise<Client | undefined> {
+    const [client] = await this.db
+      .select()
+      .from(clients)
+      .where(and(eq(clients.tenantId, tenantId), eq(clients.phone, phone)))
+      .limit(1);
+    return client;
+  }
+
+  /**
+   * Get all clients for a tenant with optional filters
+   */
+  async getClientsByTenant(
+    tenantId: string,
+    filters?: {
+      status?: string;
+      source?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<Client[]> {
+    const conditions = [eq(clients.tenantId, tenantId)];
+
+    if (filters?.status) {
+      conditions.push(eq(clients.status, filters.status));
+    }
+    if (filters?.source) {
+      conditions.push(eq(clients.firstInteractionSource, filters.source));
+    }
+
+    let query = this.db
+      .select()
+      .from(clients)
+      .where(and(...conditions))
+      .orderBy(desc(clients.createdAt));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return await query;
+  }
+
+  /**
+   * Get client statistics for a tenant
+   */
+  async getClientStats(tenantId: string): Promise<{
+    totalClients: number;
+    activeClients: number;
+    newThisMonth: number;
+    bySource: Record<string, number>;
+  }> {
+    // Get total and active clients
+    const allClients = await this.db.select().from(clients).where(eq(clients.tenantId, tenantId));
+
+    const activeClients = allClients.filter((c) => c.status === 'active');
+
+    // Get clients created this month
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const newThisMonth = allClients.filter((c) => c.createdAt >= firstDayOfMonth);
+
+    // Group by source
+    const bySource: Record<string, number> = {};
+    for (const client of allClients) {
+      bySource[client.firstInteractionSource] = (bySource[client.firstInteractionSource] || 0) + 1;
+    }
+
+    return {
+      totalClients: allClients.length,
+      activeClients: activeClients.length,
+      newThisMonth: newThisMonth.length,
+      bySource,
+    };
+  }
+
+  /**
+   * Create a new client
+   */
+  async createClient(client: InsertClient): Promise<Client> {
+    const [created] = await this.db.insert(clients).values(client).returning();
+    return created!;
+  }
+
+  /**
+   * Update client
+   */
+  async updateClient(id: string, updates: Partial<InsertClient>): Promise<Client | undefined> {
+    const [updated] = await this.db
+      .update(clients)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(clients.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Delete client
+   */
+  async deleteClient(id: string): Promise<void> {
+    await this.db.delete(clients).where(eq(clients.id, id));
+  }
+
+  // ============================================
+  // CLIENT SERVICE MAPPING METHODS
+  // ============================================
+
+  /**
+   * Get client service mapping by ID
+   */
+  async getClientServiceMapping(id: string): Promise<ClientServiceMapping | undefined> {
+    const [mapping] = await this.db
+      .select()
+      .from(clientServiceMappings)
+      .where(eq(clientServiceMappings.id, id))
+      .limit(1);
+    return mapping;
+  }
+
+  /**
+   * Get all service mappings for a client
+   */
+  async getClientServiceMappings(clientId: string): Promise<ClientServiceMapping[]> {
+    return await this.db
+      .select()
+      .from(clientServiceMappings)
+      .where(eq(clientServiceMappings.clientId, clientId))
+      .orderBy(desc(clientServiceMappings.createdAt));
+  }
+
+  /**
+   * Find client by service provider ID
+   * Used when receiving webhooks from external services (Phorest, Fresha, etc.)
+   */
+  async getClientByServiceProviderId(
+    tenantId: string,
+    serviceName: string,
+    serviceProviderClientId: string,
+  ): Promise<Client | undefined> {
+    const [mapping] = await this.db
+      .select()
+      .from(clientServiceMappings)
+      .where(
+        and(
+          eq(clientServiceMappings.tenantId, tenantId),
+          eq(clientServiceMappings.serviceName, serviceName),
+          eq(clientServiceMappings.serviceProviderClientId, serviceProviderClientId),
+        ),
+      )
+      .limit(1);
+
+    if (!mapping) return undefined;
+
+    return await this.getClient(mapping.clientId);
+  }
+
+  /**
+   * Create a new client service mapping
+   */
+  async createClientServiceMapping(
+    mapping: InsertClientServiceMapping,
+  ): Promise<ClientServiceMapping> {
+    const [created] = await this.db.insert(clientServiceMappings).values(mapping).returning();
+    return created!;
+  }
+
+  /**
+   * Update client service mapping
+   */
+  async updateClientServiceMapping(
+    id: string,
+    updates: Partial<InsertClientServiceMapping>,
+  ): Promise<ClientServiceMapping | undefined> {
+    const [updated] = await this.db
+      .update(clientServiceMappings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(clientServiceMappings.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Delete client service mapping
+   */
+  async deleteClientServiceMapping(id: string): Promise<void> {
+    await this.db.delete(clientServiceMappings).where(eq(clientServiceMappings.id, id));
+  }
+
+  // ============================================
+  // LEAD METHODS
+  // ============================================
+
+  /**
+   * Get lead by ID
+   */
+  async getLead(id: string): Promise<Lead | undefined> {
+    const [lead] = await this.db.select().from(leads).where(eq(leads.id, id)).limit(1);
+    return lead;
+  }
+
+  /**
+   * Get lead by phone number (within tenant)
+   */
+  async getLeadByPhone(tenantId: string, phone: string): Promise<Lead | undefined> {
+    const [lead] = await this.db
+      .select()
+      .from(leads)
+      .where(and(eq(leads.tenantId, tenantId), eq(leads.phone, phone)))
+      .limit(1);
+    return lead;
+  }
+
+  /**
+   * Get all leads for a tenant with optional filters
+   */
+  async getLeadsByTenant(
+    tenantId: string,
+    filters?: {
+      status?: string;
+      assignedAgentId?: string;
+      needsFollowUp?: boolean;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<Lead[]> {
+    const conditions = [eq(leads.tenantId, tenantId)];
+
+    if (filters?.status) {
+      conditions.push(eq(leads.status, filters.status));
+    }
+    if (filters?.assignedAgentId) {
+      conditions.push(eq(leads.assignedAgentId, filters.assignedAgentId));
+    }
+    if (filters?.needsFollowUp) {
+      conditions.push(lte(leads.nextFollowUpAt, new Date()));
+      conditions.push(isNull(leads.convertedToClientId));
+    }
+
+    let query = this.db
+      .select()
+      .from(leads)
+      .where(and(...conditions))
+      .orderBy(desc(leads.createdAt));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return await query;
+  }
+
+  /**
+   * Create a new lead
+   */
+  async createLead(lead: InsertLead): Promise<Lead> {
+    const [created] = await this.db.insert(leads).values(lead).returning();
+    return created!;
+  }
+
+  /**
+   * Update lead
+   */
+  async updateLead(id: string, updates: Partial<InsertLead>): Promise<Lead | undefined> {
+    const [updated] = await this.db
+      .update(leads)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(leads.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Convert lead to client (mark as converted)
+   */
+  async convertLeadToClient(leadId: string, clientId: string): Promise<void> {
+    await this.db
+      .update(leads)
+      .set({
+        status: 'converted',
+        convertedToClientId: clientId,
+        convertedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(leads.id, leadId));
+  }
+
+  /**
+   * Delete lead
+   */
+  async deleteLead(id: string): Promise<void> {
+    await this.db.delete(leads).where(eq(leads.id, id));
+  }
+
+  // ============================================
+  // BOOKING METHODS
+  // ============================================
+
+  /**
+   * Get booking by ID
+   */
+  async getBooking(id: string): Promise<Booking | undefined> {
+    const [booking] = await this.db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
+    return booking;
+  }
+
+  /**
+   * Get all bookings for a client
+   */
+  async getBookingsByClient(clientId: string): Promise<Booking[]> {
+    return await this.db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.clientId, clientId))
+      .orderBy(desc(bookings.bookingDateTime));
+  }
+
+  /**
+   * Get all bookings for a tenant with optional filters
+   */
+  async getBookingsByTenant(
+    tenantId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      status?: string;
+      clientId?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<Booking[]> {
+    const conditions = [eq(bookings.tenantId, tenantId)];
+
+    if (filters?.startDate) {
+      conditions.push(gte(bookings.bookingDateTime, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(bookings.bookingDateTime, filters.endDate));
+    }
+    if (filters?.status) {
+      conditions.push(eq(bookings.status, filters.status));
+    }
+    if (filters?.clientId) {
+      conditions.push(eq(bookings.clientId, filters.clientId));
+    }
+
+    let query = this.db
+      .select()
+      .from(bookings)
+      .where(and(...conditions))
+      .orderBy(desc(bookings.bookingDateTime));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return await query;
+  }
+
+  /**
+   * Get booking statistics for a client
+   */
+  async getClientBookingStats(clientId: string): Promise<{
+    totalBookings: number;
+    totalSpent: number;
+    averageSpent: number;
+    lastBookingDate: Date | null;
+    favoriteServices: { serviceName: string; count: number }[];
+  }> {
+    const clientBookings = await this.getBookingsByClient(clientId);
+
+    const totalBookings = clientBookings.length;
+    const totalSpent = clientBookings.reduce((sum, b) => sum + b.amount, 0);
+    const averageSpent = totalBookings > 0 ? totalSpent / totalBookings : 0;
+    const lastBookingDate = clientBookings.length > 0 ? clientBookings[0].bookingDateTime : null;
+
+    // Calculate favorite services
+    const serviceCounts: Record<string, number> = {};
+    for (const booking of clientBookings) {
+      serviceCounts[booking.serviceName] = (serviceCounts[booking.serviceName] || 0) + 1;
+    }
+
+    const favoriteServices = Object.entries(serviceCounts)
+      .map(([serviceName, count]) => ({ serviceName, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5); // Top 5 services
+
+    return {
+      totalBookings,
+      totalSpent,
+      averageSpent,
+      lastBookingDate,
+      favoriteServices,
+    };
+  }
+
+  /**
+   * Create a new booking
+   */
+  async createBooking(booking: InsertBooking): Promise<Booking> {
+    const [created] = await this.db.insert(bookings).values(booking).returning();
+    return created!;
+  }
+
+  /**
+   * Update booking
+   */
+  async updateBooking(id: string, updates: Partial<InsertBooking>): Promise<Booking | undefined> {
+    const [updated] = await this.db
+      .update(bookings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Delete booking
+   */
+  async deleteBooking(id: string): Promise<void> {
+    await this.db.delete(bookings).where(eq(bookings.id, id));
   }
 }
 

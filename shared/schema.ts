@@ -891,3 +891,234 @@ export const insertTenantBranchSchema = createInsertSchema(tenantBranches).omit(
 
 export type InsertTenantBranch = z.infer<typeof insertTenantBranchSchema>;
 export type TenantBranch = typeof tenantBranches.$inferSelect;
+
+// ============================================
+// CUSTOMER MANAGEMENT
+// Platform-specific client and lead tracking
+// ============================================
+
+/**
+ * Clients
+ * End customers who have successfully booked through the platform
+ * Phone number is the primary identifier (unique per tenant)
+ */
+export const clients = pgTable(
+  'clients',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Basic Info
+    firstName: text('first_name').notNull(),
+    lastName: text('last_name').notNull(),
+    email: text('email'), // Optional - might not have email
+    phone: text('phone').notNull(), // PRIMARY IDENTIFIER
+
+    // Acquisition Tracking
+    firstInteractionSource: text('first_interaction_source').notNull(), // 'voice', 'web', 'whatsapp'
+    firstInteractionDate: timestamp('first_interaction_date').defaultNow().notNull(),
+    firstBookingDate: timestamp('first_booking_date'), // When they actually completed first booking
+    lastBookingDate: timestamp('last_booking_date'),
+
+    // Status
+    status: text('status').notNull().default('active'), // active, inactive, blocked
+
+    // Timestamps
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // UNIQUE constraint: One phone per tenant (same person = same record)
+    uniquePhoneTenant: unique().on(table.phone, table.tenantId),
+  }),
+);
+
+export const insertClientSchema = createInsertSchema(clients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Client = typeof clients.$inferSelect;
+
+/**
+ * Client Service Mappings
+ * Maps platform clients to their IDs in external service providers (Phorest, Fresha, etc.)
+ * One client can have multiple mappings across different services/branches
+ */
+export const clientServiceMappings = pgTable(
+  'client_service_mappings',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    clientId: varchar('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    tenantId: varchar('tenant_id').notNull(), // Denormalized for faster queries
+
+    // Which business/branch/service
+    businessId: varchar('business_id')
+      .notNull()
+      .references(() => tenantBusinesses.id, { onDelete: 'cascade' }),
+    branchId: varchar('branch_id').references(() => tenantBranches.id, { onDelete: 'set null' }), // Nullable - some services don't have branches
+
+    // External provider info
+    serviceName: text('service_name').notNull(), // 'phorest_api', 'fresha_api', etc.
+    serviceProviderClientId: text('service_provider_client_id').notNull(), // Their client ID (e.g., Phorest client ID)
+
+    // Optional: Store full provider data if needed
+    serviceProviderData: jsonb('service_provider_data'),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // One client can have multiple mappings (different services/branches)
+    // But each service+business combination should be unique per client
+    uniqueClientBusiness: unique().on(table.clientId, table.businessId),
+  }),
+);
+
+export const insertClientServiceMappingSchema = createInsertSchema(clientServiceMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertClientServiceMapping = z.infer<typeof insertClientServiceMappingSchema>;
+export type ClientServiceMapping = typeof clientServiceMappings.$inferSelect;
+
+/**
+ * Leads
+ * Prospects who interacted with the platform but haven't completed a booking yet
+ * Used for outbound call campaigns and lead nurturing
+ */
+export const leads = pgTable(
+  'leads',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    tenantId: varchar('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Basic Info (might be partial)
+    firstName: text('first_name'),
+    lastName: text('last_name'),
+    email: text('email'),
+    phone: text('phone').notNull(), // PRIMARY IDENTIFIER
+
+    // Lead Source
+    source: text('source').notNull(), // 'voice', 'web', 'whatsapp', 'manual_entry'
+    sourceDetails: jsonb('source_details'), // Additional context (chat_id, call_id, etc.)
+
+    // Lead Status
+    status: text('status').notNull().default('new'),
+    // new, contacted, interested, not_interested, converted, invalid
+
+    // Outbound Campaign Tracking
+    assignedAgentId: varchar('assigned_agent_id').references(() => humanAgents.id, {
+      onDelete: 'set null',
+    }), // Which agent should call
+    callAttempts: integer('call_attempts').notNull().default(0),
+    lastContactedAt: timestamp('last_contacted_at'),
+    nextFollowUpAt: timestamp('next_follow_up_at'), // Scheduled follow-up
+
+    // Conversion
+    convertedToClientId: varchar('converted_to_client_id').references(() => clients.id, {
+      onDelete: 'set null',
+    }), // If they booked
+    convertedAt: timestamp('converted_at'),
+
+    // Notes
+    notes: text('notes'), // Agent notes
+
+    // Timestamps
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // One phone per tenant in leads table
+    uniquePhoneTenant: unique().on(table.phone, table.tenantId),
+  }),
+);
+
+export const insertLeadSchema = createInsertSchema(leads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type Lead = typeof leads.$inferSelect;
+
+/**
+ * Bookings
+ * All appointments/services booked through the platform
+ * Linked to clients and tracks service provider details
+ */
+export const bookings = pgTable('bookings', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  clientId: varchar('client_id')
+    .notNull()
+    .references(() => clients.id, { onDelete: 'cascade' }),
+
+  // Branch/Service Context
+  businessId: varchar('business_id').references(() => tenantBusinesses.id, {
+    onDelete: 'set null',
+  }), // Which business entity
+  branchId: varchar('branch_id').references(() => tenantBranches.id, { onDelete: 'set null' }), // Which branch
+
+  // Service Details
+  serviceName: text('service_name').notNull(),
+  serviceCategory: text('service_category'), // 'facial', 'massage', 'nails', 'hair', etc.
+
+  // Financial
+  amount: real('amount').notNull(),
+  currency: text('currency').notNull().default('EUR'),
+  paymentStatus: text('payment_status').notNull().default('pending'), // pending, paid, refunded
+
+  // Scheduling
+  bookingDateTime: timestamp('booking_date_time').notNull(),
+  duration: integer('duration'), // minutes
+
+  staffMemberName: text('staff_member_name'),
+  staffMemberId: text('staff_member_id'), // External service provider staff ID
+
+  // Status
+  status: text('status').notNull().default('confirmed'),
+  // confirmed, completed, cancelled, no-show, rescheduled
+
+  // Service Provider Mapping
+  serviceProvider: text('service_provider').notNull(), // 'phorest_api', 'fresha_api', etc.
+  serviceProviderBookingId: text('service_provider_booking_id'), // Their booking ID
+  serviceProviderData: jsonb('service_provider_data'),
+
+  // Source Tracking
+  bookingSource: text('booking_source').notNull(), // 'voice', 'web', 'whatsapp'
+  bookingSourceDetails: jsonb('booking_source_details'), // chat_id, call_id, etc.
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const insertBookingSchema = createInsertSchema(bookings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertBooking = z.infer<typeof insertBookingSchema>;
+export type Booking = typeof bookings.$inferSelect;
