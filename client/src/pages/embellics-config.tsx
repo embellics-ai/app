@@ -7,7 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Copy, Check } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface EmbellicsConfigPageProps {
@@ -44,18 +52,61 @@ function CopyButton({ text, url }: { text: string; url: string }) {
 }
 
 export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfigPageProps) {
+  const [allExpanded, setAllExpanded] = useState(false);
+  const [expandedEndpoints, setExpandedEndpoints] = useState<Record<string, boolean>>({
+    'webhook-clients': false,
+    'track-interaction': false,
+    'complete-booking': false,
+    'update-booking': false,
+  });
+
+  const toggleAll = () => {
+    const newState = !allExpanded;
+    setAllExpanded(newState);
+    setExpandedEndpoints({
+      'webhook-clients': newState,
+      'track-interaction': newState,
+      'complete-booking': newState,
+      'update-booking': newState,
+    });
+  };
+
+  const toggleEndpoint = (key: string) => {
+    setExpandedEndpoints((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
   return (
     <div className={embedded ? '' : 'flex-1 space-y-4 p-8 pt-6'}>
-      {!embedded && (
-        <div className="flex items-center justify-between space-y-2">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Embellics Customer Management API</h2>
-            <p className="text-muted-foreground">
-              Track customers who book through your platform (Voice, Web, WhatsApp)
-            </p>
-          </div>
+      <div className="flex items-center justify-between space-y-2">
+        <div>
+          {!embedded && (
+            <>
+              <h2 className="text-3xl font-bold tracking-tight">
+                Embellics Customer Management API
+              </h2>
+              <p className="text-muted-foreground">
+                Track customers who book through your platform (Voice, Web, WhatsApp)
+              </p>
+            </>
+          )}
         </div>
-      )}
+        <Button onClick={toggleAll} variant="outline" className="flex items-center gap-2">
+          {allExpanded ? (
+            <>
+              <ChevronsUpDown className="h-4 w-4" />
+              Collapse All
+            </>
+          ) : (
+            <>
+              <ChevronsDownUp className="h-4 w-4" />
+              Expand All
+            </>
+          )}
+        </Button>
+      </div>
 
       <div className="space-y-4">
         <Card>
@@ -86,79 +137,93 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
 
         {/* Create Client Endpoint - Webhook */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="default">POST</Badge>
-              <code className="text-sm">/api/platform/webhook/clients</code>
-              <CopyButton text="endpoint URL" url="/api/platform/webhook/clients" />
-            </CardTitle>
-            <CardDescription>
-              Create or update customer from external systems (Retell AI, N8N)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">Description</h4>
-              <p className="text-sm text-muted-foreground">
-                Creates a new customer record or updates an existing one. Phone number is used as
-                the unique identifier per tenant. Designed for external systems like Retell AI, N8N,
-                and webhooks.
-              </p>
-              <p className="text-sm text-red-600 font-medium mt-2">
-                🔐 Authentication Required: X-API-Key header (not Bearer token)
-              </p>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h4 className="font-semibold mb-2">Headers</h4>
-              <div className="bg-muted p-4 rounded-md">
-                <code className="text-xs font-mono">
-                  X-API-Key: Your API key from environment variables
-                  <br />
-                  Content-Type: application/json
-                </code>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h4 className="font-semibold mb-2">Request Body</h4>
-              <div className="bg-muted p-4 rounded-md overflow-x-auto">
-                <pre className="text-xs font-mono">
-                  {JSON.stringify(
-                    {
-                      tenantId: '{{tenantId}}',
-                      firstName: '{{first_name}}',
-                      lastName: '{{last_name}}',
-                      phone: '{{phone}}',
-                      email: '{{email}}',
-                      firstInteractionSource: 'voice | web | whatsapp (required)',
-                      status: 'active | inactive | blocked (default: active)',
-                    },
-                    null,
-                    2,
+          <Collapsible
+            open={expandedEndpoints['webhook-clients']}
+            onOpenChange={() => toggleEndpoint('webhook-clients')}
+          >
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center gap-2">
+                    <Badge variant="default">POST</Badge>
+                    <code className="text-sm">/api/platform/webhook/clients</code>
+                    <CopyButton text="endpoint URL" url="/api/platform/webhook/clients" />
+                  </CardTitle>
+                  {expandedEndpoints['webhook-clients'] ? (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                   )}
-                </pre>
-              </div>
-              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
-                <p className="text-xs text-blue-700 dark:text-blue-300">
-                  ℹ️ <strong>Auto-populated fields:</strong> <code>firstInteractionDate</code> is
-                  automatically set to the current timestamp when the client is created.{' '}
-                  <code>firstBookingDate</code> is automatically set when the client makes their
-                  first booking.
-                </p>
-              </div>
-            </div>
+                </div>
+                <CardDescription className="text-left mt-2">
+                  Create or update customer from external systems (Retell AI, N8N)
+                </CardDescription>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">Description</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Creates a new customer record or updates an existing one. Phone number is used
+                    as the unique identifier per tenant. Designed for external systems like Retell
+                    AI, N8N, and webhooks.
+                  </p>
+                  <p className="text-sm text-red-600 font-medium mt-2">
+                    🔐 Authentication Required: X-API-Key header (not Bearer token)
+                  </p>
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div>
-              <h4 className="font-semibold mb-2">Example Request</h4>
-              <div className="bg-muted p-4 rounded-md overflow-x-auto">
-                <pre className="text-xs font-mono">{`POST /api/platform/webhook/clients
+                <div>
+                  <h4 className="font-semibold mb-2">Headers</h4>
+                  <div className="bg-muted p-4 rounded-md">
+                    <code className="text-xs font-mono">
+                      X-API-Key: Your API key from environment variables
+                      <br />
+                      Content-Type: application/json
+                    </code>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-semibold mb-2">Request Body</h4>
+                  <div className="bg-muted p-4 rounded-md overflow-x-auto">
+                    <pre className="text-xs font-mono">
+                      {JSON.stringify(
+                        {
+                          tenantId: '{{tenantId}}',
+                          firstName: '{{first_name}}',
+                          lastName: '{{last_name}}',
+                          phone: '{{phone}}',
+                          email: '{{email}}',
+                          firstInteractionSource: 'voice | web | whatsapp (required)',
+                          status: 'active | inactive | blocked (default: active)',
+                        },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </div>
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      ℹ️ <strong>Auto-populated fields:</strong> <code>firstInteractionDate</code>{' '}
+                      is automatically set to the current timestamp when the client is created.{' '}
+                      <code>firstBookingDate</code> is automatically set when the client makes their
+                      first booking.
+                    </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-semibold mb-2">Example Request</h4>
+                  <div className="bg-muted p-4 rounded-md overflow-x-auto">
+                    <pre className="text-xs font-mono">{`POST /api/platform/webhook/clients
 X-API-Key: YOUR_API_KEY
 Content-Type: application/json
 
@@ -175,230 +240,70 @@ ${JSON.stringify(
   null,
   2,
 )}`}</pre>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h4 className="font-semibold mb-2">Responses</h4>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-green-600 hover:bg-green-700">201</Badge>
-                    <span className="text-sm">Created - New customer created</span>
-                  </div>
-                  <div className="bg-muted p-3 rounded-md overflow-x-auto">
-                    <pre className="text-xs font-mono">
-                      {JSON.stringify(
-                        {
-                          success: true,
-                          client: {
-                            id: '{CLIENT_UUID}',
-                            tenantId: '{TENANT_ID}',
-                            firstName: 'Emma',
-                            lastName: 'Johnson',
-                            phone: '+353871234567',
-                            firstInteractionSource: 'voice',
-                            firstInteractionDate: '2025-12-26T10:30:00Z', // Auto-set
-                            firstBookingDate: null, // Set when first booking created
-                            status: 'active',
-                          },
-                          message: 'Client created successfully',
-                          existed: false,
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
                   </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-blue-600 hover:bg-blue-700">200</Badge>
-                    <span className="text-sm">OK - Customer already exists</span>
-                  </div>
-                </div>
+                <Separator />
 
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="destructive">401</Badge>
-                    <span className="text-sm">Unauthorized - Invalid X-API-Key</span>
+                  <h4 className="font-semibold mb-2">Responses</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className="bg-green-600 hover:bg-green-700">201</Badge>
+                        <span className="text-sm">Created - New customer created</span>
+                      </div>
+                      <div className="bg-muted p-3 rounded-md overflow-x-auto">
+                        <pre className="text-xs font-mono">
+                          {JSON.stringify(
+                            {
+                              success: true,
+                              client: {
+                                id: '{CLIENT_UUID}',
+                                tenantId: '{TENANT_ID}',
+                                firstName: 'Emma',
+                                lastName: 'Johnson',
+                                phone: '+353871234567',
+                                firstInteractionSource: 'voice',
+                                firstInteractionDate: '2025-12-26T10:30:00Z', // Auto-set
+                                firstBookingDate: null, // Set when first booking created
+                                status: 'active',
+                              },
+                              message: 'Client created successfully',
+                              existed: false,
+                            },
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className="bg-blue-600 hover:bg-blue-700">200</Badge>
+                        <span className="text-sm">OK - Customer already exists</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="destructive">401</Badge>
+                        <span className="text-sm">Unauthorized - Invalid X-API-Key</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="destructive">400</Badge>
+                        <span className="text-sm">Bad Request - Missing required fields</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="destructive">400</Badge>
-                    <span className="text-sm">Bad Request - Missing required fields</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Removed old POST /bookings endpoint - Use /bookings/complete instead */}
-
-        {/* Booking Lifecycle Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="default">POST</Badge>
-              <code className="text-sm">/api/platform/tenants/:tenantId/bookings</code>
-              <CopyButton text="endpoint URL" url="/api/platform/tenants/:tenantId/bookings" />
-            </CardTitle>
-            <CardDescription>Record a new booking for a customer</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">Description</h4>
-              <p className="text-sm text-muted-foreground">
-                Creates a booking record linked to a customer. The customer must already exist in
-                the system. This endpoint tracks all appointment details including service, staff,
-                pricing, and booking source.
-              </p>
-              <p className="text-sm text-red-600 font-medium mt-2">
-                🔐 Authentication Required: Bearer token with Platform Admin or Client Admin access
-              </p>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h4 className="font-semibold mb-2">URL Parameters</h4>
-              <div className="bg-muted p-4 rounded-md">
-                <code className="text-xs font-mono">
-                  tenantId: The unique identifier for the tenant/business
-                </code>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h4 className="font-semibold mb-2">Request Body</h4>
-              <div className="bg-muted p-4 rounded-md overflow-x-auto">
-                <pre className="text-xs font-mono">
-                  {JSON.stringify(
-                    {
-                      clientId: 'string (required) - Customer UUID',
-                      bookingDate: 'ISO 8601 datetime (required)',
-                      serviceName: 'string (required)',
-                      serviceCategory: 'string (optional)',
-                      duration: 'number (optional) - minutes',
-                      staffMember: 'string (optional)',
-                      amount: 'number (required) - decimal',
-                      currency: 'string (default: EUR)',
-                      status: 'pending | confirmed | completed | cancelled (default: confirmed)',
-                      paymentStatus: 'pending | paid | refunded (default: pending)',
-                      source: 'voice | web | whatsapp (required)',
-                      externalBookingId: 'string (optional) - Phorest/Fresha booking ID',
-                      notes: 'string (optional)',
-                    },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h4 className="font-semibold mb-2">Example Request</h4>
-              <div className="bg-muted p-4 rounded-md overflow-x-auto">
-                <pre className="text-xs font-mono">{`POST /api/platform/tenants/{TENANT_ID}/bookings
-Authorization: Bearer YOUR_TOKEN
-Content-Type: application/json
-
-${JSON.stringify(
-  {
-    clientId: '{CLIENT_UUID}',
-    bookingDate: '2025-12-27T14:00:00Z',
-    serviceName: 'Deep Tissue Massage',
-    serviceCategory: 'massage',
-    duration: 60,
-    staffMember: 'Emma Thompson',
-    amount: 75.0,
-    currency: 'EUR',
-    status: 'confirmed',
-    paymentStatus: 'pending',
-    source: 'voice',
-    externalBookingId: 'PHOREST-12345',
-    notes: 'Customer requested firm pressure',
-  },
-  null,
-  2,
-)}`}</pre>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <h4 className="font-semibold mb-2">Responses</h4>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-green-600 hover:bg-green-700">201</Badge>
-                    <span className="text-sm">Created - Booking recorded</span>
-                  </div>
-                  <div className="bg-muted p-3 rounded-md overflow-x-auto">
-                    <pre className="text-xs font-mono">
-                      {JSON.stringify(
-                        {
-                          id: '{BOOKING_UUID}',
-                          tenantId: '{TENANT_ID}',
-                          clientId: '{CLIENT_UUID}',
-                          bookingDate: '2025-12-27T14:00:00Z',
-                          serviceName: 'Deep Tissue Massage',
-                          serviceCategory: 'massage',
-                          duration: 60,
-                          staffMember: 'Emma Thompson',
-                          amount: 75.0,
-                          currency: 'EUR',
-                          status: 'confirmed',
-                          paymentStatus: 'pending',
-                          source: 'voice',
-                          externalBookingId: 'PHOREST-12345',
-                          createdAt: '2025-12-26T10:30:00Z',
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="destructive">404</Badge>
-                    <span className="text-sm">Not Found - Customer doesn't exist</span>
-                  </div>
-                  <div className="bg-muted p-3 rounded-md overflow-x-auto">
-                    <pre className="text-xs font-mono">
-                      {JSON.stringify(
-                        {
-                          error: 'Client not found or does not belong to this tenant',
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="destructive">403</Badge>
-                    <span className="text-sm">Forbidden - Access denied</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
 
         {/* Booking Lifecycle Section */}
@@ -433,48 +338,62 @@ ${JSON.stringify(
 
         {/* Track Interaction Endpoint */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="default">POST</Badge>
-              <code className="text-sm">/api/platform/interactions/track</code>
-              <CopyButton text="endpoint URL" url="/api/platform/interactions/track" />
-            </CardTitle>
-            <CardDescription>
-              Track customer interaction (inquiry/reservation) without creating Phorest booking
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">When to use</h4>
-              <p className="text-sm text-muted-foreground">
-                Use this endpoint when a customer makes an inquiry or reserves a booking but hasn't
-                paid yet. This creates/updates a client record and optionally creates a lead for
-                follow-up. Does NOT create booking in Phorest.
-              </p>
-              <p className="text-sm text-red-600 font-medium mt-2">
-                🔐 Authentication Required: X-API-Key header (not Bearer token)
-              </p>
-            </div>
+          <Collapsible
+            open={expandedEndpoints['track-interaction']}
+            onOpenChange={() => toggleEndpoint('track-interaction')}
+          >
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center gap-2">
+                    <Badge variant="default">POST</Badge>
+                    <code className="text-sm">/api/platform/interactions/track</code>
+                    <CopyButton text="endpoint URL" url="/api/platform/interactions/track" />
+                  </CardTitle>
+                  {expandedEndpoints['track-interaction'] ? (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <CardDescription className="text-left mt-2">
+                  Track customer interaction (inquiry/reservation) without creating Phorest booking
+                </CardDescription>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">When to use</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Use this endpoint when a customer makes an inquiry or reserves a booking but
+                    hasn't paid yet. This creates/updates a client record and optionally creates a
+                    lead for follow-up. Does NOT create booking in Phorest.
+                  </p>
+                  <p className="text-sm text-red-600 font-medium mt-2">
+                    🔐 Authentication Required: X-API-Key header (not Bearer token)
+                  </p>
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div>
-              <h4 className="font-semibold mb-2">Headers</h4>
-              <div className="bg-muted p-4 rounded-md">
-                <code className="text-xs font-mono">
-                  X-API-Key: Your API key from environment variables
-                  <br />
-                  Content-Type: application/json
-                </code>
-              </div>
-            </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Headers</h4>
+                  <div className="bg-muted p-4 rounded-md">
+                    <code className="text-xs font-mono">
+                      X-API-Key: Your API key from environment variables
+                      <br />
+                      Content-Type: application/json
+                    </code>
+                  </div>
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div>
-              <h4 className="font-semibold mb-2">Request Body</h4>
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
-                {`{
+                <div>
+                  <h4 className="font-semibold mb-2">Request Body</h4>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+                    {`{
   "tenantId": "{TENANT_ID}",
   "phone": "+353871234567",
   "email": "customer@example.com",
@@ -489,43 +408,46 @@ ${JSON.stringify(
   "notes": "Interested in facial treatment, wants to book for next week",
   "serviceInterest": "Premium Facial"
 }`}
-              </pre>
-            </div>
+                  </pre>
+                </div>
 
-            <div>
-              <h4 className="font-semibold mb-2">Fields</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">tenantId</code>
-                  <span className="text-red-600 ml-1">*</span> - Your tenant ID
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">phone</code>
-                  <span className="text-red-600 ml-1">*</span> - Customer phone (unique identifier)
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">source</code>
-                  <span className="text-red-600 ml-1">*</span> - 'voice', 'web', or 'whatsapp'
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">interactionType</code> - 'inquiry',
-                  'reservation', 'callback_request'
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">email, firstName, lastName</code> -
-                  Customer details (optional but recommended)
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">notes</code> - Any additional notes
-                  from the interaction
-                </li>
-              </ul>
-            </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Fields</h4>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">tenantId</code>
+                      <span className="text-red-600 ml-1">*</span> - Your tenant ID
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">phone</code>
+                      <span className="text-red-600 ml-1">*</span> - Customer phone (unique
+                      identifier)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">source</code>
+                      <span className="text-red-600 ml-1">*</span> - 'voice', 'web', or 'whatsapp'
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">interactionType</code> -
+                      'inquiry', 'reservation', 'callback_request'
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">
+                        email, firstName, lastName
+                      </code>{' '}
+                      - Customer details (optional but recommended)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">notes</code> - Any additional
+                      notes from the interaction
+                    </li>
+                  </ul>
+                </div>
 
-            <div>
-              <h4 className="font-semibold mb-2">Response</h4>
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
-                {`{
+                <div>
+                  <h4 className="font-semibold mb-2">Response</h4>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+                    {`{
   "success": true,
   "client": {
     "id": "{CLIENT_UUID}",
@@ -548,53 +470,71 @@ ${JSON.stringify(
   },
   "message": "Interaction tracked successfully"
 }`}
-              </pre>
-            </div>
-          </CardContent>
+                  </pre>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
 
         {/* Complete Booking Endpoint */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="default">POST</Badge>
-              <code className="text-sm">/api/platform/bookings/complete</code>
-              <CopyButton text="endpoint URL" url="/api/platform/bookings/complete" />
-            </CardTitle>
-            <CardDescription>Create confirmed booking with Phorest integration</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">When to use</h4>
-              <p className="text-sm text-muted-foreground">
-                Use this endpoint when a customer pays a deposit or confirms their booking. This
-                creates a booking record, integrates with Phorest to create the appointment, and
-                updates the client status.
-              </p>
-              <p className="text-sm text-red-600 font-medium mt-2">
-                🔐 Authentication Required: X-API-Key header (not Bearer token)
-              </p>
-            </div>
+          <Collapsible
+            open={expandedEndpoints['complete-booking']}
+            onOpenChange={() => toggleEndpoint('complete-booking')}
+          >
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center gap-2">
+                    <Badge variant="default">POST</Badge>
+                    <code className="text-sm">/api/platform/bookings/complete</code>
+                    <CopyButton text="endpoint URL" url="/api/platform/bookings/complete" />
+                  </CardTitle>
+                  {expandedEndpoints['complete-booking'] ? (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <CardDescription className="text-left mt-2">
+                  Create confirmed booking with Phorest integration
+                </CardDescription>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">When to use</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Use this endpoint when a customer pays a deposit or confirms their booking. This
+                    creates a booking record, integrates with Phorest to create the appointment, and
+                    updates the client status.
+                  </p>
+                  <p className="text-sm text-red-600 font-medium mt-2">
+                    🔐 Authentication Required: X-API-Key header (not Bearer token)
+                  </p>
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div>
-              <h4 className="font-semibold mb-2">Headers</h4>
-              <div className="bg-muted p-4 rounded-md">
-                <code className="text-xs font-mono">
-                  X-API-Key: Your API key from environment variables
-                  <br />
-                  Content-Type: application/json
-                </code>
-              </div>
-            </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Headers</h4>
+                  <div className="bg-muted p-4 rounded-md">
+                    <code className="text-xs font-mono">
+                      X-API-Key: Your API key from environment variables
+                      <br />
+                      Content-Type: application/json
+                    </code>
+                  </div>
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div>
-              <h4 className="font-semibold mb-2">Request Body</h4>
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
-                {`{
+                <div>
+                  <h4 className="font-semibold mb-2">Request Body</h4>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+                    {`{
   "tenantId": "{TENANT_ID}",
   "clientId": "{CLIENT_UUID}",
   "businessId": "{BUSINESS_UUID}",
@@ -615,42 +555,43 @@ ${JSON.stringify(
   },
   "createInPhorest": true
 }`}
-              </pre>
-            </div>
+                  </pre>
+                </div>
 
-            <div>
-              <h4 className="font-semibold mb-2">Required Fields</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">tenantId</code> - Your tenant ID
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">clientId</code> - Customer's UUID
-                  from previous call
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">serviceName</code> - Name of the
-                  service/treatment
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">amount</code> - Total booking
-                  amount
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">bookingDateTime</code> - ISO 8601
-                  timestamp
-                </li>
-                <li>
-                  <code className="bg-muted px-1 py-0.5 rounded">bookingSource</code> - 'voice',
-                  'web', or 'whatsapp'
-                </li>
-              </ul>
-            </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Required Fields</h4>
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">tenantId</code> - Your tenant
+                      ID
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">clientId</code> - Customer's
+                      UUID from previous call
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">serviceName</code> - Name of
+                      the service/treatment
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">amount</code> - Total booking
+                      amount
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">bookingDateTime</code> - ISO
+                      8601 timestamp
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">bookingSource</code> - 'voice',
+                      'web', or 'whatsapp'
+                    </li>
+                  </ul>
+                </div>
 
-            <div>
-              <h4 className="font-semibold mb-2">Response</h4>
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
-                {`{
+                <div>
+                  <h4 className="font-semibold mb-2">Response</h4>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+                    {`{
   "success": true,
   "booking": {
     "id": "{BOOKING_UUID}",
@@ -668,94 +609,116 @@ ${JSON.stringify(
   },
   "message": "Booking completed successfully"
 }`}
-              </pre>
-            </div>
-          </CardContent>
+                  </pre>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
 
         {/* Update Booking Status Endpoint */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="secondary">PATCH</Badge>
-              <code className="text-sm">/api/platform/tenants/:tenantId/bookings/:bookingId</code>
-              <CopyButton
-                text="endpoint URL"
-                url="/api/platform/tenants/:tenantId/bookings/:bookingId"
-              />
-            </CardTitle>
-            <CardDescription>Update booking status and lifecycle actions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold mb-2">When to use</h4>
-              <p className="text-sm text-muted-foreground">
-                Use this endpoint to update booking status throughout its lifecycle: confirm,
-                complete, cancel, or mark as no-show.
-              </p>
-            </div>
+          <Collapsible
+            open={expandedEndpoints['update-booking']}
+            onOpenChange={() => toggleEndpoint('update-booking')}
+          >
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center gap-2">
+                    <Badge variant="default">PATCH</Badge>
+                    <code className="text-sm">
+                      /api/platform/tenants/:tenantId/bookings/:bookingId
+                    </code>
+                    <CopyButton
+                      text="endpoint URL"
+                      url="/api/platform/tenants/:tenantId/bookings/:bookingId"
+                    />
+                  </CardTitle>
+                  {expandedEndpoints['update-booking'] ? (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <CardDescription className="text-left mt-2">
+                  Update booking status and lifecycle actions
+                </CardDescription>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">When to use</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Use this endpoint to update booking status throughout its lifecycle: confirm,
+                    complete, cancel, or mark as no-show.
+                  </p>
+                </div>
 
-            <Separator />
+                <Separator />
 
-            <div>
-              <h4 className="font-semibold mb-2">Actions</h4>
-              <div className="space-y-3">
-                <div className="bg-muted p-3 rounded-lg">
-                  <h5 className="font-medium text-sm mb-1">Confirm Booking (Deposit Paid)</h5>
-                  <pre className="text-xs overflow-x-auto">
-                    {`{
+                <div>
+                  <h4 className="font-semibold mb-2">Actions</h4>
+                  <div className="space-y-3">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <h5 className="font-medium text-sm mb-1">Confirm Booking (Deposit Paid)</h5>
+                      <pre className="text-xs overflow-x-auto">
+                        {`{
   "action": "confirm",
   "depositAmount": 20.00
 }`}
-                  </pre>
-                </div>
+                      </pre>
+                    </div>
 
-                <div className="bg-muted p-3 rounded-lg">
-                  <h5 className="font-medium text-sm mb-1">Complete Booking (Service Done)</h5>
-                  <pre className="text-xs overflow-x-auto">
-                    {`{
+                    <div className="bg-muted p-3 rounded-lg">
+                      <h5 className="font-medium text-sm mb-1">Complete Booking (Service Done)</h5>
+                      <pre className="text-xs overflow-x-auto">
+                        {`{
   "action": "complete"
 }`}
-                  </pre>
-                </div>
+                      </pre>
+                    </div>
 
-                <div className="bg-muted p-3 rounded-lg">
-                  <h5 className="font-medium text-sm mb-1">Cancel Booking</h5>
-                  <pre className="text-xs overflow-x-auto">
-                    {`{
+                    <div className="bg-muted p-3 rounded-lg">
+                      <h5 className="font-medium text-sm mb-1">Cancel Booking</h5>
+                      <pre className="text-xs overflow-x-auto">
+                        {`{
   "action": "cancel",
   "reason": "Customer requested cancellation",
   "refundAmount": 20.00,
   "notes": "Full deposit refunded"
 }`}
-                  </pre>
-                </div>
+                      </pre>
+                    </div>
 
-                <div className="bg-muted p-3 rounded-lg">
-                  <h5 className="font-medium text-sm mb-1">Mark as No-Show</h5>
-                  <pre className="text-xs overflow-x-auto">
-                    {`{
+                    <div className="bg-muted p-3 rounded-lg">
+                      <h5 className="font-medium text-sm mb-1">Mark as No-Show</h5>
+                      <pre className="text-xs overflow-x-auto">
+                        {`{
   "action": "no_show"
 }`}
-                  </pre>
+                      </pre>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div>
-              <h4 className="font-semibold mb-2">General Update</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                You can also update any booking field directly without an action:
-              </p>
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
-                {`{
+                <div>
+                  <h4 className="font-semibold mb-2">General Update</h4>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    You can also update any booking field directly without an action:
+                  </p>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+                    {`{
   "staffMemberName": "New Staff Name",
   "duration": 90,
   "amount": 120.00
 }`}
-              </pre>
-            </div>
-          </CardContent>
+                  </pre>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
 
         {/* Integration Flow */}
