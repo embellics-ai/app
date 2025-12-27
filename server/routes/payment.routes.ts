@@ -115,11 +115,13 @@ router.post('/create-link', async (req: Request, res: Response) => {
       try {
         const stripe = await getTenantStripeClient(tenantId);
         const session = await stripe.checkout.sessions.retrieve(existingLink.stripeSessionId);
-        
+
         // Check if session is expired or already completed
         if (session.status === 'expired') {
           // Session expired, we'll create a new one (fall through)
-          console.log(`[Payment Link] Existing session expired for booking ${externalServiceBookingId}, creating new one`);
+          console.log(
+            `[Payment Link] Existing session expired for booking ${externalServiceBookingId}, creating new one`,
+          );
         } else if (session.status === 'complete' || existingLink.status === 'completed') {
           // Already paid
           return res.status(200).json({
@@ -154,7 +156,9 @@ router.post('/create-link', async (req: Request, res: Response) => {
       } catch (stripeError) {
         console.error('[Stripe Session Retrieval Error]', stripeError);
         // If we can't retrieve from Stripe, create a new session
-        console.log(`[Payment Link] Could not retrieve existing session for booking ${externalServiceBookingId}, creating new one`);
+        console.log(
+          `[Payment Link] Could not retrieve existing session for booking ${externalServiceBookingId}, creating new one`,
+        );
       }
     }
 
