@@ -571,7 +571,8 @@ ${JSON.stringify(
     "callId": "call_abc123",
     "agentId": "agent_xyz"
   },
-  "serviceProviderBookingId": "external_booking_123"
+  "serviceProviderBookingId": "external_booking_123",
+  "paymentIntentId": "pi_3SJ3dtETQpLUZxas06R4jSqc (optional)"
 }`}
                   </pre>
                   <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 rounded-md border border-amber-200 dark:border-amber-800">
@@ -646,6 +647,11 @@ ${JSON.stringify(
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">depositAmount</code> - Amount
                       paid as deposit (omit if no payment yet)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">paymentIntentId</code> - Stripe
+                      payment_intent ID (e.g., pi_3SJ3dtETQpLUZxas06R4jSqc) - Updates
+                      payment_links.stripe_payment_intent_id for payment tracking
                     </li>
                   </ul>
                 </div>
