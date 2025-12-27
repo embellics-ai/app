@@ -59,9 +59,11 @@ async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
  * {
  *   tenantId: string (required)
  *   amount: number (required - in euros, e.g., 50.00)
+ *   businessId: string (required - internal business UUID for N8N webhook queries)
+ *   branchId: string (required - internal branch UUID for N8N webhook queries)
+ *   externalServiceBookingId: string (required - external service booking ID like Phorest)
  *   currency?: string (optional - default: 'eur')
  *   bookingId?: string (optional - internal booking ID, can be linked later)
- *   externalServiceBookingId: string (required - external service booking ID like Phorest)
  *   expiresInMinutes?: number (optional - default: 30, min: 30, max: 1440 = 24 hours)
  * }
  */
@@ -72,14 +74,17 @@ router.post('/create-link', async (req: Request, res: Response) => {
       amount,
       currency = 'eur',
       bookingId,
+      businessId,
+      branchId,
       externalServiceBookingId,
       expiresInMinutes = 30,
     } = req.body;
 
     // Validation
-    if (!tenantId || !amount || !externalServiceBookingId) {
+    if (!tenantId || !amount || !externalServiceBookingId || !businessId || !branchId) {
       return res.status(400).json({
-        error: 'Missing required fields: tenantId, amount, externalServiceBookingId',
+        error:
+          'Missing required fields: tenantId, amount, businessId, branchId, externalServiceBookingId',
       });
     }
 
@@ -132,6 +137,8 @@ router.post('/create-link', async (req: Request, res: Response) => {
       .values({
         tenantId,
         bookingId,
+        businessId,
+        branchId,
         stripeSessionId: session.id,
         amount,
         currency,
