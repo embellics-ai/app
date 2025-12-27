@@ -405,8 +405,8 @@ router.patch(
 
       // Handle specific actions
       if (action === 'confirm') {
-        const { depositAmount } = updateData;
-        updatedBooking = await storage.confirmBooking(bookingId, depositAmount);
+        const { depositAmount, paymentIntentId } = updateData;
+        updatedBooking = await storage.confirmBooking(bookingId, depositAmount, paymentIntentId);
       } else if (action === 'complete') {
         updatedBooking = await storage.completeBooking(bookingId);
       } else if (action === 'cancel') {
@@ -419,7 +419,21 @@ router.patch(
         updatedBooking = await storage.markBookingNoShow(bookingId);
       } else {
         // General update
-        updatedBooking = await storage.updateBooking(bookingId, updateData);
+        const { paymentIntentId, ...bookingUpdates } = updateData;
+
+        // Update the booking
+        updatedBooking = await storage.updateBooking(bookingId, bookingUpdates);
+
+        // If paymentIntentId is provided, also update the payment link
+        if (paymentIntentId && updatedBooking) {
+          // Update payment link with the payment intent ID
+          await storage.updatePaymentLinkIntent(
+            bookingId,
+            updatedBooking.serviceProviderBookingId,
+            updatedBooking.tenantId,
+            paymentIntentId,
+          );
+        }
       }
 
       res.json(updatedBooking);

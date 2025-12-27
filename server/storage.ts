@@ -488,7 +488,11 @@ export interface IStorage {
   }>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBooking(id: string, updates: Partial<InsertBooking>): Promise<Booking | undefined>;
-  confirmBooking(bookingId: string, depositAmount?: number): Promise<Booking | undefined>;
+  confirmBooking(
+    bookingId: string,
+    depositAmount?: number,
+    paymentIntentId?: string,
+  ): Promise<Booking | undefined>;
   completeBooking(bookingId: string): Promise<Booking | undefined>;
   cancelBooking(
     bookingId: string,
@@ -502,6 +506,12 @@ export interface IStorage {
     externalServiceBookingId: string,
     bookingId: string,
     tenantId: string,
+  ): Promise<void>;
+  updatePaymentLinkIntent(
+    bookingId: string,
+    externalServiceBookingId: string | null,
+    tenantId: string,
+    paymentIntentId: string,
   ): Promise<void>;
 }
 
@@ -3229,7 +3239,11 @@ export class DbStorage implements IStorage {
   /**
    * Confirm booking - mark as confirmed with deposit paid
    */
-  async confirmBooking(bookingId: string, depositAmount?: number): Promise<Booking | undefined> {
+  async confirmBooking(
+    bookingId: string,
+    depositAmount?: number,
+    paymentIntentId?: string,
+  ): Promise<Booking | undefined> {
     const now = new Date();
     const updates: any = {
       status: 'confirmed',
@@ -3251,14 +3265,22 @@ export class DbStorage implements IStorage {
 
     // Also update payment_links status if a payment link exists for this booking
     if (updated) {
+      // Prepare payment link updates
+      const paymentLinkUpdates: any = {
+        status: 'completed',
+        paidAt: now,
+        updatedAt: now,
+      };
+
+      // Add payment intent ID if provided
+      if (paymentIntentId) {
+        paymentLinkUpdates.stripePaymentIntentId = paymentIntentId;
+      }
+
       // Try to find payment link by bookingId first
       const paymentLinksByBookingId = await this.db
         .update(paymentLinks)
-        .set({
-          status: 'completed',
-          paidAt: now,
-          updatedAt: now,
-        })
+        .set(paymentLinkUpdates)
         .where(eq(paymentLinks.bookingId, bookingId))
         .returning();
 
@@ -3267,9 +3289,7 @@ export class DbStorage implements IStorage {
         const paymentLinksByExternalId = await this.db
           .update(paymentLinks)
           .set({
-            status: 'completed',
-            paidAt: now,
-            updatedAt: now,
+            ...paymentLinkUpdates,
             bookingId: bookingId, // Link the payment to this booking if not already linked
           })
           .where(
@@ -3387,6 +3407,49 @@ export class DbStorage implements IStorage {
         .returning();
     } catch (error) {
       console.error('[Storage] Error linking payment to booking:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update payment link with stripe payment intent ID
+   * Used when updating a booking with payment information
+   */
+  async updatePaymentLinkIntent(
+    bookingId: string,
+    externalServiceBookingId: string | null,
+    tenantId: string,
+    paymentIntentId: string,
+  ): Promise<void> {
+    try {
+      const now = new Date();
+
+      // Try to update by bookingId first
+      await this.db
+        .update(paymentLinks)
+        .set({
+          stripePaymentIntentId: paymentIntentId,
+          updatedAt: now,
+        })
+        .where(eq(paymentLinks.bookingId, bookingId));
+
+      // Also try by externalServiceBookingId if available
+      if (externalServiceBookingId) {
+        await this.db
+          .update(paymentLinks)
+          .set({
+            stripePaymentIntentId: paymentIntentId,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(paymentLinks.tenantId, tenantId),
+              eq(paymentLinks.externalServiceBookingId, externalServiceBookingId),
+            ),
+          );
+      }
+    } catch (error) {
+      console.error('[Storage] Error updating payment intent:', error);
       throw error;
     }
   }
