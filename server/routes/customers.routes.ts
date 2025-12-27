@@ -656,6 +656,12 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       await storage.confirmBooking(booking.id, depositAmount);
     }
 
+    // Link any existing payment links to this booking
+    // This connects payment links created before the booking
+    if (serviceProviderBookingId) {
+      await storage.linkPaymentToBooking(serviceProviderBookingId, booking.id, tenantId);
+    }
+
     // Update client's firstBookingDate if this is their first booking
     if (!client.firstBookingDate) {
       await storage.updateClient(client.id, {

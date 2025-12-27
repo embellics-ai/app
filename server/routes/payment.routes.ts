@@ -57,19 +57,12 @@ async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
  *
  * Body:
  * {
- *   tenantId: string
- *   amount: number (in euros, e.g., 50.00)
- *   currency?: string (default: 'eur')
- *   customerEmail?: string
- *   customerPhone?: string
- *   customerName?: string
- *   bookingReference: string (can be internal booking ID or external reference)
- *   bookingId?: string (internal booking ID to link payment to booking)
- *   phorestBookingId?: string
- *   phorestClientId?: string
- *   description?: string
- *   expiresInMinutes?: number (default: 30, min: 30, max: 1440 = 24 hours)
- *   metadata?: object
+ *   tenantId: string (required)
+ *   amount: number (required - in euros, e.g., 50.00)
+ *   currency?: string (optional - default: 'eur')
+ *   bookingId?: string (optional - internal booking ID, can be linked later)
+ *   externalServiceBookingId: string (required - external service booking ID like Phorest)
+ *   expiresInMinutes?: number (optional - default: 30, min: 30, max: 1440 = 24 hours)
  * }
  */
 router.post('/create-link', async (req: Request, res: Response) => {
@@ -78,22 +71,15 @@ router.post('/create-link', async (req: Request, res: Response) => {
       tenantId,
       amount,
       currency = 'eur',
-      customerEmail,
-      customerPhone,
-      customerName,
-      bookingReference,
-      bookingId, // NEW: Optional internal booking ID
-      phorestBookingId,
-      phorestClientId,
-      description,
+      bookingId,
+      externalServiceBookingId,
       expiresInMinutes = 30,
-      metadata = {},
     } = req.body;
 
     // Validation
-    if (!tenantId || !amount || !bookingReference) {
+    if (!tenantId || !amount || !externalServiceBookingId) {
       return res.status(400).json({
-        error: 'Missing required fields: tenantId, amount, bookingReference',
+        error: 'Missing required fields: tenantId, amount, externalServiceBookingId',
       });
     }
 
@@ -121,8 +107,8 @@ router.post('/create-link', async (req: Request, res: Response) => {
           price_data: {
             currency,
             product_data: {
-              name: description || 'Booking Payment',
-              description: `Booking Reference: ${bookingReference}`,
+              name: 'Booking Deposit Payment',
+              description: `Booking ID: ${bookingId || externalServiceBookingId}`,
             },
             unit_amount: amountInCents,
           },
@@ -132,13 +118,10 @@ router.post('/create-link', async (req: Request, res: Response) => {
       mode: 'payment',
       success_url: `${process.env.APP_URL?.replace(/\/$/, '')}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_URL?.replace(/\/$/, '')}/payment/cancelled`,
-      customer_email: customerEmail,
       metadata: {
         tenantId,
-        bookingReference,
-        phorestBookingId: phorestBookingId || '',
-        phorestClientId: phorestClientId || '',
-        ...metadata,
+        bookingId: bookingId || '',
+        externalServiceBookingId: externalServiceBookingId || '',
       },
       expires_at: Math.floor(Date.now() / 1000) + expirySeconds,
     });
@@ -148,20 +131,12 @@ router.post('/create-link', async (req: Request, res: Response) => {
       .insert(paymentLinks)
       .values({
         tenantId,
-        bookingId: bookingId || null, // NEW: Store internal booking ID if provided
-        bookingReference,
+        bookingId,
         stripeSessionId: session.id,
         amount,
         currency,
         status: 'pending',
-        customerEmail: customerEmail || null,
-        customerPhone: customerPhone || null,
-        customerName: customerName || null,
-        phorestBookingId: phorestBookingId || null,
-        phorestClientId: phorestClientId || null,
-        description: description || null,
-        metadata: metadata || {},
-        expiresAt: new Date(session.expires_at * 1000),
+        externalServiceBookingId: externalServiceBookingId || null,
       })
       .returning();
 
@@ -174,8 +149,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
         amount: paymentLink.amount,
         currency: paymentLink.currency,
         status: paymentLink.status,
-        expiresAt: paymentLink.expiresAt,
-        bookingReference: paymentLink.bookingReference,
+        bookingId: paymentLink.bookingId,
       },
     });
   } catch (error) {
@@ -253,17 +227,14 @@ router.get('/:id/status', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/payments/booking/:reference
- * Get payment link by booking reference
+ * GET /api/payments/booking/:bookingId
+ * Get payment link by booking ID
  */
-router.get('/booking/:reference', async (req: Request, res: Response) => {
+router.get('/booking/:bookingId', async (req: Request, res: Response) => {
   try {
-    const { reference } = req.params;
+    const { bookingId } = req.params;
 
-    const links = await db
-      .select()
-      .from(paymentLinks)
-      .where(eq(paymentLinks.bookingReference, reference));
+    const links = await db.select().from(paymentLinks).where(eq(paymentLinks.bookingId, bookingId));
 
     if (links.length === 0) {
       return res.status(404).json({ error: 'No payment links found for this booking' });

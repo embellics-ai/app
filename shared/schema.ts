@@ -775,22 +775,13 @@ export const paymentLinks = pgTable('payment_links', {
   tenantId: varchar('tenant_id')
     .notNull()
     .references(() => tenants.id, { onDelete: 'cascade' }),
-  bookingId: varchar('booking_id'), // Internal booking ID (foreign key to bookings table)
-  bookingReference: varchar('booking_reference', { length: 255 }).notNull(),
+  bookingId: varchar('booking_id').references(() => bookings.id, { onDelete: 'cascade' }), // Link to internal booking
   stripeSessionId: varchar('stripe_session_id', { length: 255 }).notNull().unique(),
   stripePaymentIntentId: varchar('stripe_payment_intent_id', { length: 255 }),
   amount: real('amount').notNull(),
   currency: varchar('currency', { length: 3 }).notNull().default('eur'),
   status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, completed, expired, failed
-  customerEmail: varchar('customer_email', { length: 255 }),
-  customerPhone: varchar('customer_phone', { length: 50 }),
-  customerName: varchar('customer_name', { length: 255 }),
-  phorestBookingId: varchar('phorest_booking_id', { length: 255 }),
-  phorestClientId: varchar('phorest_client_id', { length: 255 }),
-  phorestPurchaseId: varchar('phorest_purchase_id', { length: 255 }),
-  description: text('description'),
-  metadata: jsonb('metadata').default({}),
-  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  externalServiceBookingId: varchar('external_service_booking_id', { length: 255 }), // External service's booking ID (Phorest, Fresha, etc.)
   paidAt: timestamp('paid_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
