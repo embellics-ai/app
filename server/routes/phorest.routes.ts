@@ -374,7 +374,7 @@ router.get(
         hasBusiness = !!business;
         businessDetails = business
           ? {
-              businessId: business.businessId,
+              businessId: (business as any).externalBusinessId,
               businessName: business.businessName,
             }
           : null;
