@@ -118,7 +118,7 @@ export class PhorestService {
       .from(tenantBusinesses)
       .where(
         and(
-          eq(tenantBusinesses.businessId, businessId),
+          eq(tenantBusinesses.externalBusinessId, businessId),
           eq(tenantBusinesses.serviceName, 'phorest_api'),
         ),
       );

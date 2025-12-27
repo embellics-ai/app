@@ -816,8 +816,6 @@ export const tenantBusinesses = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     serviceName: text('service_name').notNull(),
     // Must match external_api_configs.service_name (e.g., 'phorest_api', 'stripe')
-    businessId: text('business_id').notNull(),
-    // The business ID from the external service
     businessName: text('business_name').notNull(),
     // Human-readable business name
 
