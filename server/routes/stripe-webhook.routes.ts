@@ -151,6 +151,8 @@ router.post(
  */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log(`[Stripe Webhook] Checkout session completed: ${session.id}`);
+  console.log(`[Stripe Webhook] Session payment status: ${session.payment_status}`);
+  console.log(`[Stripe Webhook] Session metadata:`, session.metadata);
 
   try {
     // Find payment link by session ID
@@ -160,9 +162,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       .where(eq(paymentLinks.stripeSessionId, session.id));
 
     if (!paymentLink) {
-      console.error(`[Stripe Webhook] Payment link not found for session: ${session.id}`);
+      console.error(`[Stripe Webhook] ❌ Payment link not found for session: ${session.id}`);
+      console.error(`[Stripe Webhook] Searched with stripeSessionId = ${session.id}`);
       return;
     }
+
+    console.log(
+      `[Stripe Webhook] ✅ Found payment link: ${paymentLink.id}, current status: ${paymentLink.status}`,
+    );
 
     const paidAt = new Date();
 
@@ -178,7 +185,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       .where(eq(paymentLinks.id, paymentLink.id))
       .returning();
 
-    console.log(`[Stripe Webhook] Payment link ${updatedLink.id} marked as completed`);
+    console.log(
+      `[Stripe Webhook] ✅ Payment link ${updatedLink.id} updated to status: ${updatedLink.status}`,
+    );
+    console.log(`[Stripe Webhook] Payment link paidAt: ${updatedLink.paidAt}`);
 
     // Update the associated booking if booking_id is present
     if (updatedLink.bookingId) {
