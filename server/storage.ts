@@ -502,6 +502,7 @@ export interface IStorage {
     externalServiceBookingId: string,
     bookingId: string,
     tenantId: string,
+    paymentIntentId?: string,
   ): Promise<void>;
 }
 
@@ -3369,14 +3370,22 @@ export class DbStorage implements IStorage {
     externalServiceBookingId: string,
     bookingId: string,
     tenantId: string,
+    paymentIntentId?: string, // Optional: Stripe payment_intent ID
   ): Promise<void> {
     try {
+      const updateData: any = {
+        bookingId,
+        updatedAt: new Date(),
+      };
+
+      // Add payment_intent_id if provided
+      if (paymentIntentId) {
+        updateData.stripePaymentIntentId = paymentIntentId;
+      }
+
       const result = await this.db
         .update(paymentLinks)
-        .set({
-          bookingId,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(
           and(
             eq(paymentLinks.tenantId, tenantId),
