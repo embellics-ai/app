@@ -62,7 +62,7 @@ interface Business {
   id: string;
   tenantId: string;
   serviceName: string;
-  businessId: string;
+  externalBusinessId: string;
   businessName: string;
   createdAt: string;
   updatedAt: string;
@@ -438,15 +438,18 @@ export default function BusinessBranchModal({
                       />
                     </div>
                     <div>
-                      <Label htmlFor="businessId">Business ID</Label>
+                      <Label htmlFor="businessId">External Business ID</Label>
                       <Input
                         id="businessId"
-                        placeholder="e.g., BUS123"
+                        placeholder="e.g., Xuq9HTXKLidtKJVE6p8ACA"
                         value={newBusiness.businessId}
                         onChange={(e) =>
                           setNewBusiness({ ...newBusiness, businessId: e.target.value })
                         }
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        The business ID from your external service (Phorest, Fresha, etc.)
+                      </p>
                     </div>
                     <div>
                       <Label htmlFor="businessName">Business Name</Label>
@@ -550,7 +553,7 @@ export default function BusinessBranchModal({
                                 </div>
                                 <div>
                                   <Label htmlFor="editBusinessId" className="text-xs">
-                                    Business ID
+                                    External Business ID
                                   </Label>
                                   <Input
                                     id="editBusinessId"
@@ -561,9 +564,12 @@ export default function BusinessBranchModal({
                                         businessId: e.target.value,
                                       })
                                     }
-                                    placeholder="Business ID"
+                                    placeholder="External business ID"
                                     className="h-8"
                                   />
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    From your external service
+                                  </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -594,7 +600,7 @@ export default function BusinessBranchModal({
                                     {business.serviceName}
                                   </Badge>
                                   <Badge variant="outline" className="text-xs">
-                                    ID: {business.businessId}
+                                    ID: {business.externalBusinessId}
                                   </Badge>
                                 </div>
                                 <div className="text-sm text-muted-foreground mt-1">
@@ -609,7 +615,7 @@ export default function BusinessBranchModal({
                                   onClick={() => {
                                     setEditingBusiness(business.id);
                                     setEditBusinessData({
-                                      businessId: business.businessId,
+                                      businessId: business.externalBusinessId,
                                       businessName: business.businessName,
                                     });
                                   }}

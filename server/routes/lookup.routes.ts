@@ -75,7 +75,7 @@ router.get('/tenant', requireRetellApiKey, async (req: Request, res: Response) =
         const branches = await storage.getTenantBranchesByBusiness(business.id);
         return {
           serviceName: business.serviceName,
-          businessId: business.businessId,
+          businessId: business.externalBusinessId,
           businessName: business.businessName,
           branches: branches.map((branch) => ({
             branchId: branch.branchId,

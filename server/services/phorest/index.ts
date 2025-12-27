@@ -154,7 +154,7 @@ export class PhorestService {
       throw new PhorestConfigError('Phorest business not configured for tenant', { tenantId });
     }
 
-    return businesses[0] as TenantBusiness;
+    return businesses[0];
   }
 
   /**

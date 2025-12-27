@@ -108,7 +108,8 @@ export interface TenantBusiness {
   id: string;
   tenantId: string;
   serviceName: string;
-  businessId: string;
+  externalBusinessId: string | null;
+  externalServiceName: string | null;
   businessName: string | null;
   createdAt: Date;
   updatedAt: Date | null;
