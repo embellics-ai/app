@@ -385,20 +385,15 @@ router.patch(
 /**
  * PATCH /api/platform/tenants/:tenantId/bookings/:bookingId
  * Update booking status and details
- * Accessible by: Platform Admin (any tenant) OR Client Admin (own tenant only)
+ * Authentication: API Key (X-API-Key header) - for webhook/automation access
  */
 router.patch(
   '/:tenantId/bookings/:bookingId',
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
+  requireRetellApiKey,
+  async (req: Request, res: Response) => {
     try {
       const { tenantId, bookingId } = req.params;
       const { action, ...updateData } = req.body;
-
-      // Authorization check
-      if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
-        return res.status(403).json({ error: 'Access denied to this tenant' });
-      }
 
       // Get existing booking to verify tenant ownership
       const existingBooking = await storage.getBooking(bookingId);
