@@ -537,20 +537,18 @@ router.post('/interactions/track', requireRetellApiKey, async (req, res: Respons
 
 /**
  * POST /api/platform/bookings/complete
- * Complete booking flow: Create booking + Phorest integration + mapping
+ * Complete booking flow: Create booking + External service integration + mapping
  * Used when: Customer pays deposit, booking is confirmed
  * Authentication: API Key (X-API-Key header)
- *
- * Optional: Set createPaymentLink=true to automatically generate a Stripe payment link
  */
 router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response) => {
   try {
     const {
       tenantId,
-      externalServiceName = 'phorest_api', // Default to phorest_api
-      externalServiceClientId, // Phorest client ID (required)
-      externalBusinessId, // Phorest business ID (optional, will lookup internal ID)
-      externalBranchId, // Phorest branch ID (optional, will lookup internal ID)
+      externalServiceName = 'external_service_api', // Default to external_service_api
+      externalServiceClientId, // External service client ID (required)
+      externalBusinessId, // External service business ID (optional, will lookup internal ID)
+      externalBranchId, // External service branch ID (optional, will lookup internal ID)
       serviceName,
       amount,
       currency,
@@ -559,8 +557,7 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       staffMemberId,
       bookingSource,
       bookingSourceDetails,
-      createPaymentLink = false, // NEW: Optional flag to create payment link
-      serviceProviderBookingId, // NEW: Optional external booking ID (e.g., from Phorest)
+      serviceProviderBookingId, // REQUIRED: External booking ID from external service
     } = req.body;
 
     // Validate required fields
@@ -570,11 +567,12 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       !serviceName ||
       !amount ||
       !bookingDateTime ||
-      !bookingSource
+      !bookingSource ||
+      !serviceProviderBookingId
     ) {
       return res.status(400).json({
         error:
-          'Missing required fields: tenantId, externalServiceClientId, serviceName, amount, bookingDateTime, bookingSource',
+          'Missing required fields: tenantId, externalServiceClientId, serviceName, amount, bookingDateTime, bookingSource, serviceProviderBookingId',
       });
     }
 
@@ -682,53 +680,6 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       });
     }
 
-    // Create payment link if requested and payment is still needed
-    let paymentLinkData = null;
-    if (createPaymentLink && !depositAmount) {
-      try {
-        // Call the payment link creation endpoint internally
-        const paymentResponse = await fetch(
-          `${process.env.APP_URL || 'http://localhost:5000'}/api/payment/create-link`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              tenantId,
-              amount,
-              currency: currency || 'EUR',
-              bookingReference: booking.id, // Use internal booking ID as reference
-              bookingId: booking.id, // NEW: Link payment to booking
-              customerEmail: client.email,
-              customerPhone: client.phone,
-              customerName: `${client.firstName || ''} ${client.lastName || ''}`.trim(),
-              phorestBookingId: serviceProviderBookingId,
-              phorestClientId: externalServiceClientId,
-              description: `Deposit for ${serviceName}`,
-              expiresInMinutes: 60, // 1 hour to pay
-            }),
-          },
-        );
-
-        if (paymentResponse.ok) {
-          const paymentData = await paymentResponse.json();
-          paymentLinkData = paymentData.paymentLink;
-          console.log(
-            `[Bookings] ✅ Payment link created for booking ${booking.id}: ${paymentLinkData.stripeUrl}`,
-          );
-        } else {
-          const errorText = await paymentResponse.text();
-          console.error(
-            `[Bookings] ⚠️ Failed to create payment link: ${paymentResponse.status} - ${errorText}`,
-          );
-        }
-      } catch (paymentError) {
-        console.error('[Bookings] ⚠️ Error creating payment link:', paymentError);
-        // Don't fail the booking creation if payment link fails
-      }
-    }
-
     res.status(201).json({
       success: true,
       booking,
@@ -738,7 +689,6 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       },
       business: businessData,
       branch: branchData,
-      paymentLink: paymentLinkData, // Include payment link if created
       message: 'Booking completed successfully',
     });
   } catch (error) {

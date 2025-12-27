@@ -555,8 +555,8 @@ ${JSON.stringify(
   "tenantId": "{TENANT_ID}",
   "externalServiceName": "external_service_api (default)",
   "externalServiceClientId": "ext_client_123",
-  "externalBusinessId": "ext_business_456 (optional - required for businessId)",
-  "externalBranchId": "ext_branch_789 (optional - required for branchId)",
+  "externalBusinessId": "ext_business_456 (optional - for businessId)",
+  "externalBranchId": "ext_branch_789 (optional - for branchId)",
   "serviceName": "Premium Facial Treatment",
   "amount": 89.00,
   "currency": "EUR",
@@ -568,13 +568,12 @@ ${JSON.stringify(
     "callId": "call_abc123",
     "agentId": "agent_xyz"
   },
-  "serviceProviderBookingId": "external_booking_123 (optional)",
-  "createPaymentLink": true (optional - auto-creates Stripe payment link)
+  "serviceProviderBookingId": "external_booking_123"
 }`}
                   </pre>
                   <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 rounded-md border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                      ⚠️ <strong>IMPORTANT - Field Name Changes:</strong>
+                      ⚠️ <strong>CRITICAL - Field Name Changes:</strong>
                       <br />• Use{' '}
                       <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">
                         externalBusinessId
@@ -585,16 +584,11 @@ ${JSON.stringify(
                         externalBranchId
                       </code>{' '}
                       (NOT branchId)
-                      <br />• Add{' '}
+                      <br />• <strong>REQUIRED:</strong>{' '}
                       <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">
                         serviceProviderBookingId
                       </code>{' '}
-                      for external system sync
-                      <br />• Set{' '}
-                      <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">
-                        createPaymentLink: true
-                      </code>{' '}
-                      to auto-generate Stripe payment URL
+                      - External system's booking ID (needed for payment tracking)
                     </p>
                   </div>
                 </div>
@@ -626,6 +620,10 @@ ${JSON.stringify(
                       <code className="bg-muted px-1 py-0.5 rounded">bookingSource</code> - 'voice',
                       'web', or 'whatsapp'
                     </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">serviceProviderBookingId</code>{' '}
+                      - External system's booking ID (required for payment tracking)
+                    </li>
                   </ul>
 
                   <h4 className="font-semibold mb-2 mt-4">Optional Fields</h4>
@@ -641,14 +639,6 @@ ${JSON.stringify(
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">externalBranchId</code> -
                       External provider's branch ID (populates booking.branchId)
-                    </li>
-                    <li>
-                      <code className="bg-muted px-1 py-0.5 rounded">serviceProviderBookingId</code>{' '}
-                      - External system's booking ID (e.g., external service appointment ID)
-                    </li>
-                    <li>
-                      <code className="bg-muted px-1 py-0.5 rounded">createPaymentLink</code> - Set
-                      to true to auto-generate Stripe payment link
                     </li>
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">depositAmount</code> - Amount
@@ -692,27 +682,9 @@ ${JSON.stringify(
     "branchId": "ext_branch_789",
     "branchName": "Dublin City Center"
   },
-  "paymentLink": {
-    "id": 123,
-    "stripeUrl": "https://checkout.stripe.com/c/pay/cs_test_...",
-    "stripeSessionId": "cs_test_...",
-    "amount": 89.00,
-    "currency": "EUR",
-    "status": "pending",
-    "expiresAt": "2025-01-15T11:35:00Z",
-    "bookingReference": "{BOOKING_UUID}"
-  },
   "message": "Booking completed successfully"
 }`}
                   </pre>
-                  <div className="mt-2 p-3 bg-green-50 dark:bg-green-950 rounded-md border border-green-200 dark:border-green-800">
-                    <p className="text-xs text-green-700 dark:text-green-300">
-                      ✅ <strong>Payment Link (NEW):</strong> When createPaymentLink is true, the
-                      response includes a paymentLink object with the Stripe checkout URL. Send this
-                      URL to the customer to complete payment. When payment succeeds, the booking
-                      status will automatically update to 'confirmed'.
-                    </p>
-                  </div>
                 </div>
               </CardContent>
             </CollapsibleContent>

@@ -275,13 +275,12 @@ curl -X POST 'https://embellics-app.onrender.com/api/platform/tenants/YOUR_TENAN
    - Creates booking record with status "pending" or "confirmed"
    - **REQUIRED**: Use `externalBusinessId` (NOT businessId)
    - **REQUIRED**: Use `externalBranchId` (NOT branchId)
-   - **NEW**: Add `serviceProviderBookingId` for external system sync
-   - **NEW**: Set `createPaymentLink: true` to auto-generate Stripe payment URL
+   - **REQUIRED**: Add `serviceProviderBookingId` - External system's booking ID (critical for payment tracking)
    - Creates appointment in external service
    - Updates client's last booking date
    - **Sets client's firstBookingDate if it's their first booking**
 6. **Payment (if needed)**:
-   - If `createPaymentLink: true`, response includes Stripe checkout URL
+   - Create payment link separately using payment API
    - Send payment URL to customer via SMS/email
    - When payment completes, booking status automatically updates to "confirmed"
 7. **Call Ends**: Booking is complete
@@ -301,8 +300,7 @@ curl -X POST 'https://embellics-app.onrender.com/api/platform/tenants/YOUR_TENAN
   "bookingDateTime": "2025-12-27T11:00:00.000Z",
   "staffMemberId": "ZAUE5vJhCt89hGBAdUA",
   "bookingSource": "voice",
-  "serviceProviderBookingId": "external_booking_789",
-  "createPaymentLink": true
+  "serviceProviderBookingId": "external_booking_789"
 }
 ```
 
