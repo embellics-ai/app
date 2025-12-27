@@ -111,21 +111,33 @@ router.post('/create-link', async (req: Request, res: Response) => {
       .limit(1);
 
     if (existingLink) {
-      // Return existing payment link
+      // Payment link already exists - retrieve the actual Stripe checkout URL
       console.log(`[Payment Link] Returning existing link for booking ${externalServiceBookingId}`);
-      return res.status(200).json({
-        success: true,
-        paymentLink: {
-          id: existingLink.id,
-          stripeUrl: `https://checkout.stripe.com/c/pay/${existingLink.stripeSessionId}`,
-          stripeSessionId: existingLink.stripeSessionId,
-          amount: existingLink.amount,
-          currency: existingLink.currency,
-          status: existingLink.status,
-          bookingId: existingLink.bookingId,
-        },
-        message: 'Payment link already exists for this booking',
-      });
+      try {
+        const stripe = await getTenantStripeClient(tenantId);
+        const session = await stripe.checkout.sessions.retrieve(existingLink.stripeSessionId);
+
+        return res.status(200).json({
+          success: true,
+          paymentLink: {
+            id: existingLink.id,
+            stripeUrl: session.url, // Use actual URL from Stripe
+            stripeSessionId: existingLink.stripeSessionId,
+            amount: existingLink.amount,
+            currency: existingLink.currency,
+            status: existingLink.status,
+            bookingId: existingLink.bookingId,
+          },
+          message: 'Payment link already exists for this booking',
+        });
+      } catch (stripeError) {
+        console.error('[Stripe Session Retrieval Error for duplicate]', stripeError);
+        // If we can't retrieve from Stripe, return error
+        return res.status(500).json({
+          error: 'Failed to retrieve existing payment link',
+          details: 'Could not fetch Stripe session URL',
+        });
+      }
     }
 
     // Get tenant's Stripe client
