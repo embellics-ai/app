@@ -111,21 +111,51 @@ router.post('/create-link', async (req: Request, res: Response) => {
       .limit(1);
 
     if (existingLink) {
-      // If the existing link is expired, we could create a new one
-      // For now, return the existing one
-      return res.status(200).json({
-        success: true,
-        paymentLink: {
-          id: existingLink.id,
-          stripeUrl: `https://checkout.stripe.com/c/pay/${existingLink.stripeSessionId}`,
-          stripeSessionId: existingLink.stripeSessionId,
-          amount: existingLink.amount,
-          currency: existingLink.currency,
-          status: existingLink.status,
-          bookingId: existingLink.bookingId,
-        },
-        message: 'Payment link already exists for this booking',
-      });
+      // Retrieve the actual Stripe checkout URL for the existing session
+      try {
+        const stripe = await getTenantStripeClient(tenantId);
+        const session = await stripe.checkout.sessions.retrieve(existingLink.stripeSessionId);
+        
+        // Check if session is expired or already completed
+        if (session.status === 'expired') {
+          // Session expired, we'll create a new one (fall through)
+          console.log(`[Payment Link] Existing session expired for booking ${externalServiceBookingId}, creating new one`);
+        } else if (session.status === 'complete' || existingLink.status === 'completed') {
+          // Already paid
+          return res.status(200).json({
+            success: true,
+            paymentLink: {
+              id: existingLink.id,
+              stripeUrl: session.url,
+              stripeSessionId: existingLink.stripeSessionId,
+              amount: existingLink.amount,
+              currency: existingLink.currency,
+              status: existingLink.status,
+              bookingId: existingLink.bookingId,
+            },
+            message: 'Payment already completed for this booking',
+          });
+        } else {
+          // Session still active, return the existing URL
+          return res.status(200).json({
+            success: true,
+            paymentLink: {
+              id: existingLink.id,
+              stripeUrl: session.url,
+              stripeSessionId: existingLink.stripeSessionId,
+              amount: existingLink.amount,
+              currency: existingLink.currency,
+              status: existingLink.status,
+              bookingId: existingLink.bookingId,
+            },
+            message: 'Payment link already exists for this booking',
+          });
+        }
+      } catch (stripeError) {
+        console.error('[Stripe Session Retrieval Error]', stripeError);
+        // If we can't retrieve from Stripe, create a new session
+        console.log(`[Payment Link] Could not retrieve existing session for booking ${externalServiceBookingId}, creating new one`);
+      }
     }
 
     // Get tenant's Stripe client
