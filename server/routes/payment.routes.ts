@@ -123,17 +123,34 @@ router.post('/create-link', async (req: Request, res: Response) => {
             `[Payment Link] Existing session expired for booking ${externalServiceBookingId}, creating new one`,
           );
         } else if (session.status === 'complete' || existingLink.status === 'completed') {
-          // Already paid
+          // Already paid - update payment_intent_id if missing
+          let linkToReturn = existingLink;
+          if (!existingLink.stripePaymentIntentId && session.payment_intent) {
+            const [updatedLink] = await db
+              .update(paymentLinks)
+              .set({
+                stripePaymentIntentId: session.payment_intent as string,
+                updatedAt: new Date(),
+              })
+              .where(eq(paymentLinks.id, existingLink.id))
+              .returning();
+            linkToReturn = updatedLink;
+            console.log(
+              `[Payment Link] Updated missing payment_intent_id for link ${existingLink.id}`,
+            );
+          }
+
           return res.status(200).json({
             success: true,
             paymentLink: {
-              id: existingLink.id,
+              id: linkToReturn.id,
               stripeUrl: session.url,
-              stripeSessionId: existingLink.stripeSessionId,
-              amount: existingLink.amount,
-              currency: existingLink.currency,
-              status: existingLink.status,
-              bookingId: existingLink.bookingId,
+              stripeSessionId: linkToReturn.stripeSessionId,
+              stripePaymentIntentId: linkToReturn.stripePaymentIntentId,
+              amount: linkToReturn.amount,
+              currency: linkToReturn.currency,
+              status: linkToReturn.status,
+              bookingId: linkToReturn.bookingId,
             },
             message: 'Payment already completed for this booking',
           });
@@ -145,6 +162,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
               id: existingLink.id,
               stripeUrl: session.url,
               stripeSessionId: existingLink.stripeSessionId,
+              stripePaymentIntentId: existingLink.stripePaymentIntentId,
               amount: existingLink.amount,
               currency: existingLink.currency,
               status: existingLink.status,
