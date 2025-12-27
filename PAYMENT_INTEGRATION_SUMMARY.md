@@ -142,14 +142,29 @@ curl -X POST http://localhost:3000/api/payments/create-link \
     "tenantId": "84e33bb8-6a3a-49c0-8ea0-117f2e79bd79",
     "amount": 50.00,
     "currency": "eur",
-    "customerEmail": "customer@example.com",
-    "customerPhone": "+353851234567",
-    "bookingReference": "BOOKING_123",
-    "phorestBookingId": "PHOREST_123",
-    "phorestClientId": "CLIENT_456",
-    "description": "Haircut - 15 Dec 2025"
+    "businessId": "uuid-of-business",
+    "branchId": "uuid-of-branch",
+    "externalServiceBookingId": "PHOREST_123",
+    "bookingId": "optional-internal-booking-id"
   }'
 ```
+
+**Required Fields:**
+
+- `tenantId` - Your tenant ID
+- `amount` - Payment amount in euros
+- `externalServiceBookingId` - External service booking ID (e.g., Phorest booking ID)
+
+**Optional Fields:**
+
+- `currency` - Currency code (default: 'eur')
+- `bookingId` - Internal booking ID (if you have a booking record)
+- `businessId` - Internal business ID (stores which business this payment is for)
+- `branchId` - Internal branch ID (stores which branch this payment is for)
+- `expiresInMinutes` - Link expiry time (default: 30, max: 1440)
+
+**Why businessId and branchId?**
+These fields allow you to store business/branch context directly on the payment link, so N8N webhooks can fetch external business/branch IDs even if the internal booking record hasn't been created yet.
 
 ### Response
 
@@ -175,27 +190,36 @@ curl -X POST http://localhost:3000/api/payments/create-link \
 **Option 1: After Phorest Booking Created**
 
 ```typescript
-// In your booking flow
+// In your booking flow (e.g., N8N workflow)
 const phorestBooking = await createPhorestBooking(bookingData);
 
-// Generate payment link
+// Generate payment link with business and branch context
 const paymentLink = await fetch('/api/payments/create-link', {
   method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     tenantId: currentTenant.id,
     amount: bookingData.totalPrice,
-    phorestBookingId: phorestBooking.id,
-    phorestClientId: phorestBooking.clientId,
-    bookingReference: phorestBooking.id,
-    customerEmail: customer.email,
-    customerPhone: customer.phone,
-    description: `${bookingData.service} - ${bookingData.dateTime}`,
+    businessId: tenantBusiness.id, // Internal business UUID
+    branchId: tenantBranch.id, // Internal branch UUID
+    externalServiceBookingId: phorestBooking.id, // Phorest booking ID
+    bookingId: internalBooking?.id, // Optional: Internal booking record ID
   }),
 });
 
 // Send payment link via SMS/WhatsApp
 await sendSMS(customer.phone, `Complete your booking: ${paymentLink.stripeUrl}`);
 ```
+
+**N8N Workflow Integration:**
+
+1. Create booking in Phorest → Get `phorestBookingId`
+2. Create Stripe payment session → Get `stripeSessionId`
+3. Call `POST /api/payments/create-link` with:
+   - `businessId` from your tenant_businesses lookup
+   - `branchId` from your tenant_branches lookup
+   - `externalServiceBookingId` from Phorest response
+4. On Stripe webhook, query payment_links to get external business/branch IDs for Phorest API calls
 
 **Option 2: Retell AI Function Call**
 

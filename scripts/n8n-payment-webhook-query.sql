@@ -10,25 +10,25 @@ SELECT
   pl.external_service_booking_id as phorest_booking_id,
   pl.booking_id,
   
-  -- Booking details
+  -- Booking details (if booking exists)
   b.id as booking_internal_id,
   b.client_id,
   b.service_name,
   b.booking_date_time,
   b.status as booking_status,
   
-  -- External Business ID (for Phorest API)
+  -- External Business ID (for Phorest API) - directly from payment_links
   tb.external_business_id as external_business_id,
   tb.business_name,
   
-  -- External Branch ID (for Phorest API)  
+  -- External Branch ID (for Phorest API) - directly from payment_links
   tbr.branch_id as external_branch_id,
   tbr.branch_name
   
 FROM payment_links pl
 LEFT JOIN bookings b ON pl.booking_id = b.id
-LEFT JOIN tenant_businesses tb ON b.business_id = tb.id
-LEFT JOIN tenant_branches tbr ON b.branch_id = tbr.id
+LEFT JOIN tenant_businesses tb ON pl.business_id = tb.id
+LEFT JOIN tenant_branches tbr ON pl.branch_id = tbr.id
 
 WHERE pl.stripe_session_id = '{{ $json.data.object.id }}' -- From Stripe webhook
   AND pl.status = 'completed'

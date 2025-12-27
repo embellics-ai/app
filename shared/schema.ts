@@ -776,6 +776,12 @@ export const paymentLinks = pgTable('payment_links', {
     .notNull()
     .references(() => tenants.id, { onDelete: 'cascade' }),
   bookingId: varchar('booking_id').references(() => bookings.id, { onDelete: 'cascade' }), // Link to internal booking
+  businessId: varchar('business_id')
+    .notNull()
+    .references(() => tenantBusinesses.id, { onDelete: 'restrict' }), // Link to business - REQUIRED for N8N queries
+  branchId: varchar('branch_id')
+    .notNull()
+    .references(() => tenantBranches.id, { onDelete: 'restrict' }), // Link to branch - REQUIRED for N8N queries
   stripeSessionId: varchar('stripe_session_id', { length: 255 }).notNull().unique(),
   stripePaymentIntentId: varchar('stripe_payment_intent_id', { length: 255 }),
   amount: real('amount').notNull(),

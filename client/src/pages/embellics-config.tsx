@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Info,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -846,7 +847,10 @@ ${JSON.stringify(
   "tenantId": "your-tenant-id",
   "amount": 50.00,
   "currency": "eur",
+  "businessId": "uuid-of-business",
+  "branchId": "uuid-of-branch",
   "externalServiceBookingId": "phorest_booking_12345",
+  "bookingId": "optional-internal-booking-id",
   "expiresInMinutes": 30
 }`}
                   </pre>
@@ -862,6 +866,14 @@ ${JSON.stringify(
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">amount</code> - Payment amount
                       in euros (e.g., 50.00)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">businessId</code> - Internal
+                      business UUID (required for N8N to fetch external business ID)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">branchId</code> - Internal
+                      branch UUID (required for N8N to fetch external branch ID)
                     </li>
                     <li>
                       <code className="bg-muted px-1 py-0.5 rounded">externalServiceBookingId</code>{' '}
@@ -954,6 +966,10 @@ ${JSON.stringify(
                           <code className="bg-muted px-1 py-0.5 rounded">
                             externalServiceBookingId
                           </code>
+                          , plus optional{' '}
+                          <code className="bg-muted px-1 py-0.5 rounded">businessId</code> and{' '}
+                          <code className="bg-muted px-1 py-0.5 rounded">branchId</code> to enable
+                          N8N webhook queries
                         </p>
                       </div>
                     </div>
@@ -988,6 +1004,27 @@ ${JSON.stringify(
                           <Badge variant="outline">payment_links.status = completed</Badge>
                           <Badge variant="outline">bookings.status = confirmed</Badge>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 mt-4">
+                      <div className="flex shrink-0 items-start">
+                        <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-sm text-blue-600 dark:text-blue-400">
+                          N8N Webhook Integration
+                        </h5>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          When Stripe payment completes, your N8N workflow can query the external
+                          business and branch IDs directly from the payment_links table using the
+                          SQL query in{' '}
+                          <code className="bg-muted px-1 py-0.5 rounded">
+                            scripts/n8n-payment-webhook-query.sql
+                          </code>
+                          . This works even if the internal booking record hasn't been created yet,
+                          because businessId and branchId are stored directly on the payment link.
+                        </p>
                       </div>
                     </div>
                   </div>
