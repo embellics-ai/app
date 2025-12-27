@@ -211,13 +211,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       console.warn(`[Stripe Webhook] ⚠️ No booking_id linked to payment link ${updatedLink.id}`);
     }
 
-    // TODO: Call Phorest API to record purchase
-    // This will be implemented in the next step
-    if (updatedLink.phorestBookingId) {
+    // TODO: Call external service API to record purchase
+    if (updatedLink.externalServiceBookingId) {
       console.log(
-        `[Stripe Webhook] TODO: Record purchase in Phorest for booking ${updatedLink.phorestBookingId}`,
+        `[Stripe Webhook] TODO: Record purchase in external service for booking ${updatedLink.externalServiceBookingId}`,
       );
-      // await recordPhorestPurchase(updatedLink);
+      // await recordExternalServicePurchase(updatedLink);
     }
   } catch (error) {
     console.error('[Stripe Webhook] Error handling checkout session completed:', error);

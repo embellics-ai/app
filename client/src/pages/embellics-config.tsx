@@ -58,6 +58,7 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
     'track-interaction': false,
     'complete-booking': false,
     'update-booking': false,
+    'create-payment-link': false,
   });
 
   const toggleAll = () => {
@@ -68,6 +69,7 @@ export default function EmbellicsConfigPage({ embedded = false }: EmbellicsConfi
       'track-interaction': newState,
       'complete-booking': newState,
       'update-booking': newState,
+      'create-payment-link': newState,
     });
   };
 
@@ -789,6 +791,206 @@ ${JSON.stringify(
   "bookingDateTime": "2025-01-21T15:00:00Z"
 }`}
                   </pre>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Create Payment Link Endpoint */}
+        <Card>
+          <Collapsible
+            open={expandedEndpoints['create-payment-link']}
+            onOpenChange={() => toggleEndpoint('create-payment-link')}
+          >
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center gap-2">
+                    <Badge variant="default">POST</Badge>
+                    <code className="text-sm">/api/payments/create-link</code>
+                    <CopyButton text="endpoint URL" url="/api/payments/create-link" />
+                  </CardTitle>
+                  {expandedEndpoints['create-payment-link'] ? (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <CardDescription className="text-left mt-2">
+                  Create Stripe payment link for booking deposit
+                </CardDescription>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">When to use</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Create a payment link immediately after reserving a booking in your external
+                    service (Phorest, Fresha, etc.). The payment link will be automatically linked
+                    to the booking when you call{' '}
+                    <code className="bg-muted px-1 py-0.5 rounded">
+                      POST /api/platform/bookings/complete
+                    </code>
+                    .
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-semibold mb-2">Request Body</h4>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+                    {`{
+  "tenantId": "your-tenant-id",
+  "amount": 50.00,
+  "currency": "eur",
+  "externalServiceBookingId": "phorest_booking_12345",
+  "expiresInMinutes": 30
+}`}
+                  </pre>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">Required Fields</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground list-disc list-inside">
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">tenantId</code> - Your tenant
+                      ID
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">amount</code> - Payment amount
+                      in euros (e.g., 50.00)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">externalServiceBookingId</code>{' '}
+                      - External service's booking ID (e.g., Phorest booking ID). Used to
+                      automatically link payment to booking.
+                    </li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">Optional Fields</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground list-disc list-inside">
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">currency</code> - Currency code
+                      (default: 'eur')
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">bookingId</code> - Internal
+                      booking ID (if booking already exists in your database)
+                    </li>
+                    <li>
+                      <code className="bg-muted px-1 py-0.5 rounded">expiresInMinutes</code> - Link
+                      expiration time (default: 30, min: 30, max: 1440)
+                    </li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">Response</h4>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+                    {`{
+  "success": true,
+  "paymentLink": {
+    "id": 123,
+    "stripeUrl": "https://checkout.stripe.com/c/pay/cs_test_...",
+    "stripeSessionId": "cs_test_...",
+    "amount": 50.00,
+    "currency": "eur",
+    "status": "pending",
+    "bookingId": null
+  }
+}`}
+                  </pre>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    🔗 Automatic Linking
+                  </p>
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                    When you call{' '}
+                    <code className="bg-blue-100 dark:bg-blue-900 px-1 py-0.5 rounded">
+                      POST /api/platform/bookings/complete
+                    </code>{' '}
+                    with the same{' '}
+                    <code className="bg-blue-100 dark:bg-blue-900 px-1 py-0.5 rounded">
+                      serviceProviderBookingId
+                    </code>
+                    , the payment link will be automatically linked to the booking. No additional
+                    steps required!
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">Payment Flow</h4>
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                        1
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-sm">
+                          Reserve booking in external service
+                        </h5>
+                        <p className="text-sm text-muted-foreground">
+                          Create temporary booking in Phorest/Fresha and get{' '}
+                          <code className="bg-muted px-1 py-0.5 rounded">bookingId</code>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                        2
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-sm">Create payment link</h5>
+                        <p className="text-sm text-muted-foreground">
+                          Call POST /api/payments/create-link with{' '}
+                          <code className="bg-muted px-1 py-0.5 rounded">
+                            externalServiceBookingId
+                          </code>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                        3
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-sm">Create booking in your database</h5>
+                        <p className="text-sm text-muted-foreground">
+                          Call POST /api/platform/bookings/complete with same{' '}
+                          <code className="bg-muted px-1 py-0.5 rounded">
+                            serviceProviderBookingId
+                          </code>
+                          . Payment link auto-links here!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                        4
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-sm">Customer pays</h5>
+                        <p className="text-sm text-muted-foreground">
+                          Stripe webhook automatically updates both payment_links and bookings
+                          tables
+                        </p>
+                        <div className="flex gap-2 mt-1">
+                          <Badge variant="outline">payment_links.status = completed</Badge>
+                          <Badge variant="outline">bookings.status = confirmed</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </CollapsibleContent>

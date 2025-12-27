@@ -66,6 +66,7 @@ import {
   clientServiceMappings,
   leads,
   bookings,
+  paymentLinks,
 } from '@shared/schema';
 import { randomUUID } from 'crypto';
 import pg from 'pg';
@@ -497,6 +498,11 @@ export interface IStorage {
   ): Promise<Booking | undefined>;
   markBookingNoShow(bookingId: string): Promise<Booking | undefined>;
   deleteBooking(id: string): Promise<void>;
+  linkPaymentToBooking(
+    externalServiceBookingId: string,
+    bookingId: string,
+    tenantId: string,
+  ): Promise<void>;
 }
 
 // Database storage implementation using PostgreSQL
@@ -3319,6 +3325,44 @@ export class DbStorage implements IStorage {
    */
   async deleteBooking(id: string): Promise<void> {
     await this.db.delete(bookings).where(eq(bookings.id, id));
+  }
+
+  /**
+   * Link payment link to booking by matching external service booking ID
+   * Called after booking is created to connect pre-existing payment links
+   */
+  async linkPaymentToBooking(
+    externalServiceBookingId: string,
+    bookingId: string,
+    tenantId: string,
+  ): Promise<void> {
+    try {
+      const result = await this.db
+        .update(paymentLinks)
+        .set({
+          bookingId,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(paymentLinks.tenantId, tenantId),
+            eq(paymentLinks.externalServiceBookingId, externalServiceBookingId),
+            isNull(paymentLinks.bookingId), // Only update if not already linked
+          ),
+        )
+        .returning();
+
+      if (result.length > 0) {
+        console.log(`[Storage] ✅ Linked ${result.length} payment link(s) to booking ${bookingId}`);
+      } else {
+        console.log(
+          `[Storage] ℹ️ No unlinked payment links found for external booking ${externalServiceBookingId}`,
+        );
+      }
+    } catch (error) {
+      console.error('[Storage] Error linking payment to booking:', error);
+      throw error;
+    }
   }
 }
 
