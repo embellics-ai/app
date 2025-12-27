@@ -3248,6 +3248,40 @@ export class DbStorage implements IStorage {
       .set(updates)
       .where(eq(bookings.id, bookingId))
       .returning();
+
+    // Also update payment_links status if a payment link exists for this booking
+    if (updated) {
+      // Try to find payment link by bookingId first
+      const paymentLinksByBookingId = await this.db
+        .update(paymentLinks)
+        .set({
+          status: 'completed',
+          paidAt: now,
+          updatedAt: now,
+        })
+        .where(eq(paymentLinks.bookingId, bookingId))
+        .returning();
+
+      // Also try to find payment link by externalServiceBookingId (if booking has serviceProviderBookingId)
+      if (updated.serviceProviderBookingId) {
+        const paymentLinksByExternalId = await this.db
+          .update(paymentLinks)
+          .set({
+            status: 'completed',
+            paidAt: now,
+            updatedAt: now,
+            bookingId: bookingId, // Link the payment to this booking if not already linked
+          })
+          .where(
+            and(
+              eq(paymentLinks.externalServiceBookingId, updated.serviceProviderBookingId),
+              isNull(paymentLinks.bookingId), // Only update if not already linked
+            ),
+          )
+          .returning();
+      }
+    }
+
     return updated;
   }
 
@@ -3351,14 +3385,6 @@ export class DbStorage implements IStorage {
           ),
         )
         .returning();
-
-      if (result.length > 0) {
-        console.log(`[Storage] ✅ Linked ${result.length} payment link(s) to booking ${bookingId}`);
-      } else {
-        console.log(
-          `[Storage] ℹ️ No unlinked payment links found for external booking ${externalServiceBookingId}`,
-        );
-      }
     } catch (error) {
       console.error('[Storage] Error linking payment to booking:', error);
       throw error;
