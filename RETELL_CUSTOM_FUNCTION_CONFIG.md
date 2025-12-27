@@ -269,13 +269,41 @@ curl -X POST 'https://embellics-app.onrender.com/api/platform/tenants/YOUR_TENAN
 3. **Track Interaction**: Call `POST /api/platform/interactions/track`
    - Creates/updates client record
    - Creates lead record with status "interested"
-   - No Phorest call yet
+   - No external service call yet
 4. **Customer Confirms**: Customer agrees to booking and payment details
 5. **Complete Booking**: Call `POST /api/platform/bookings/complete`
-   - Creates booking record with status "confirmed"
-   - Creates appointment in Phorest
+   - Creates booking record with status "pending" or "confirmed"
+   - **REQUIRED**: Use `externalBusinessId` (NOT businessId)
+   - **REQUIRED**: Use `externalBranchId` (NOT branchId)
+   - **NEW**: Add `serviceProviderBookingId` for external system sync
+   - **NEW**: Set `createPaymentLink: true` to auto-generate Stripe payment URL
+   - Creates appointment in external service
    - Updates client's last booking date
    - **Sets client's firstBookingDate if it's their first booking**
-6. **Call Ends**: Booking is complete
+6. **Payment (if needed)**:
+   - If `createPaymentLink: true`, response includes Stripe checkout URL
+   - Send payment URL to customer via SMS/email
+   - When payment completes, booking status automatically updates to "confirmed"
+7. **Call Ends**: Booking is complete
+
+**Example Payload:**
+
+```json
+{
+  "tenantId": "tenant_123",
+  "externalServiceName": "external_service_api",
+  "externalServiceClientId": "external_client_456",
+  "externalBusinessId": "K2e7saP77YvkzIa0N-XNW",
+  "externalBranchId": "62e7saP77YvkzIa0N-XNW",
+  "serviceName": "Bleach Cheeks",
+  "amount": 100,
+  "currency": "EUR",
+  "bookingDateTime": "2025-12-27T11:00:00.000Z",
+  "staffMemberId": "ZAUE5vJhCt89hGBAdUA",
+  "bookingSource": "voice",
+  "serviceProviderBookingId": "external_booking_789",
+  "createPaymentLink": true
+}
+```
 
 This two-step approach matches the booking lifecycle you just implemented!
