@@ -154,8 +154,8 @@ router.post('/create-link', async (req: Request, res: Response) => {
             },
             message: 'Payment already completed for this booking',
           });
-        } else {
-          // Session still active, return the existing URL
+        } else if (session.url) {
+          // Session still active and has a URL, return the existing URL
           return res.status(200).json({
             success: true,
             paymentLink: {
@@ -170,6 +170,11 @@ router.post('/create-link', async (req: Request, res: Response) => {
             },
             message: 'Payment link already exists for this booking',
           });
+        } else {
+          // Session exists but no URL (shouldn't happen, but create new one to be safe)
+          console.log(
+            `[Payment Link] Existing session has no URL for booking ${externalServiceBookingId}, creating new one`,
+          );
         }
       } catch (stripeError) {
         console.error('[Stripe Session Retrieval Error]', stripeError);
