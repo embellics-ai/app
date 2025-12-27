@@ -744,9 +744,14 @@ ${JSON.stringify(
                       <pre className="text-xs overflow-x-auto">
                         {`{
   "action": "confirm",
-  "depositAmount": 20.00
+  "depositAmount": 20.00,
+  "paymentIntentId": "pi_3SJ3dtETQpLUZxas06R4jSqc (optional)"
 }`}
                       </pre>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        💡 <code className="bg-muted px-1 rounded">paymentIntentId</code> updates
+                        payment_links.stripe_payment_intent_id
+                      </p>
                     </div>
 
                     <div className="bg-muted p-3 rounded-lg">
@@ -789,9 +794,15 @@ ${JSON.stringify(
                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
                     {`{
   "amount": 120.00,
-  "bookingDateTime": "2025-01-21T15:00:00Z"
+  "bookingDateTime": "2025-01-21T15:00:00Z",
+  "paymentIntentId": "pi_3SJ3dtETQpLUZxas06R4jSqc (optional)"
 }`}
                   </pre>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 When <code className="bg-muted px-1 rounded">paymentIntentId</code> is
+                    provided, it updates the associated payment link's stripe_payment_intent_id
+                    field
+                  </p>
                 </div>
               </CardContent>
             </CollapsibleContent>
