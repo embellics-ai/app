@@ -553,7 +553,6 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
       bookingSource,
       bookingSourceDetails,
       serviceProviderBookingId, // REQUIRED: External booking ID from external service
-      paymentIntentId, // OPTIONAL: Stripe payment_intent ID to link with payment_links record
     } = req.body;
 
     // Validate required fields
@@ -660,12 +659,7 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
     // Link any existing payment links to this booking
     // This connects payment links created before the booking
     if (serviceProviderBookingId) {
-      await storage.linkPaymentToBooking(
-        serviceProviderBookingId,
-        booking.id,
-        tenantId,
-        paymentIntentId,
-      );
+      await storage.linkPaymentToBooking(serviceProviderBookingId, booking.id, tenantId);
     }
 
     // Update client's firstBookingDate if this is their first booking
