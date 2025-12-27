@@ -775,6 +775,7 @@ export const paymentLinks = pgTable('payment_links', {
   tenantId: varchar('tenant_id')
     .notNull()
     .references(() => tenants.id, { onDelete: 'cascade' }),
+  bookingId: varchar('booking_id'), // Internal booking ID (foreign key to bookings table)
   bookingReference: varchar('booking_reference', { length: 255 }).notNull(),
   stripeSessionId: varchar('stripe_session_id', { length: 255 }).notNull().unique(),
   stripePaymentIntentId: varchar('stripe_payment_intent_id', { length: 255 }),

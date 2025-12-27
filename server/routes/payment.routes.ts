@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { paymentLinks, externalApiConfigs } from '../../shared/schema';
+import { paymentLinks, externalApiConfigs, bookings } from '../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { decrypt } from '../encryption';
 
@@ -63,7 +63,8 @@ async function getTenantStripeClient(tenantId: string): Promise<Stripe> {
  *   customerEmail?: string
  *   customerPhone?: string
  *   customerName?: string
- *   bookingReference: string
+ *   bookingReference: string (can be internal booking ID or external reference)
+ *   bookingId?: string (internal booking ID to link payment to booking)
  *   phorestBookingId?: string
  *   phorestClientId?: string
  *   description?: string
@@ -81,6 +82,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
       customerPhone,
       customerName,
       bookingReference,
+      bookingId, // NEW: Optional internal booking ID
       phorestBookingId,
       phorestClientId,
       description,
@@ -146,6 +148,7 @@ router.post('/create-link', async (req: Request, res: Response) => {
       .insert(paymentLinks)
       .values({
         tenantId,
+        bookingId: bookingId || null, // NEW: Store internal booking ID if provided
         bookingReference,
         stripeSessionId: session.id,
         amount,

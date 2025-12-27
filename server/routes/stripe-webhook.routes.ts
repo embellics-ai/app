@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { paymentLinks, externalApiConfigs } from '../../shared/schema';
+import { paymentLinks, externalApiConfigs, bookings } from '../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { decrypt } from '../encryption';
 
@@ -164,19 +164,52 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       return;
     }
 
+    const paidAt = new Date();
+
     // Update payment link status
     const [updatedLink] = await db
       .update(paymentLinks)
       .set({
         status: 'completed',
         stripePaymentIntentId: session.payment_intent as string,
-        paidAt: new Date(),
+        paidAt,
         updatedAt: new Date(),
       })
       .where(eq(paymentLinks.id, paymentLink.id))
       .returning();
 
     console.log(`[Stripe Webhook] Payment link ${updatedLink.id} marked as completed`);
+
+    // Update the associated booking if booking_id is present
+    if (updatedLink.bookingId) {
+      try {
+        const [updatedBooking] = await db
+          .update(bookings)
+          .set({
+            paymentStatus: 'deposit_paid',
+            depositAmount: updatedLink.amount,
+            depositPaidAt: paidAt,
+            status: 'confirmed',
+            confirmedAt: paidAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookings.id, updatedLink.bookingId))
+          .returning();
+
+        if (updatedBooking) {
+          console.log(
+            `[Stripe Webhook] ✅ Booking ${updatedBooking.id} updated: status=confirmed, paymentStatus=deposit_paid`,
+          );
+        } else {
+          console.warn(`[Stripe Webhook] ⚠️ Booking ${updatedLink.bookingId} not found for update`);
+        }
+      } catch (bookingError) {
+        console.error('[Stripe Webhook] Error updating booking:', bookingError);
+        // Don't throw - payment was successful, booking update is secondary
+      }
+    } else {
+      console.warn(`[Stripe Webhook] ⚠️ No booking_id linked to payment link ${updatedLink.id}`);
+    }
 
     // TODO: Call Phorest API to record purchase
     // This will be implemented in the next step
