@@ -318,12 +318,15 @@ router.post('/api/widget/chat', async (req, res) => {
       const parsedMessage = JSON.parse(message);
 
       // Check if this is contact form data with required fields
+      // Support both businessId (legacy/internal ID) and externalBusinessId (Phorest ID)
+      const hasBusinessIdentifier = parsedMessage.businessId || parsedMessage.externalBusinessId;
+      
       if (
         parsedMessage.first_name &&
         parsedMessage.last_name &&
         parsedMessage.email &&
         parsedMessage.phone &&
-        parsedMessage.businessId
+        hasBusinessIdentifier
       ) {
         console.log('[Widget Chat] Contact form data detected, creating Phorest client');
         console.log(
@@ -332,9 +335,36 @@ router.post('/api/widget/chat', async (req, res) => {
         );
 
         try {
+          // Determine which business ID to use
+          let externalBusinessId = parsedMessage.externalBusinessId;
+          
+          // If only businessId is provided and it looks like a database ID (numeric),
+          // look up the external business ID
+          if (!externalBusinessId && parsedMessage.businessId) {
+            const businessDbId = parsedMessage.businessId;
+            console.log('[Widget Chat] Looking up external business ID for internal ID:', businessDbId);
+            
+            try {
+              const business = await storage.getTenantBusiness(businessDbId);
+              if (business) {
+                externalBusinessId = business.externalBusinessId;
+                console.log('[Widget Chat] Found external business ID:', externalBusinessId);
+              } else {
+                throw new Error(`Business not found with ID: ${businessDbId}`);
+              }
+            } catch (lookupError) {
+              console.error('[Widget Chat] Failed to lookup business:', lookupError);
+              throw new Error(`Invalid business ID: ${businessDbId}`);
+            }
+          }
+          
+          if (!externalBusinessId) {
+            throw new Error('No valid business ID provided');
+          }
+
           // Call Phorest service directly (no HTTP call needed - we're already on the server!)
           const requestPayload = {
-            businessId: parsedMessage.businessId,
+            businessId: externalBusinessId,
             firstName: parsedMessage.first_name,
             lastName: parsedMessage.last_name,
             mobile: parsedMessage.phone,

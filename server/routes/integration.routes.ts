@@ -979,7 +979,7 @@ router.post(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tenantId } = req.params;
-      const { serviceName, businessId, businessName } = req.body;
+      const { serviceName, externalBusinessId, businessName } = req.body;
 
       // Platform admins can access any tenant, regular users only their own
       if (!req.user?.isPlatformAdmin) {
@@ -990,9 +990,9 @@ router.post(
       }
 
       // Validate input
-      if (!serviceName || !businessId || !businessName) {
+      if (!serviceName || !externalBusinessId || !businessName) {
         return res.status(400).json({
-          error: 'Missing required fields: serviceName, businessId, businessName',
+          error: 'Missing required fields: serviceName, externalBusinessId, businessName',
         });
       }
 
@@ -1008,7 +1008,8 @@ router.post(
       const business = await storage.createTenantBusiness({
         tenantId,
         serviceName,
-        businessId,
+        externalBusinessId,
+        externalServiceName: serviceName, // Set external service name same as service name
         businessName,
       });
 
@@ -1032,7 +1033,7 @@ router.put(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tenantId, businessId: businessDbId } = req.params;
-      const { businessId, businessName } = req.body;
+      const { externalBusinessId, businessName } = req.body;
 
       // Platform admins can access any tenant, regular users only their own
       if (!req.user?.isPlatformAdmin) {
@@ -1048,12 +1049,14 @@ router.put(
       }
 
       const updates: any = {};
-      if (businessId !== undefined) updates.businessId = businessId;
+      if (externalBusinessId !== undefined) {
+        updates.externalBusinessId = externalBusinessId;
+      }
       if (businessName !== undefined) updates.businessName = businessName;
 
       const updated = await storage.updateTenantBusiness(businessDbId, updates);
 
-      console.log('[Business] Updated business:', businessId);
+      console.log('[Business] Updated business:', businessDbId);
 
       res.json(updated);
     } catch (error) {
