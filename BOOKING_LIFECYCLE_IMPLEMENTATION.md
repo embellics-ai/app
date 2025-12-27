@@ -180,7 +180,7 @@ Added comprehensive documentation:
    POST /api/platform/bookings/complete
    {
      "tenantId": "tenant_123",
-     "externalServiceClientId": "phorest_client_456",
+     "externalServiceClientId": "external_client_456",
      "externalBusinessId": "K2e7saP77YvkzIa0N-XNW",
      "externalBranchId": "62e7saP77YvkzIa0N-XNW",
      "serviceName": "Premium Facial",
@@ -188,14 +188,13 @@ Added comprehensive documentation:
      "depositAmount": 20.00,
      "bookingDateTime": "2025-01-20T14:30:00Z",
      "bookingSource": "voice",
-     "serviceProviderBookingId": "external_booking_789",
-     "createPaymentLink": false
+     "serviceProviderBookingId": "external_booking_789"
    }
    ```
 
    Result: Booking created with status="confirmed", paymentStatus="deposit_paid", External service appointment created
 
-   **Alternative: Auto-generate payment link**
+   **Alternative: Payment pending (no deposit yet)**
 
    ```typescript
    POST /api/platform/bookings/complete
@@ -208,12 +207,11 @@ Added comprehensive documentation:
      "amount": 89.00,
      "bookingDateTime": "2025-01-20T14:30:00Z",
      "bookingSource": "voice",
-     "serviceProviderBookingId": "external_booking_789",
-     "createPaymentLink": true
+     "serviceProviderBookingId": "external_booking_789"
    }
    ```
 
-   Result: Booking created with status="pending", Stripe payment URL returned, When payment completes, booking auto-updates to "confirmed"
+   Result: Booking created with status="pending", Create payment link separately, When payment completes via Stripe webhook, booking auto-updates to "confirmed"
 
 3. **Service is completed** (after appointment)
    ```typescript
