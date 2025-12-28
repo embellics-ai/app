@@ -143,8 +143,8 @@ function Router() {
           </RoleProtectedRoute>
         </ProtectedRoute>
       </Route>
-      <Route path="/customers/:id">
-        <ProtectedRoute path="/customers/:id">
+      <Route path="/customers/:tenantId/:id">
+        <ProtectedRoute path="/customers/:tenantId/:id">
           <RoleProtectedRoute allowedRoles={['client_admin', 'owner']} fallbackPath="/agent-queue">
             <CustomerDetailPage />
           </RoleProtectedRoute>

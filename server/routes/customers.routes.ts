@@ -94,9 +94,6 @@ router.get(
         return res.status(404).json({ error: 'Client not found' });
       }
 
-      // Get client's service mappings
-      const serviceMappings = await storage.getClientServiceMappings(clientId);
-
       // Get client's bookings
       const bookings = await storage.getBookingsByClient(clientId);
 
@@ -105,7 +102,6 @@ router.get(
 
       res.json({
         ...client,
-        serviceMappings,
         bookings,
         stats: bookingStats,
       });

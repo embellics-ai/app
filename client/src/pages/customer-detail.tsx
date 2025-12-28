@@ -30,15 +30,8 @@ interface Client {
   firstBookingDate: string | null;
   lastBookingDate: string | null;
   status: string;
-  createdAt: string;
-}
-
-interface ServiceMapping {
-  id: string;
-  serviceName: string;
-  serviceProviderClientId: string;
-  businessId: string;
-  branchId: string | null;
+  externalServiceName: string | null;
+  externalServiceClientId: string | null;
   createdAt: string;
 }
 
@@ -62,30 +55,32 @@ interface BookingStats {
 }
 
 interface ClientDetail extends Client {
-  serviceMappings: ServiceMapping[];
   bookings: Booking[];
   stats: BookingStats;
 }
 
 export default function CustomerDetailPage() {
   const { user } = useAuth();
-  const [, params] = useRoute('/customers/:id');
+  const [, params] = useRoute('/customers/:tenantId/:id');
   const clientId = params?.id;
-
-  const tenantId = user?.isPlatformAdmin ? user?.tenantId : user?.tenantId;
+  const tenantId = params?.tenantId;
 
   // Fetch client details
-  const { data: clientDetail, isLoading } = useQuery<ClientDetail>({
+  const {
+    data: clientDetail,
+    isLoading,
+    error,
+  } = useQuery<ClientDetail>({
     queryKey: [`/api/platform/tenants/${tenantId}/clients/${clientId}`],
     enabled: !!tenantId && !!clientId,
   });
 
-  if (!tenantId || !clientId) {
+  if (!clientId || !tenantId) {
     return (
       <div className="p-8">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-muted-foreground">Invalid request</p>
+            <p className="text-muted-foreground">Invalid request - missing client or tenant ID</p>
           </CardContent>
         </Card>
       </div>
@@ -98,6 +93,20 @@ export default function CustomerDetailPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-muted-foreground">Loading client details...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">
+              Error loading client: {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -333,35 +342,25 @@ export default function CustomerDetailPage() {
         </Card>
       )}
 
-      {/* Service Provider Mappings */}
-      {clientDetail.serviceMappings.length > 0 && (
+      {/* External Service Provider Info */}
+      {clientDetail.externalServiceName && clientDetail.externalServiceClientId && (
         <Card>
           <CardHeader>
-            <CardTitle>Service Provider Accounts</CardTitle>
+            <CardTitle>Service Provider Account</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {clientDetail.serviceMappings.map((mapping) => (
-                <div
-                  key={mapping.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium capitalize">
-                        {mapping.serviceName.replace('_', ' ')}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Client ID: {mapping.serviceProviderClientId}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant="outline">
-                    {new Date(mapping.createdAt).toLocaleDateString()}
-                  </Badge>
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center space-x-3">
+                <MapPin className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium capitalize">
+                    {clientDetail.externalServiceName.replace('_', ' ')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Client ID: {clientDetail.externalServiceClientId}
+                  </p>
                 </div>
-              ))}
+              </div>
             </div>
           </CardContent>
         </Card>
