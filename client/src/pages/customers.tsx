@@ -62,12 +62,12 @@ export default function CustomersPage() {
     enabled: !!tenantId,
   });
 
-  // Fetch clients list
+  // Fetch clients list - construct URL with query params
+  const clientsQueryParams = selectedSource ? `?source=${selectedSource}` : '';
+  const clientsUrl = `/api/platform/tenants/${tenantId}/clients${clientsQueryParams}`;
+
   const { data: clients, isLoading: clientsLoading } = useQuery<Client[]>({
-    queryKey: [
-      `/api/platform/tenants/${tenantId}/clients`,
-      selectedSource && { source: selectedSource },
-    ],
+    queryKey: [clientsUrl],
     enabled: !!tenantId,
   });
 
@@ -226,6 +226,7 @@ export default function CustomersPage() {
                 onClick={() => setSelectedSource(undefined)}
               >
                 All Sources
+                <span className="ml-2 text-xs opacity-70">({stats?.totalClients || 0})</span>
               </Button>
               {Object.entries(stats.bySource).map(([source, count]) => (
                 <Button
@@ -258,7 +259,7 @@ export default function CustomersPage() {
           ) : (
             <div className="space-y-4">
               {clients.map((client: Client) => (
-                <Link key={client.id} href={`/customers/${client.id}`}>
+                <Link key={client.id} href={`/customers/${tenantId}/${client.id}`}>
                   <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
