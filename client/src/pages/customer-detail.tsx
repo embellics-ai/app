@@ -14,9 +14,11 @@ import {
   Activity,
   TrendingUp,
   User,
+  Heart,
 } from 'lucide-react';
 import { useRoute, Link } from 'wouter';
 import { formatDistanceToNow } from 'date-fns';
+import { SentimentBadge } from '@/components/sentiment-badge';
 
 interface Client {
   id: string;
@@ -33,6 +35,10 @@ interface Client {
   externalServiceName: string | null;
   externalServiceClientId: string | null;
   createdAt: string;
+  sentimentScore: number | null;
+  sentimentCategory: string | null;
+  sentimentTrend: string | null;
+  sentimentUpdatedAt: string | null;
 }
 
 interface Booking {
@@ -205,6 +211,13 @@ export default function CustomerDetailPage() {
               <Badge variant="outline" className="capitalize">
                 via {clientDetail.firstInteractionSource}
               </Badge>
+              <SentimentBadge
+                score={clientDetail.sentimentScore}
+                category={clientDetail.sentimentCategory}
+                trend={clientDetail.sentimentTrend}
+                showScore={true}
+                showTrend={true}
+              />
             </div>
           </div>
         </div>
@@ -268,7 +281,22 @@ export default function CustomerDetailPage() {
       </Card>
 
       {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Customer Health</CardTitle>
+            <Heart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {clientDetail.sentimentScore !== null ? clientDetail.sentimentScore : 'N/A'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 capitalize">
+              {clientDetail.sentimentCategory || 'Not calculated'}
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>

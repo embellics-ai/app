@@ -64,6 +64,7 @@ import {
   tenantBranches,
   clients,
   clientServiceMappings,
+  clientSentimentHistory,
   leads,
   bookings,
   paymentLinks,
@@ -72,7 +73,7 @@ import { randomUUID } from 'crypto';
 import pg from 'pg';
 const { Pool } = pg;
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, desc, and, or, gte, lte, gt, sql, isNull } from 'drizzle-orm';
+import { eq, desc, and, or, gte, lte, gt, sql, isNull, inArray } from 'drizzle-orm';
 import { encryptApiKey, decryptApiKey } from './encryption';
 
 export interface IStorage {
@@ -486,6 +487,19 @@ export interface IStorage {
     lastBookingDate: Date | null;
     favoriteServices: { serviceName: string; count: number }[];
   }>;
+  calculateAndUpdateClientSentiment(
+    clientId: string,
+    triggerEvent?: string,
+    triggerBookingId?: string,
+  ): Promise<{
+    sentimentScore: number;
+    sentimentCategory: string;
+    sentimentTrend: string;
+  }>;
+  getClientSentimentHistory(
+    clientId: string,
+    limit?: number,
+  ): Promise<Array<typeof clientSentimentHistory.$inferSelect>>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBooking(id: string, updates: Partial<InsertBooking>): Promise<Booking | undefined>;
   confirmBooking(
@@ -2829,6 +2843,7 @@ export class DbStorage implements IStorage {
     filters?: {
       status?: string;
       source?: string;
+      sentiment?: string;
       limit?: number;
       offset?: number;
     },
@@ -2840,6 +2855,9 @@ export class DbStorage implements IStorage {
     }
     if (filters?.source) {
       conditions.push(eq(clients.firstInteractionSource, filters.source));
+    }
+    if (filters?.sentiment) {
+      conditions.push(eq(clients.sentimentCategory, filters.sentiment));
     }
 
     let query = this.db
@@ -2866,6 +2884,7 @@ export class DbStorage implements IStorage {
     activeClients: number;
     newThisMonth: number;
     bySource: Record<string, number>;
+    bySentiment: Record<string, number>;
   }> {
     // Get total and active clients
     const allClients = await this.db.select().from(clients).where(eq(clients.tenantId, tenantId));
@@ -2883,11 +2902,19 @@ export class DbStorage implements IStorage {
       bySource[client.firstInteractionSource] = (bySource[client.firstInteractionSource] || 0) + 1;
     }
 
+    // Group by sentiment category
+    const bySentiment: Record<string, number> = {};
+    for (const client of allClients) {
+      const category = client.sentimentCategory || 'none';
+      bySentiment[category] = (bySentiment[category] || 0) + 1;
+    }
+
     return {
       totalClients: allClients.length,
       activeClients: activeClients.length,
       newThisMonth: newThisMonth.length,
       bySource,
+      bySentiment,
     };
   }
 
@@ -3214,6 +3241,210 @@ export class DbStorage implements IStorage {
       lastBookingDate,
       favoriteServices,
     };
+  }
+
+  /**
+   * Calculate and update client sentiment score
+   * Scores are based on: booking frequency, spend, reliability, and recency
+   */
+  async calculateAndUpdateClientSentiment(
+    clientId: string,
+    triggerEvent: string = 'manual_recalc',
+    triggerBookingId?: string,
+  ): Promise<{
+    sentimentScore: number;
+    sentimentCategory: string;
+    sentimentTrend: string;
+  }> {
+    // Get all client bookings
+    const clientBookings = await this.getBookingsByClient(clientId);
+    const client = await this.getClient(clientId);
+
+    if (!client) {
+      throw new Error('Client not found');
+    }
+
+    // Get payment links data - SOURCE OF TRUTH for which bookings were actually paid
+    const bookingIds = clientBookings.map((b) => b.id);
+    let payments: any[] = [];
+
+    if (bookingIds.length > 0) {
+      payments = await this.db
+        .select()
+        .from(paymentLinks)
+        .where(inArray(paymentLinks.bookingId, bookingIds));
+    }
+
+    // Filter to ONLY bookings where deposit was paid (payment completed)
+    const paidBookingIds = new Set(
+      payments.filter((p) => p.status === 'completed').map((p) => p.bookingId),
+    );
+
+    const paidBookings = clientBookings.filter((b) => paidBookingIds.has(b.id));
+
+    // Calculate metrics - ONLY from paid bookings
+    const totalBookings = paidBookings.length;
+
+    const cancelledBookings = paidBookings.filter(
+      (b) => b.status === 'cancelled' || b.status === 'canceled',
+    ).length;
+
+    // No-shows don't count - not our platform's concern
+    const noShowBookings = 0;
+
+    const completedBookings = paidBookings.filter((b) => b.status === 'completed').length;
+
+    // Revenue = FULL booking amount (not deposit) for paid, non-cancelled bookings
+    const revenueBookings = paidBookings.filter(
+      (b) => b.status !== 'cancelled' && b.status !== 'canceled',
+    );
+
+    const totalSpent = revenueBookings.reduce((sum, b) => sum + b.amount, 0);
+    const avgBookingValue = revenueBookings.length > 0 ? totalSpent / revenueBookings.length : 0;
+
+    // Calculate days since last PAID booking
+
+    const now = new Date();
+    const daysSinceLastBooking = client.lastBookingDate
+      ? Math.floor(
+          (now.getTime() - new Date(client.lastBookingDate).getTime()) / (1000 * 60 * 60 * 24),
+        )
+      : 999;
+
+    // Calculate days since first booking for frequency calculation
+    const daysSinceFirstBooking = client.firstBookingDate
+      ? Math.floor(
+          (now.getTime() - new Date(client.firstBookingDate).getTime()) / (1000 * 60 * 60 * 24),
+        )
+      : 1;
+
+    // ===== SCORING LOGIC =====
+
+    // 1. Booking Frequency Score (35% weight) - based on bookings per month
+    let frequencyScore = 0;
+    if (totalBookings > 0 && daysSinceFirstBooking > 0) {
+      const bookingsPerMonth = (totalBookings / Math.max(daysSinceFirstBooking, 1)) * 30;
+      if (bookingsPerMonth >= 4)
+        frequencyScore = 100; // Weekly or more
+      else if (bookingsPerMonth >= 2)
+        frequencyScore = 80; // Bi-weekly
+      else if (bookingsPerMonth >= 1)
+        frequencyScore = 60; // Monthly
+      else if (bookingsPerMonth >= 0.5)
+        frequencyScore = 40; // Every 2 months
+      else frequencyScore = 20; // Less frequent
+    }
+
+    // 2. Financial Health Score (30% weight) - based on spend
+    let financialScore = 0;
+    if (totalBookings > 0) {
+      if (totalSpent >= 1000)
+        financialScore = 100; // High value customer
+      else if (totalSpent >= 500) financialScore = 80;
+      else if (totalSpent >= 250) financialScore = 60;
+      else if (totalSpent >= 100) financialScore = 40;
+      else financialScore = 20;
+
+      // Bonus for high average booking value
+      if (avgBookingValue >= 100) financialScore = Math.min(100, financialScore + 10);
+      else if (avgBookingValue >= 75) financialScore = Math.min(100, financialScore + 5);
+    }
+
+    // 3. Reliability Score (25% weight) - based on cancellations and no-shows
+    let reliabilityScore = 100; // Start perfect
+    if (totalBookings > 0) {
+      const cancellationRate = cancelledBookings / totalBookings;
+      const noShowRate = noShowBookings / totalBookings;
+
+      reliabilityScore -= cancellationRate * 40; // -40 points per 100% cancellation rate
+      reliabilityScore -= noShowRate * 60; // -60 points per 100% no-show rate (worse)
+      reliabilityScore = Math.max(0, reliabilityScore);
+    }
+
+    // 4. Recency Score (10% weight) - based on days since last booking
+    let recencyScore = 100;
+    if (daysSinceLastBooking <= 30)
+      recencyScore = 100; // Last month
+    else if (daysSinceLastBooking <= 60)
+      recencyScore = 80; // Last 2 months
+    else if (daysSinceLastBooking <= 90)
+      recencyScore = 60; // Last 3 months
+    else if (daysSinceLastBooking <= 180)
+      recencyScore = 40; // Last 6 months
+    else if (daysSinceLastBooking <= 365)
+      recencyScore = 20; // Last year
+    else recencyScore = 0; // Over a year
+
+    // Calculate weighted final score
+    const sentimentScore = Math.round(
+      frequencyScore * 0.35 + financialScore * 0.3 + reliabilityScore * 0.25 + recencyScore * 0.1,
+    );
+
+    // Determine category
+    let sentimentCategory = 'active';
+    if (sentimentScore >= 80) sentimentCategory = 'champion';
+    else if (sentimentScore >= 60) sentimentCategory = 'loyal';
+    else if (sentimentScore >= 40) sentimentCategory = 'active';
+    else if (sentimentScore >= 20) sentimentCategory = 'casual';
+    else sentimentCategory = 'inactive';
+
+    // Determine trend (compare with last recorded sentiment)
+    let sentimentTrend = 'stable';
+    const previousSentiment = client.sentimentScore;
+    if (previousSentiment !== null && previousSentiment !== undefined) {
+      const scoreDiff = sentimentScore - previousSentiment;
+      if (scoreDiff >= 10) sentimentTrend = 'improving';
+      else if (scoreDiff <= -10) sentimentTrend = 'declining';
+      else sentimentTrend = 'stable';
+    }
+
+    // Update client record
+    await this.db
+      .update(clients)
+      .set({
+        sentimentScore,
+        sentimentCategory,
+        sentimentTrend,
+        sentimentUpdatedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(clients.id, clientId));
+
+    // Record in sentiment history
+    await this.db.insert(clientSentimentHistory).values({
+      clientId,
+      sentimentScore,
+      sentimentCategory,
+      triggerEvent,
+      triggerBookingId,
+      totalBookings,
+      cancelledBookings,
+      noShowBookings,
+      totalSpent,
+      avgBookingValue,
+      daysSinceLastBooking,
+    });
+
+    return {
+      sentimentScore,
+      sentimentCategory,
+      sentimentTrend,
+    };
+  }
+
+  /**
+   * Get client sentiment history
+   */
+  async getClientSentimentHistory(
+    clientId: string,
+    limit: number = 30,
+  ): Promise<Array<typeof clientSentimentHistory.$inferSelect>> {
+    return await this.db
+      .select()
+      .from(clientSentimentHistory)
+      .where(eq(clientSentimentHistory.clientId, clientId))
+      .orderBy(desc(clientSentimentHistory.recordedAt))
+      .limit(limit);
   }
 
   /**
