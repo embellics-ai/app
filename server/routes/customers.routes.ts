@@ -24,7 +24,7 @@ const router = Router();
 router.get('/:tenantId/clients', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const { status, source, limit, offset } = req.query;
+    const { status, source, sentiment, limit, offset } = req.query;
 
     // Authorization: Platform admin can access any tenant, client admin only their own
     if (!req.user!.isPlatformAdmin && req.user!.tenantId !== tenantId) {
@@ -34,6 +34,7 @@ router.get('/:tenantId/clients', requireAuth, async (req: AuthenticatedRequest, 
     const filters = {
       status: status as string | undefined,
       source: source as string | undefined,
+      sentiment: sentiment as string | undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       offset: offset ? parseInt(offset as string) : undefined,
     };
@@ -403,16 +404,52 @@ router.patch(
       if (action === 'confirm') {
         const { depositAmount, paymentIntentId } = updateData;
         updatedBooking = await storage.confirmBooking(bookingId, depositAmount, paymentIntentId);
+
+        // Update sentiment after confirmation
+        if (updatedBooking && existingBooking.clientId) {
+          await storage.calculateAndUpdateClientSentiment(
+            existingBooking.clientId,
+            'booking_confirmed',
+            bookingId,
+          );
+        }
       } else if (action === 'complete') {
         updatedBooking = await storage.completeBooking(bookingId);
+
+        // Update sentiment after completion
+        if (updatedBooking && existingBooking.clientId) {
+          await storage.calculateAndUpdateClientSentiment(
+            existingBooking.clientId,
+            'booking_completed',
+            bookingId,
+          );
+        }
       } else if (action === 'cancel') {
         const { reason, refundAmount, notes } = updateData;
         if (!reason) {
           return res.status(400).json({ error: 'Cancellation reason is required' });
         }
         updatedBooking = await storage.cancelBooking(bookingId, reason, refundAmount, notes);
+
+        // Update sentiment after cancellation
+        if (updatedBooking && existingBooking.clientId) {
+          await storage.calculateAndUpdateClientSentiment(
+            existingBooking.clientId,
+            'booking_cancelled',
+            bookingId,
+          );
+        }
       } else if (action === 'no_show') {
         updatedBooking = await storage.markBookingNoShow(bookingId);
+
+        // Update sentiment after no-show
+        if (updatedBooking && existingBooking.clientId) {
+          await storage.calculateAndUpdateClientSentiment(
+            existingBooking.clientId,
+            'booking_no_show',
+            bookingId,
+          );
+        }
       } else {
         // General update
         const { paymentIntentId, ...bookingUpdates } = updateData;
@@ -690,6 +727,9 @@ router.post('/bookings/complete', requireRetellApiKey, async (req, res: Response
         lastBookingDate: booking.bookingDateTime,
       });
     }
+
+    // Calculate and update client sentiment after new booking
+    await storage.calculateAndUpdateClientSentiment(client.id, 'booking_created', booking.id);
 
     res.status(201).json({
       success: true,

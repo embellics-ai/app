@@ -936,6 +936,12 @@ export const clients = pgTable(
     externalServiceName: text('external_service_name'), // 'phorest_api', 'fresha_api', etc.
     externalServiceClientId: text('external_service_client_id'), // External provider's client ID
 
+    // Sentiment Tracking
+    sentimentScore: integer('sentiment_score').default(50), // 0-100 score
+    sentimentCategory: text('sentiment_category').default('active'), // champion, loyal, active, casual, inactive
+    sentimentTrend: text('sentiment_trend').default('stable'), // improving, stable, declining
+    sentimentUpdatedAt: timestamp('sentiment_updated_at').defaultNow(),
+
     // Timestamps
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -1134,6 +1140,37 @@ export const bookings = pgTable('bookings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// ============================================
+// CLIENT SENTIMENT HISTORY TABLE
+// ============================================
+export const clientSentimentHistory = pgTable('client_sentiment_history', {
+  id: varchar('id')
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  clientId: varchar('client_id')
+    .notNull()
+    .references(() => clients.id, { onDelete: 'cascade' }),
+
+  // Sentiment data at this point in time
+  sentimentScore: integer('sentiment_score').notNull(),
+  sentimentCategory: text('sentiment_category').notNull(),
+
+  // What triggered this calculation
+  triggerEvent: text('trigger_event').notNull(), // 'booking_created', 'booking_cancelled', 'booking_completed', 'manual_recalc'
+  triggerBookingId: varchar('trigger_booking_id'), // Reference to the booking that triggered this
+
+  // Metrics snapshot at time of calculation
+  totalBookings: integer('total_bookings'),
+  cancelledBookings: integer('cancelled_bookings'),
+  noShowBookings: integer('no_show_bookings'),
+  totalSpent: real('total_spent'),
+  avgBookingValue: real('avg_booking_value'),
+  daysSinceLastBooking: integer('days_since_last_booking'),
+
+  // Timestamp
+  recordedAt: timestamp('recorded_at').defaultNow().notNull(),
+});
+
 export const insertBookingSchema = createInsertSchema(bookings).omit({
   id: true,
   createdAt: true,
@@ -1142,3 +1179,4 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
 
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
+export type ClientSentimentHistory = typeof clientSentimentHistory.$inferSelect;

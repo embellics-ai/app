@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { SentimentBadge } from '@/components/sentiment-badge';
 
 interface Tenant {
   id: string;
@@ -32,6 +33,10 @@ interface Client {
   lastBookingDate: string | null;
   status: string;
   createdAt: string;
+  sentimentScore: number | null;
+  sentimentCategory: string | null;
+  sentimentTrend: string | null;
+  sentimentUpdatedAt: string | null;
 }
 
 interface ClientStats {
@@ -39,11 +44,13 @@ interface ClientStats {
   activeClients: number;
   newThisMonth: number;
   bySource: Record<string, number>;
+  bySentiment: Record<string, number>;
 }
 
 export default function CustomersPage() {
   const { user } = useAuth();
   const [selectedSource, setSelectedSource] = useState<string | undefined>();
+  const [selectedSentiment, setSelectedSentiment] = useState<string | undefined>();
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
 
   // Fetch all tenants (for platform admin)
@@ -63,8 +70,11 @@ export default function CustomersPage() {
   });
 
   // Fetch clients list - construct URL with query params
-  const clientsQueryParams = selectedSource ? `?source=${selectedSource}` : '';
-  const clientsUrl = `/api/platform/tenants/${tenantId}/clients${clientsQueryParams}`;
+  const queryParams = new URLSearchParams();
+  if (selectedSource) queryParams.append('source', selectedSource);
+  if (selectedSentiment) queryParams.append('sentiment', selectedSentiment);
+  const clientsQueryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  const clientsUrl = `/api/platform/tenants/${tenantId}/clients${clientsQueryString}`;
 
   const { data: clients, isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: [clientsUrl],
@@ -121,7 +131,6 @@ export default function CustomersPage() {
           </p>
         </div>
       </div>
-
       {/* Tenant Selector for Platform Admin */}
       {(user?.role === 'owner' || user?.isPlatformAdmin) && (
         <div className="max-w-xs space-y-2">
@@ -140,7 +149,6 @@ export default function CustomersPage() {
           </Select>
         </div>
       )}
-
       {/* Stats Cards */}
       {statsLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -211,7 +219,6 @@ export default function CustomersPage() {
           </Card>
         </div>
       )}
-
       {/* Source Filter Buttons */}
       {stats?.bySource && (
         <Card>
@@ -243,7 +250,68 @@ export default function CustomersPage() {
           </CardContent>
         </Card>
       )}
-
+      {/* Sentiment Filter Buttons */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Filter by Customer Sentiment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={selectedSentiment === undefined ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedSentiment(undefined)}
+            >
+              All Customers
+              <span className="ml-2 text-xs opacity-70">({stats?.totalClients || 0})</span>
+            </Button>
+            <Button
+              variant={selectedSentiment === 'champion' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedSentiment('champion')}
+              className="border-green-300"
+            >
+              Champion
+              <span className="ml-2 text-xs opacity-70">({stats?.bySentiment?.champion || 0})</span>
+            </Button>
+            <Button
+              variant={selectedSentiment === 'loyal' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedSentiment('loyal')}
+              className="border-blue-300"
+            >
+              Loyal
+              <span className="ml-2 text-xs opacity-70">({stats?.bySentiment?.loyal || 0})</span>
+            </Button>
+            <Button
+              variant={selectedSentiment === 'active' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedSentiment('active')}
+            >
+              Active
+              <span className="ml-2 text-xs opacity-70">({stats?.bySentiment?.active || 0})</span>
+            </Button>
+            <Button
+              variant={selectedSentiment === 'casual' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedSentiment('casual')}
+              className="border-yellow-300"
+            >
+              Casual
+              <span className="ml-2 text-xs opacity-70">({stats?.bySentiment?.casual || 0})</span>
+            </Button>
+            <Button
+              variant={selectedSentiment === 'inactive' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedSentiment('inactive')}
+              className="border-red-300"
+            >
+              Inactive
+              <span className="ml-2 text-xs opacity-70">({stats?.bySentiment?.inactive || 0})</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>{' '}
       {/* Clients List */}
       <Card>
         <CardHeader>
@@ -287,7 +355,15 @@ export default function CustomersPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-medium capitalize">{client.status}</div>
+                      <div className="flex items-center gap-2 justify-end mb-1">
+                        <div className="text-sm font-medium capitalize">{client.status}</div>
+                        <SentimentBadge
+                          score={client.sentimentScore}
+                          category={client.sentimentCategory}
+                          trend={client.sentimentTrend}
+                          showTrend={true}
+                        />
+                      </div>
                       <div className="text-xs text-muted-foreground mt-1 capitalize">
                         via {client.firstInteractionSource}
                       </div>
